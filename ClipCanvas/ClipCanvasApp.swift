@@ -3,7 +3,9 @@ import SwiftUI
 
 @main
 struct ClipCanvasApp: App {
+    #if canImport(UIKit)
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
+    #endif
     @Environment(\.scenePhase) private var scenePhase
 
     private let modelContainer: ModelContainer

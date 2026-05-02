@@ -182,7 +182,7 @@ private struct ChatBubble: View {
             .padding(.horizontal, 12)
             .padding(.vertical, 10)
             .background(
-                isUser ? Color.accentColor : Color(.secondarySystemGroupedBackground),
+                isUser ? Color.accentColor : Color.clipCanvasSecondaryBackground,
                 in: RoundedRectangle(cornerRadius: 10)
             )
             .foregroundStyle(isUser ? .white : .primary)
@@ -202,7 +202,7 @@ private struct ChatInputBar: View {
                 .lineLimit(1...5)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
-                .background(Color(.secondarySystemFill), in: RoundedRectangle(cornerRadius: 10))
+                .background(Color.clipCanvasInputBackground, in: RoundedRectangle(cornerRadius: 10))
                 .disabled(isSending)
             Button(action: send) {
                 Image(systemName: isSending ? "hourglass" : "arrow.up.circle.fill")

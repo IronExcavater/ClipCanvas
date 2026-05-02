@@ -1,3 +1,6 @@
+import Foundation
+
+#if canImport(UIKit)
 import UIKit
 
 final class AppDelegate: NSObject, UIApplicationDelegate {
@@ -16,6 +19,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         }
     }
 }
+#endif
 
 extension Notification.Name {
     static let copyToCanvasRequested = Notification.Name("clipcanvas.copyToCanvasRequested")

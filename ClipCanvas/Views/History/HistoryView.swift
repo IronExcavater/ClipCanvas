@@ -125,7 +125,7 @@ private struct LibraryRow: View {
         HStack(alignment: .top, spacing: 12) {
             Image(systemName: snippet.type.icon)
                 .frame(width: 28, height: 28)
-                .background(Color(.secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 6))
+                .background(Color.clipCanvasSecondaryBackground, in: RoundedRectangle(cornerRadius: 6))
             VStack(alignment: .leading, spacing: 6) {
                 Text(snippet.preview)
                     .font(.body)

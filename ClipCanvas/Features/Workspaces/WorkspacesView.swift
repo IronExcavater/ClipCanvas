@@ -20,7 +20,9 @@ struct WorkspacesView: View {
                 Section {
                     HStack {
                         TextField("New workspace", text: $newWorkspaceName)
+                            #if canImport(UIKit)
                             .textInputAutocapitalization(.words)
+                            #endif
                         Button(action: createWorkspace) {
                             Image(systemName: "plus.circle.fill")
                         }
@@ -44,11 +46,13 @@ struct WorkspacesView: View {
                 }
             }
             .navigationTitle("Workspaces")
+            #if canImport(UIKit)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     EditButton()
                 }
             }
+            #endif
             .alert("Rename Workspace", isPresented: Binding(
                 get: { renameWorkspace != nil },
                 set: { if !$0 { renameWorkspace = nil } }
