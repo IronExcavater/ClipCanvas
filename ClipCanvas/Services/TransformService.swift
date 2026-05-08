@@ -46,7 +46,7 @@ struct TransformService {
             let lowercased = line.lowercased()
             return markers.contains { lowercased.contains($0) }
         }
-        let items = matches.isEmpty ? lines.prefix(5).map(String.init) : matches
+        let items: [String] = matches.isEmpty ? Array(lines.prefix(5)) : matches
         return items
             .map { "- [ ] \($0.trimmingCharacters(in: .whitespacesAndNewlines))" }
             .joined(separator: "\n")
