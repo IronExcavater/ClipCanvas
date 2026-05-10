@@ -68,3 +68,7 @@ fastlane/test_output
 
 # MacOS directory metadata
 .DS_Store
+
+# Local app secrets
+.env
+.env.local
