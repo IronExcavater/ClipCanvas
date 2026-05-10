@@ -723,10 +723,10 @@ private struct WorkspaceTopBar: View {
             Divider()
                 .frame(height: 24)
 
-            Button(action: toggleChat) {
+            Button(action: selectedCount > 0 ? chat : toggleChat) {
                 Image(systemName: isChatVisible ? "sidebar.right" : "sparkles")
             }
-            .help("Toggle AI workspace")
+            .help(selectedCount > 0 ? "Ask AI about selection" : "Toggle AI workspace")
             Button(action: openSettings) {
                 Image(systemName: "gearshape")
             }

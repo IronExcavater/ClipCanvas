@@ -9,6 +9,7 @@ struct WorkspaceChatPanel: View {
     let close: () -> Void
 
     @Environment(\.modelContext) private var modelContext
+    @AppStorage("openAIKey") private var openAIKey = ""
     @State private var thread: WorkspaceChatThread?
     @State private var inputText = ""
     @State private var isSending = false
@@ -95,6 +96,10 @@ struct WorkspaceChatPanel: View {
     private func send() {
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !isSending else { return }
+        guard !openAIKey.isEmpty else {
+            errorMessage = "Add your OpenAI API key in Settings first."
+            return
+        }
         ensureThread()
         guard let thread else { return }
 
@@ -108,21 +113,28 @@ struct WorkspaceChatPanel: View {
         thread.updatedAt = Date()
         modelContext.insert(userMessage)
 
+        let history = messages.dropLast().map { msg in
+            (role: msg.role == .user ? "user" : "assistant", content: msg.content)
+        }
+
         Task {
-            let response = replyText(for: text)
-            let reply = WorkspaceChatMessage(role: .reply, content: response)
-            reply.thread = thread
-            thread.messages.append(reply)
-            thread.updatedAt = Date()
-            modelContext.insert(reply)
+            do {
+                let response = try await OpenAIService.chat(
+                    userPrompt: text,
+                    context: contextText,
+                    history: history,
+                    apiKey: openAIKey
+                )
+                let reply = WorkspaceChatMessage(role: .reply, content: response)
+                reply.thread = thread
+                thread.messages.append(reply)
+                thread.updatedAt = Date()
+                modelContext.insert(reply)
+            } catch {
+                errorMessage = error.localizedDescription
+            }
             isSending = false
         }
-    }
-
-    private func replyText(for text: String) -> String {
-        let trimmedContext = contextText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedContext.isEmpty else { return text }
-        return [text, trimmedContext].joined(separator: "\n\n")
     }
 }
 

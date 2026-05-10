@@ -9,11 +9,22 @@ struct SettingsView: View {
     @Query private var chatThreads: [WorkspaceChatThread]
 
     @AppStorage("normalExpiryDays") private var normalExpiryDays = 30
+    @AppStorage("openAIKey") private var openAIKey = ""
     @State private var showResetConfirmation = false
 
     var body: some View {
         NavigationStack {
             Form {
+                Section {
+                    SecureField("OpenAI API Key", text: $openAIKey)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                } header: {
+                    Text("AI")
+                } footer: {
+                    Text("Used for Workspace Chat. Your key is stored locally on this device only.")
+                }
+
                 Section {
                     Picker("Normal clips expire", selection: $normalExpiryDays) {
                         Text("7 days").tag(7)
