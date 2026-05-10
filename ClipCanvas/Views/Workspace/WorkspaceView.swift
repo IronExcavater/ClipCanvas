@@ -4,6 +4,7 @@ import SwiftUI
 struct WorkspaceView: View {
     @Environment(AppRouter.self) private var router
     @Environment(\.modelContext) private var modelContext
+    @Environment(\.horizontalSizeClass) private var sizeClass
     @Query(
         filter: #Predicate<Workspace> { !$0.isArchived },
         sort: [SortDescriptor(\Workspace.sortIndex), SortDescriptor(\Workspace.createdAt)]
@@ -14,11 +15,13 @@ struct WorkspaceView: View {
     @State private var editingCard: WorkspaceCard?
     @State private var showChatPanel = false
     @State private var showSettings = false
+    @State private var showLibrary = false
     @State private var feedback: String?
     @State private var runningTransforms = Set<UUID>()
     @State private var chatContextCardIDs = Set<UUID>()
     @State private var droppedChatContext: [String] = []
     @State private var lastObservedClipboard: String?
+    @State private var showSidebar = false
 
     private var activeWorkspace: Workspace? {
         workspaces.first(where: \.isActive) ?? workspaces.first
@@ -35,53 +38,116 @@ struct WorkspaceView: View {
     }
 
     var body: some View {
-        HStack(spacing: 0) {
-            WorkspaceSidebar(
-                workspaces: workspaces,
-                snippets: Array(snippets.prefix(60)),
-                activeWorkspace: activeWorkspace,
+        mainContent
+            .sheet(item: $editingCard) { card in
+                CardEditSheet(card: card)
+            }
+            .sheet(isPresented: $showSettings) {
+                SettingsView()
+            }
+            .sheet(isPresented: $showLibrary) {
+                LibraryView()
+            }
+            .onChange(of: router.pendingRoute) { _, route in
+                consumePendingRoute(route)
+            }
+            .task {
+                AppBootstrap.ensureActiveWorkspace(in: modelContext)
+                consumePendingRoute(router.pendingRoute)
+            }
+            .task(id: activeWorkspace?.id) {
+                await listenForClipboardChanges()
+            }
+            .animation(.snappy(duration: 0.18), value: showChatPanel)
+            .animation(.spring(duration: 0.25), value: feedback)
+    }
+
+    @ViewBuilder
+    private var mainContent: some View {
+        GeometryReader { proxy in
+            let isVertical = sizeClass == .compact || proxy.size.width < 760 || proxy.size.height > proxy.size.width * 1.25
+            if isVertical {
+                ZStack(alignment: .leading) {
+                    canvasContent(toggleSidebar: { withAnimation { showSidebar.toggle() } }, isNarrow: true)
+                    if showSidebar {
+                        Color.black.opacity(0.3)
+                            .ignoresSafeArea()
+                            .onTapGesture { withAnimation { showSidebar = false } }
+                        sidebar
+                            .transition(.move(edge: .leading))
+                    }
+                }
+                .animation(.spring(duration: 0.25), value: showSidebar)
+            } else {
+                HStack(spacing: 0) {
+                    sidebar
+                    Divider()
+                    canvasContent(toggleSidebar: nil, isNarrow: false)
+                }
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var sidebar: some View {
+        WorkspaceSidebar(
+            workspaces: workspaces,
+            snippets: Array(snippets.prefix(60)),
+            activeWorkspace: activeWorkspace,
+            selectedCount: selectedCardIDs.count,
+            activateWorkspace: activateWorkspace,
+            createWorkspace: createWorkspace,
+            addSnippetToCanvas: addSnippetToCanvas,
+            copySnippet: copySnippet,
+            openLibrary: { showLibrary = true }
+        )
+        .frame(width: 252)
+    }
+
+    private var canvasSurface: some View {
+        CanvasSurface(
+            workspace: activeWorkspace,
+            selectedCardIDs: $selectedCardIDs,
+            editingCard: $editingCard,
+            runningTransforms: runningTransforms,
+            openChatForCard: openChat(for:),
+            copyCard: copyCard,
+            deleteCard: deleteCard,
+            duplicateCard: duplicateCard,
+            moveCards: moveCards,
+            addDroppedContent: addDroppedContent
+        )
+    }
+
+    @ViewBuilder
+    private func canvasContent(toggleSidebar: (() -> Void)?, isNarrow: Bool) -> some View {
+        VStack(spacing: 0) {
+            WorkspaceTopBar(
+                workspace: activeWorkspace,
                 selectedCount: selectedCardIDs.count,
-                activateWorkspace: activateWorkspace,
-                createWorkspace: createWorkspace,
-                addSnippetToCanvas: addSnippetToCanvas,
-                copySnippet: copySnippet
+                isNarrow: isNarrow,
+                isChatVisible: showChatPanel,
+                paste: { pasteToCanvas(method: .manualPaste) },
+                addCard: addBlankCard,
+                transform: runTransform,
+                chat: openChatForSelection,
+                copySelected: copySelectedCards,
+                deleteSelected: deleteSelectedCards,
+                clearSelection: { selectedCardIDs.removeAll() },
+                selectedArePrivate: selectedArePrivate,
+                togglePrivacy: toggleSelectedPrivacy,
+                toggleChat: { showChatPanel.toggle() },
+                openLibrary: { showLibrary = true },
+                openSettings: { showSettings = true },
+                toggleSidebar: toggleSidebar
             )
-            .frame(width: 280)
 
             Divider()
 
-            VStack(spacing: 0) {
-                WorkspaceTopBar(
-                    workspace: activeWorkspace,
-                    selectedCount: selectedCardIDs.count,
-                    isChatVisible: showChatPanel,
-                    paste: { pasteToCanvas(method: .manualPaste) },
-                    addCard: addBlankCard,
-                    transform: runTransform,
-                    chat: openChatForSelection,
-                    copySelected: copySelectedCards,
-                    deleteSelected: deleteSelectedCards,
-                    clearSelection: { selectedCardIDs.removeAll() },
-                    toggleChat: { showChatPanel.toggle() },
-                    openSettings: { showSettings = true }
-                )
-
-                Divider()
-
-                ZStack(alignment: .top) {
-                    HStack(spacing: 0) {
-                        CanvasSurface(
-                            workspace: activeWorkspace,
-                            selectedCardIDs: $selectedCardIDs,
-                            editingCard: $editingCard,
-                            runningTransforms: runningTransforms,
-                            openChatForCard: openChat(for:),
-                            copyCard: copyCard,
-                            deleteCard: deleteCard,
-                            duplicateCard: duplicateCard,
-                            moveCards: moveCards,
-                            addDroppedText: addDroppedText
-                        )
+            ZStack(alignment: .top) {
+                if isNarrow {
+                    VStack(spacing: 0) {
+                        canvasSurface
 
                         if showChatPanel, let workspace = activeWorkspace {
                             Divider()
@@ -92,41 +158,40 @@ struct WorkspaceView: View {
                                 insertReply: insertChatReply,
                                 close: { showChatPanel = false }
                             )
-                            .frame(width: 360)
+                            .frame(maxHeight: 330)
                             .background(.regularMaterial)
                         }
                     }
+                } else {
+                    HStack(spacing: 0) {
+                    canvasSurface
 
-                    if let feedback {
-                        Text(feedback)
-                            .font(.caption.weight(.medium))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 7)
-                            .background(.regularMaterial, in: Capsule())
-                            .padding(.top, 10)
-                            .transition(.move(edge: .top).combined(with: .opacity))
+                    if showChatPanel, let workspace = activeWorkspace {
+                        Divider()
+                        WorkspaceChatPanel(
+                            workspace: workspace,
+                            contextCards: chatContextCards,
+                            extraContext: $droppedChatContext,
+                            insertReply: insertChatReply,
+                            close: { showChatPanel = false }
+                        )
+                        .frame(width: 360)
+                        .background(.regularMaterial)
                     }
+                    }
+                }
+
+                if let feedback {
+                    Text(feedback)
+                        .font(.caption.weight(.medium))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 7)
+                        .background(.regularMaterial, in: Capsule())
+                        .padding(.top, 10)
+                        .transition(.move(edge: .top).combined(with: .opacity))
                 }
             }
         }
-        .sheet(item: $editingCard) { card in
-            CardEditSheet(card: card)
-        }
-        .sheet(isPresented: $showSettings) {
-            SettingsView()
-        }
-        .onChange(of: router.pendingRoute) { _, route in
-            consumePendingRoute(route)
-        }
-        .task {
-            AppBootstrap.ensureActiveWorkspace(in: modelContext)
-            consumePendingRoute(router.pendingRoute)
-        }
-        .task(id: activeWorkspace?.id) {
-            await listenForClipboardChanges()
-        }
-        .animation(.snappy(duration: 0.18), value: showChatPanel)
-        .animation(.spring(duration: 0.25), value: feedback)
     }
 
     private func consumePendingRoute(_ route: AppRoute?) {
@@ -142,20 +207,21 @@ struct WorkspaceView: View {
     }
 
     private func listenForClipboardChanges() async {
-        lastObservedClipboard = PasteboardService.readString()
+        lastObservedClipboard = PasteboardService.readContent()?.fingerprint
         while !Task.isCancelled {
             try? await Task.sleep(for: .seconds(1))
-            guard let text = PasteboardService.readString(), !text.isEmpty else { continue }
-            guard text != lastObservedClipboard else { continue }
-            lastObservedClipboard = text
-            captureClipboardText(text)
+            guard let content = PasteboardService.readContent() else { continue }
+            let fingerprint = content.fingerprint
+            guard fingerprint != lastObservedClipboard else { continue }
+            lastObservedClipboard = fingerprint
+            captureClipboardContent(content)
         }
     }
 
-    private func captureClipboardText(_ text: String) {
+    private func captureClipboardContent(_ content: PasteboardContent) {
         guard let workspace = activeWorkspace else { return }
-        if snippets.first?.text == text { return }
-        insertCard(text: text, method: .quickAction, workspace: workspace)
+        if case .text(let text) = content, snippets.first?.text == text { return }
+        insertCard(content: content, method: .quickAction, workspace: workspace)
         showFeedback("Captured from clipboard")
     }
 
@@ -187,18 +253,24 @@ struct WorkspaceView: View {
             showFeedback("No active workspace")
             return
         }
-        guard let text = PasteboardService.readString() else {
+        guard let content = PasteboardService.readContent() else {
             showFeedback("Clipboard is empty")
             return
         }
-        lastObservedClipboard = text
-        insertCard(text: text, method: method, workspace: workspace)
+        lastObservedClipboard = content.fingerprint
+        insertCard(content: content, method: method, workspace: workspace)
         showFeedback(method == .manualPaste ? "Added clipboard" : "Opened in workspace")
     }
 
-    private func addDroppedText(_ text: String, at point: CGPoint) {
+    private func addDroppedContent(_ payload: SnippetDragPayload, at point: CGPoint) {
         guard let workspace = activeWorkspace else { return }
-        insertCard(text: text, method: .manualPaste, workspace: workspace, x: point.x, y: point.y)
+        let content: PasteboardContent
+        if let imageData = payload.imageData {
+            content = .image(imageData, uti: "public.png")
+        } else {
+            content = .text(payload.text)
+        }
+        insertCard(content: content, method: .manualPaste, workspace: workspace, x: point.x, y: point.y)
         showFeedback("Dropped on canvas")
     }
 
@@ -209,7 +281,9 @@ struct WorkspaceView: View {
             snippet: snippet,
             x: 180 + (index.truncatingRemainder(dividingBy: 5) * 28),
             y: 160 + (index.truncatingRemainder(dividingBy: 7) * 22),
-            color: color(for: snippet)
+            width: snippet.defaultCardSize.width,
+            height: snippet.defaultCardSize.height,
+            color: snippet.cardVariant
         )
         card.workspace = workspace
         workspace.cards.append(card)
@@ -219,8 +293,8 @@ struct WorkspaceView: View {
     }
 
     private func copySnippet(_ snippet: Snippet) {
-        PasteboardService.writeString(snippet.text)
-        lastObservedClipboard = snippet.text
+        PasteboardService.writeSnippet(snippet)
+        lastObservedClipboard = snippet.dragText
         showFeedback("Copied")
     }
 
@@ -237,11 +311,11 @@ struct WorkspaceView: View {
 
     private func addBlankCard() {
         guard let workspace = activeWorkspace else { return }
-        insertCard(text: "", method: .manualPaste, workspace: workspace, editAfterInsert: true)
+        insertCard(content: .text(""), method: .manualPaste, workspace: workspace, editAfterInsert: true)
     }
 
     private func insertCard(
-        text: String,
+        content: PasteboardContent,
         method: CaptureMethod,
         workspace: Workspace,
         editAfterInsert: Bool = false,
@@ -249,16 +323,16 @@ struct WorkspaceView: View {
         x: Double? = nil,
         y: Double? = nil
     ) {
-        let snippet = Snippet.make(from: text, capturedBy: method)
+        let snippet = Snippet.make(from: content, capturedBy: method)
         modelContext.insert(snippet)
         let index = Double(workspace.cards.count)
         let card = WorkspaceCard(
             snippet: snippet,
             x: x ?? 180 + offset + (index.truncatingRemainder(dividingBy: 5) * 28),
             y: y ?? 160 + offset + (index.truncatingRemainder(dividingBy: 7) * 22),
-            width: snippet.type == .code ? 280 : 240,
-            height: snippet.type == .code ? 190 : 160,
-            color: color(for: snippet)
+            width: snippet.defaultCardSize.width,
+            height: snippet.defaultCardSize.height,
+            color: snippet.cardVariant
         )
         card.workspace = workspace
         workspace.cards.append(card)
@@ -269,7 +343,7 @@ struct WorkspaceView: View {
 
     private func insertChatReply(_ text: String) {
         guard let workspace = activeWorkspace else { return }
-        insertCard(text: text, method: .transformResult, workspace: workspace, offset: 80)
+        insertCard(content: .text(text), method: .transformResult, workspace: workspace, offset: 80)
         showFeedback("Reply added to canvas")
     }
 
@@ -307,7 +381,7 @@ struct WorkspaceView: View {
                     y: (anchor?.y ?? 160) + 36,
                     width: 280,
                     height: 180,
-                    color: .green
+                    color: resultSnippet.cardVariant
                 )
                 card.workspace = workspace
                 workspace.cards.append(card)
@@ -325,9 +399,9 @@ struct WorkspaceView: View {
     }
 
     private func copyCard(_ card: WorkspaceCard) {
-        guard let text = card.snippet?.text, !text.isEmpty else { return }
-        PasteboardService.writeString(text)
-        lastObservedClipboard = text
+        guard let snippet = card.snippet else { return }
+        PasteboardService.writeSnippet(snippet)
+        lastObservedClipboard = snippet.dragText
         showFeedback("Copied")
     }
 
@@ -338,8 +412,9 @@ struct WorkspaceView: View {
     }
 
     private func duplicateCard(_ card: WorkspaceCard) {
-        guard let workspace = activeWorkspace, let text = card.snippet?.text else { return }
-        let snippet = Snippet.make(from: text, capturedBy: card.snippet?.captureMethod ?? .manualPaste)
+        guard let workspace = activeWorkspace, let source = card.snippet else { return }
+        let content: PasteboardContent = source.imageData.map { .image($0, uti: source.imageUTI ?? "public.png") } ?? .text(source.text)
+        let snippet = Snippet.make(from: content, capturedBy: source.captureMethod)
         modelContext.insert(snippet)
         let copy = WorkspaceCard(
             snippet: snippet,
@@ -357,17 +432,21 @@ struct WorkspaceView: View {
 
     private func moveCards(ids: Set<UUID>, by translation: CGSize, scale: CGFloat) {
         guard let workspace = activeWorkspace else { return }
-        let dx = translation.width / scale
-        let dy = translation.height / scale
         for card in workspace.cards where ids.contains(card.id) {
-            card.x += dx
-            card.y += dy
+            card.x += translation.width / scale
+            card.y += translation.height / scale
             card.updatedAt = Date()
         }
         workspace.updatedAt = Date()
     }
 
     private func copySelectedCards() {
+        if selectedCards.count == 1, let snippet = selectedCards.first?.snippet {
+            PasteboardService.writeSnippet(snippet)
+            lastObservedClipboard = snippet.dragText
+            showFeedback("Copied 1 card")
+            return
+        }
         let text = selectedCards
             .compactMap { $0.snippet?.text }
             .filter { !$0.isEmpty }
@@ -381,6 +460,16 @@ struct WorkspaceView: View {
         showFeedback("Copied \(selectedCards.count) card\(selectedCards.count == 1 ? "" : "s")")
     }
 
+    private var selectedArePrivate: Bool {
+        !selectedCards.isEmpty && selectedCards.allSatisfy { $0.snippet?.sensitivity == .privateContent }
+    }
+
+    private func toggleSelectedPrivacy() {
+        let target: Sensitivity = selectedArePrivate ? .normal : .privateContent
+        for card in selectedCards { card.snippet?.sensitivity = target }
+        showFeedback(target == .privateContent ? "Marked as private" : "Marked as normal")
+    }
+
     private func deleteSelectedCards() {
         let cards = selectedCards
         guard !cards.isEmpty else { return }
@@ -390,19 +479,6 @@ struct WorkspaceView: View {
         selectedCardIDs.removeAll()
         activeWorkspace?.updatedAt = Date()
         showFeedback("Deleted \(cards.count) card\(cards.count == 1 ? "" : "s")")
-    }
-
-    private func color(for snippet: Snippet) -> CardColor {
-        switch snippet.captureMethod {
-        case .transformResult: .green
-        case .quickAction, .appIntent: .blue
-        case .manualPaste:
-            switch snippet.type {
-            case .code: .purple
-            case .url: .yellow
-            case .text: .default
-            }
-        }
     }
 
     private func showFeedback(_ message: String) {
@@ -423,6 +499,7 @@ private struct WorkspaceSidebar: View {
     let createWorkspace: () -> Void
     let addSnippetToCanvas: (Snippet) -> Void
     let copySnippet: (Snippet) -> Void
+    let openLibrary: () -> Void
 
     @State private var searchText = ""
 
@@ -433,54 +510,52 @@ private struct WorkspaceSidebar: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 10) {
                 HStack {
-                    Label("ClipCanvas", systemImage: "rectangle.3.group.bubble.left")
-                        .font(.headline)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(activeWorkspace?.name ?? "Canvas")
+                            .font(.headline)
+                            .lineLimit(1)
+                        Text("\(activeWorkspace?.cards.count ?? 0) cards")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                     Spacer()
-                    Button(action: createWorkspace) {
-                        Image(systemName: "plus")
-                    }
-                    .help("New canvas")
-                }
-
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(activeWorkspace?.name ?? "Canvas")
-                        .font(.title3.weight(.semibold))
-                        .lineLimit(1)
-                    HStack(spacing: 8) {
-                        Label("\(activeWorkspace?.cards.count ?? 0)", systemImage: "square.stack.3d.up")
-                        if selectedCount > 0 {
-                            Label("\(selectedCount)", systemImage: "checkmark.circle")
+                    HStack(spacing: 6) {
+                        Button(action: createWorkspace) {
+                            Image(systemName: "plus")
                         }
-                        Label("Listening", systemImage: "dot.radiowaves.left.and.right")
-                            .foregroundStyle(.green)
+                        Button(action: openLibrary) {
+                            Image(systemName: "clock")
+                        }
                     }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
                 }
             }
-            .padding(16)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
 
             List {
-                Section("Canvases") {
-                    ForEach(workspaces) { workspace in
-                        WorkspaceSidebarRow(workspace: workspace)
-                            .contentShape(Rectangle())
-                            .onTapGesture { activateWorkspace(workspace) }
-                    }
+                ForEach(workspaces) { workspace in
+                    WorkspaceSidebarRow(workspace: workspace, isActive: workspace.id == activeWorkspace?.id)
+                        .contentShape(Rectangle())
+                        .onTapGesture { activateWorkspace(workspace) }
                 }
             }
             .listStyle(.sidebar)
-            .frame(height: 190)
+            .frame(height: min(CGFloat(max(workspaces.count, 1)) * 44 + 12, 156))
 
             Divider()
 
-            VStack(alignment: .leading, spacing: 10) {
+            VStack(alignment: .leading, spacing: 8) {
                 HStack {
-                    Label("Recent", systemImage: "tray.full")
-                        .font(.headline)
+                    Text("Recent")
+                        .font(.subheadline.weight(.semibold))
                     Spacer()
+                    Button(action: openLibrary) {
+                        Image(systemName: "arrow.up.forward.app")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Open history")
                     Text("\(snippets.count)")
                         .font(.caption)
                         .foregroundStyle(.secondary)
@@ -489,14 +564,16 @@ private struct WorkspaceSidebar: View {
                 TextField("Search history", text: $searchText)
                     .textFieldStyle(.roundedBorder)
             }
-            .padding([.horizontal, .top], 16)
-            .padding(.bottom, 10)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
 
             ScrollView {
-                LazyVStack(spacing: 8) {
+                LazyVStack(spacing: 6) {
                     if filteredSnippets.isEmpty {
-                        ContentUnavailableView("No clips", systemImage: "doc.on.clipboard")
-                            .frame(minHeight: 180)
+                        Image(systemName: "doc.on.clipboard")
+                            .font(.title2)
+                            .foregroundStyle(.tertiary)
+                            .frame(maxWidth: .infinity, minHeight: 120)
                     } else {
                         ForEach(filteredSnippets) { snippet in
                             SnippetLibraryCard(
@@ -507,8 +584,8 @@ private struct WorkspaceSidebar: View {
                         }
                     }
                 }
-                .padding(.horizontal, 12)
-                .padding(.bottom, 14)
+                .padding(.horizontal, 10)
+                .padding(.bottom, 12)
             }
         }
         .background(.regularMaterial)
@@ -517,12 +594,13 @@ private struct WorkspaceSidebar: View {
 
 private struct WorkspaceSidebarRow: View {
     let workspace: Workspace
+    let isActive: Bool
 
     var body: some View {
-        HStack(spacing: 10) {
-            Image(systemName: workspace.isActive ? "largecircle.fill.circle" : "rectangle.dashed")
-                .foregroundStyle(workspace.isActive ? Color.accentColor : .secondary)
-                .frame(width: 18)
+        HStack(spacing: 8) {
+            Circle()
+                .fill(isActive ? Color.accentColor : Color.secondary.opacity(0.35))
+                .frame(width: 8, height: 8)
             VStack(alignment: .leading, spacing: 2) {
                 Text(workspace.name)
                     .lineLimit(1)
@@ -531,11 +609,6 @@ private struct WorkspaceSidebarRow: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            if workspace.isActive {
-                Image(systemName: "checkmark")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color.accentColor)
-            }
         }
     }
 }
@@ -546,50 +619,53 @@ private struct SnippetLibraryCard: View {
     let copy: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 9) {
-            HStack(spacing: 9) {
-                SourceGlyph(snippet: snippet)
+        HStack(alignment: .top, spacing: 8) {
+            SourceGlyph(snippet: snippet)
+                .frame(width: 28)
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(spacing: 6) {
+                    Text(snippet.preview)
+                        .font(snippet.type == .code ? .system(.caption, design: .monospaced) : .caption)
+                        .lineLimit(2)
+                    Spacer(minLength: 4)
+                    Button(action: addToCanvas) {
+                        Image(systemName: "plus")
+                            .font(.caption.weight(.bold))
+                    }
+                    .buttonStyle(.borderless)
+                }
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(snippet.sourceTitle)
-                        .font(.caption.weight(.semibold))
                     HStack(spacing: 4) {
-                        Text(snippet.sourceDetail)
-                        Text("-")
+                        Text(snippet.sourceTitle)
                         Text(snippet.createdAt, style: .relative)
                     }
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                 }
-                Spacer()
-                Button(action: addToCanvas) {
-                    Image(systemName: "plus.square.on.square")
-                }
-                .buttonStyle(.borderless)
-                .help("Add to canvas")
-            }
 
-            Text(snippet.preview)
-                .font(snippet.type == .code ? .system(.caption, design: .monospaced) : .callout)
-                .lineLimit(4)
-                .textSelection(.enabled)
+                if snippet.type == .image {
+                    SnippetPreviewContent(snippet: snippet, lineLimit: 1, imageHeight: 82)
+                }
+            }
         }
-        .padding(10)
-        .background(snippet.cardVariant.background.opacity(0.72), in: RoundedRectangle(cornerRadius: 8))
+        .padding(8)
+        .background(snippet.cardVariant.background.opacity(0.65), in: RoundedRectangle(cornerRadius: 8))
         .overlay {
             RoundedRectangle(cornerRadius: 8)
-                .stroke(snippet.cardVariant.accent.opacity(0.24), lineWidth: 1)
+                .stroke(snippet.cardVariant.accent.opacity(0.20), lineWidth: 1)
         }
         .contextMenu {
             Button("Add to Canvas", systemImage: "plus.square.on.square", action: addToCanvas)
             Button("Copy", systemImage: "doc.on.doc", action: copy)
         }
-        .draggable(snippet.text)
+        .snippetDraggable(snippet)
     }
 }
 
 private struct WorkspaceTopBar: View {
     let workspace: Workspace?
     let selectedCount: Int
+    let isNarrow: Bool
     let isChatVisible: Bool
     let paste: () -> Void
     let addCard: () -> Void
@@ -598,25 +674,24 @@ private struct WorkspaceTopBar: View {
     let copySelected: () -> Void
     let deleteSelected: () -> Void
     let clearSelection: () -> Void
+    let selectedArePrivate: Bool
+    let togglePrivacy: () -> Void
     let toggleChat: () -> Void
+    let openLibrary: () -> Void
     let openSettings: () -> Void
+    let toggleSidebar: (() -> Void)?
 
     var body: some View {
         HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(workspace?.name ?? "Canvas")
-                    .font(.headline)
-                    .lineLimit(1)
-                HStack(spacing: 6) {
-                    Circle()
-                        .fill(.green)
-                        .frame(width: 7, height: 7)
-                    Text("Listening to clipboard")
+            if let toggleSidebar {
+                Button(action: toggleSidebar) {
+                    Image(systemName: "sidebar.left")
                 }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
             }
+
+            Text(workspace?.name ?? "Canvas")
+                .font(.headline)
+                .lineLimit(1)
 
             Spacer()
 
@@ -624,48 +699,53 @@ private struct WorkspaceTopBar: View {
                 Text("\(selectedCount) selected")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
-                Menu {
-                    ForEach(TransformKind.allCases, id: \.self) { kind in
-                        Button(kind.label) { transform(kind) }
-                    }
-                } label: {
-                    Label("Transform", systemImage: "wand.and.sparkles")
-                }
+
                 Button(action: chat) {
-                    Label("Ask", systemImage: "bubble.left.and.bubble.right")
+                    if isNarrow {
+                        Image(systemName: "bubble.left.and.bubble.right")
+                    } else {
+                        Label("Ask", systemImage: "bubble.left.and.bubble.right")
+                    }
                 }
-                Button(action: copySelected) {
-                    Image(systemName: "doc.on.doc")
-                }
-                .help("Copy selected")
-                Button(role: .destructive, action: deleteSelected) {
-                    Image(systemName: "trash")
-                }
-                .help("Delete selected")
-                Button(action: clearSelection) {
-                    Image(systemName: "xmark")
-                }
-                .help("Clear selection")
+                .help("Ask AI about selection")
             } else {
                 Button(action: paste) {
-                    Label("Capture", systemImage: "doc.on.clipboard")
+                    if isNarrow {
+                        Image(systemName: "doc.on.clipboard")
+                    } else {
+                        Label("Clipboard", systemImage: "doc.on.clipboard")
+                    }
                 }
                 .help("Add clipboard to canvas")
-                Button(action: addCard) {
-                    Image(systemName: "plus")
+            }
+
+            Menu {
+                if selectedCount > 0 {
+                    Menu("Transform", systemImage: "wand.and.sparkles") {
+                        ForEach(TransformKind.allCases, id: \.self) { kind in
+                            Button(kind.label) { transform(kind) }
+                        }
+                    }
+                    Button("Copy", systemImage: "doc.on.doc", action: copySelected)
+                    Button(
+                        selectedArePrivate ? "Unmark Private" : "Mark Private",
+                        systemImage: selectedArePrivate ? "lock.open" : "lock",
+                        action: togglePrivacy
+                    )
+                    Button("Clear Selection", systemImage: "xmark.circle", action: clearSelection)
+                    Button("Delete", systemImage: "trash", role: .destructive, action: deleteSelected)
+                    Divider()
+                } else {
+                    Button("New Card", systemImage: "plus", action: addCard)
+                    Button(isChatVisible ? "Hide Chat" : "Show Chat",
+                           systemImage: isChatVisible ? "sidebar.right" : "sparkles",
+                           action: toggleChat)
+                    Divider()
                 }
-                .help("New card")
-            }
-
-            Divider()
-                .frame(height: 24)
-
-            Button(action: toggleChat) {
-                Image(systemName: isChatVisible ? "sidebar.right" : "sparkles")
-            }
-            .help("Toggle AI workspace")
-            Button(action: openSettings) {
-                Image(systemName: "gearshape")
+                Button("History", systemImage: "clock", action: openLibrary)
+                Button("Settings", systemImage: "gearshape", action: openSettings)
+            } label: {
+                Image(systemName: "ellipsis.circle")
             }
         }
         .buttonStyle(.bordered)
@@ -685,12 +765,13 @@ private struct CanvasSurface: View {
     let deleteCard: (WorkspaceCard) -> Void
     let duplicateCard: (WorkspaceCard) -> Void
     let moveCards: (Set<UUID>, CGSize, CGFloat) -> Void
-    let addDroppedText: (String, CGPoint) -> Void
+    let addDroppedContent: (SnippetDragPayload, CGPoint) -> Void
 
     @State private var canvasOffset: CGSize = .zero
     @State private var baseOffset: CGSize = .zero
     @State private var canvasScale: CGFloat = 1
     @State private var baseScale: CGFloat = 1
+    @State private var dragState = CanvasDragState()
 
     var body: some View {
         GeometryReader { proxy in
@@ -712,6 +793,7 @@ private struct CanvasSurface: View {
                                 isSelected: selectedCardIDs.contains(card.id),
                                 isRunning: card.transformRun.map { runningTransforms.contains($0.id) } ?? false,
                                 selectedCardIDs: selectedCardIDs,
+                                dragState: dragState,
                                 select: { select(card) },
                                 ask: { openChatForCard(card) },
                                 edit: { editingCard = card },
@@ -738,6 +820,17 @@ private struct CanvasSurface: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                 .padding(18)
             }
+            .dropDestination(for: SnippetDragPayload.self) { items, location in
+                guard let payload = items.first, !payload.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || payload.imageData != nil else {
+                    return false
+                }
+                let canvasPoint = CGPoint(
+                    x: (location.x - canvasOffset.width) / canvasScale,
+                    y: (location.y - canvasOffset.height) / canvasScale
+                )
+                addDroppedContent(payload, canvasPoint)
+                return true
+            }
             .dropDestination(for: String.self) { items, location in
                 guard let text = items.first?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
                     return false
@@ -746,7 +839,7 @@ private struct CanvasSurface: View {
                     x: (location.x - canvasOffset.width) / canvasScale,
                     y: (location.y - canvasOffset.height) / canvasScale
                 )
-                addDroppedText(text, canvasPoint)
+                addDroppedContent(SnippetDragPayload(text: text, imageData: nil), canvasPoint)
                 return true
             }
             .clipped()
@@ -844,12 +937,18 @@ private struct CanvasSurface: View {
     }
 }
 
+@Observable
+private final class CanvasDragState {
+    var selectionOffset: CGSize = .zero
+}
+
 private struct CanvasCardView: View {
     @Bindable var card: WorkspaceCard
     let canvasScale: CGFloat
     let isSelected: Bool
     let isRunning: Bool
     let selectedCardIDs: Set<UUID>
+    let dragState: CanvasDragState
     let select: () -> Void
     let ask: () -> Void
     let edit: () -> Void
@@ -892,13 +991,18 @@ private struct CanvasCardView: View {
                     Image(systemName: "wand.and.sparkles")
                         .foregroundStyle(.green)
                 }
+                if let snippet = card.snippet {
+                    Image(systemName: snippet.type == .image ? "photo.on.rectangle" : "text.quote")
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 24, height: 24)
+                        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
+                        .snippetDraggable(snippet)
+                        .help("Drag into another app")
+                }
             }
 
-            Text(displayText)
-                .font(card.snippet?.type == .code ? .system(.callout, design: .monospaced) : .body)
-                .foregroundStyle(displayTextIsPlaceholder ? .secondary : .primary)
-                .lineLimit(7)
-                .textSelection(.enabled)
+            SnippetPreviewContent(snippet: card.snippet, lineLimit: 7, imageHeight: max(86, renderedHeight - 74))
 
             Spacer(minLength: 0)
         }
@@ -929,8 +1033,10 @@ private struct CanvasCardView: View {
                 ProgressView()
             }
         }
-        .offset(dragOffset)
-        .shadow(color: .black.opacity(isSelected ? 0.16 : 0.08), radius: isSelected ? 12 : 5, y: isSelected ? 7 : 2)
+        .offset(dragOffset != .zero ? dragOffset : (isSelected ? dragState.selectionOffset : .zero))
+        .shadow(color: .black.opacity(dragOffset != .zero ? 0.22 : (isSelected ? 0.16 : 0.08)),
+                radius: dragOffset != .zero ? 18 : (isSelected ? 12 : 5),
+                y: dragOffset != .zero ? 12 : (isSelected ? 7 : 2))
         .contentShape(Rectangle())
         .onTapGesture(perform: select)
         .gesture(cardDrag)
@@ -947,13 +1053,16 @@ private struct CanvasCardView: View {
             Divider()
             Button("Delete", systemImage: "trash", role: .destructive, action: delete)
         }
-        .draggable(card.snippet?.text ?? displayText)
     }
 
     private var cardDrag: some Gesture {
         DragGesture(minimumDistance: 6)
-            .onChanged { dragOffset = $0.translation }
+            .onChanged { value in
+                dragOffset = value.translation
+                if isSelected { dragState.selectionOffset = value.translation }
+            }
             .onEnded { value in
+                dragState.selectionOffset = .zero
                 let movingIDs = isSelected ? selectedCardIDs : [card.id]
                 if movingIDs.count > 1 {
                     moveCards(movingIDs, value.translation, canvasScale)
@@ -979,14 +1088,6 @@ private struct CanvasCardView: View {
             }
     }
 
-    private var displayText: String {
-        guard let text = card.snippet?.preview, !text.isEmpty else { return "Empty card" }
-        return text
-    }
-
-    private var displayTextIsPlaceholder: Bool {
-        card.snippet?.text.isEmpty ?? true
-    }
 }
 
 private struct CanvasControlStrip: View {
@@ -1097,17 +1198,12 @@ private struct DotGrid: View {
 
 private struct EmptyCanvasHint: View {
     var body: some View {
-        VStack(spacing: 12) {
+        VStack(spacing: 10) {
             Image(systemName: "rectangle.3.group.bubble.left")
-                .font(.system(size: 38))
+                .font(.system(size: 34))
                 .foregroundStyle(.tertiary)
-            Text("Your clipboard becomes a workspace")
+            Text("Empty canvas")
                 .font(.headline)
-            Text("Copy text anywhere, use Add Clipboard, or drag a clip from the sidebar.")
-                .font(.subheadline)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 340)
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
