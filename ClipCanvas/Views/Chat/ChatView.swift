@@ -41,6 +41,18 @@ struct WorkspaceChatPanel: View {
             ensureThread()
             return true
         }
+        .dropDestination(for: SnippetDragPayload.self) { items, _ in
+            let dropped = items.map { payload in
+                if payload.imageData != nil {
+                    return payload.text.isEmpty ? "Dropped image from ClipCanvas" : payload.text
+                }
+                return payload.text
+            }
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            extraContext.append(contentsOf: dropped)
+            ensureThread()
+            return !dropped.isEmpty
+        }
         .task { ensureThread() }
         .alert("Chat Error", isPresented: Binding(
             get: { errorMessage != nil },
@@ -71,7 +83,11 @@ struct WorkspaceChatPanel: View {
                 }
                 Spacer()
                 if !extraContext.isEmpty {
-                    Button("Clear dropped") { extraContext.removeAll() }
+                    Button(action: { extraContext.removeAll() }) {
+                        Image(systemName: "xmark.circle")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Clear dropped context")
                 }
             }
             .font(.caption)
@@ -147,9 +163,9 @@ private struct MessageList: View {
             ScrollView {
                 LazyVStack(spacing: 12) {
                     if messages.isEmpty {
-                        Text("Select cards or drag card text here, then ask.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                        Image(systemName: "bubble.left.and.bubble.right")
+                            .font(.title2)
+                            .foregroundStyle(.tertiary)
                             .frame(maxWidth: .infinity, minHeight: 140)
                     }
                     ForEach(messages) { message in

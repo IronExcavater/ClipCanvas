@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 extension CardColor {
     var background: Color {
@@ -30,42 +31,18 @@ extension CardColor {
 
 extension Color {
     static var clipCanvasPageBackground: Color {
-        #if canImport(UIKit)
         Color(.systemGroupedBackground)
-        #elseif canImport(AppKit)
-        Color(nsColor: .windowBackgroundColor)
-        #else
-        Color(.background)
-        #endif
     }
 
     static var clipCanvasCardBackground: Color {
-        #if canImport(UIKit)
         Color(.systemBackground)
-        #elseif canImport(AppKit)
-        Color(nsColor: .controlBackgroundColor)
-        #else
-        Color(.background)
-        #endif
     }
 
     static var clipCanvasSecondaryBackground: Color {
-        #if canImport(UIKit)
         Color(.secondarySystemGroupedBackground)
-        #elseif canImport(AppKit)
-        Color(nsColor: .underPageBackgroundColor)
-        #else
-        Color.secondary.opacity(0.12)
-        #endif
     }
 
     static var clipCanvasInputBackground: Color {
-        #if canImport(UIKit)
         Color(.secondarySystemFill)
-        #elseif canImport(AppKit)
-        Color(nsColor: .textBackgroundColor)
-        #else
-        Color.secondary.opacity(0.10)
-        #endif
     }
 }

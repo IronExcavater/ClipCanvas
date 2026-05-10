@@ -27,7 +27,7 @@ extension Snippet {
         case .transformResult: "Generated"
         case .quickAction: "Auto captured"
         case .appIntent: "Quick action"
-        case .manualPaste: "Manual"
+        case .manualPaste: type == .image ? "Screenshot" : "Manual"
         }
     }
 
@@ -54,6 +54,7 @@ private extension SnippetType {
         switch self {
         case .code: "Code"
         case .url: "Link"
+        case .image: "Image"
         case .text: "Text"
         }
     }
@@ -62,6 +63,7 @@ private extension SnippetType {
         switch self {
         case .code: .purple
         case .url: .yellow
+        case .image: .pink
         case .text: .default
         }
     }

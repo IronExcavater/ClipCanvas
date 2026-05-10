@@ -1,3 +1,4 @@
+import FoundationModels
 import SwiftData
 import SwiftUI
 
@@ -22,7 +23,14 @@ struct SettingsView: View {
                 } header: {
                     Text("AI")
                 } footer: {
-                    Text("Used for Workspace Chat. Your key is stored locally on this device only.")
+                    Text("OpenAI powers chat. Apple Intelligence powers transforms when available.")
+                }
+
+                Section("Apple Intelligence") {
+                    LabeledContent("Transforms", value: SystemLanguageModel.default.isAvailable ? "Available" : "Unavailable")
+                    if !SystemLanguageModel.default.isAvailable {
+                        LabeledContent("Reason", value: appleIntelligenceStatus)
+                    }
                 }
 
                 Section {
@@ -35,7 +43,7 @@ struct SettingsView: View {
                 } header: {
                     Text("Privacy")
                 } footer: {
-                    Text("Sensitive content expires after 1 day. Private-looking secrets expire after 1 hour.")
+                    Text("Sensitive clips expire sooner.")
                 }
 
                 Section("Local Data") {
@@ -77,5 +85,20 @@ struct SettingsView: View {
 
     private var buildNumber: String {
         Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "-"
+    }
+
+    private var appleIntelligenceStatus: String {
+        switch SystemLanguageModel.default.availability {
+        case .available:
+            "Available"
+        case .unavailable(.appleIntelligenceNotEnabled):
+            "Not enabled"
+        case .unavailable(.deviceNotEligible):
+            "Device not eligible"
+        case .unavailable(.modelNotReady):
+            "Model not ready"
+        @unknown default:
+            "Unavailable"
+        }
     }
 }

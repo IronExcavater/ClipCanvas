@@ -20,9 +20,7 @@ struct WorkspacesView: View {
                 Section {
                     HStack {
                         TextField("New workspace", text: $newWorkspaceName)
-                            #if canImport(UIKit)
                             .textInputAutocapitalization(.words)
-                            #endif
                         Button(action: createWorkspace) {
                             Image(systemName: "plus.circle.fill")
                         }
@@ -46,13 +44,11 @@ struct WorkspacesView: View {
                 }
             }
             .navigationTitle("Workspaces")
-            #if canImport(UIKit)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     EditButton()
                 }
             }
-            #endif
             .alert("Rename Workspace", isPresented: Binding(
                 get: { renameWorkspace != nil },
                 set: { if !$0 { renameWorkspace = nil } }
@@ -90,8 +86,8 @@ struct WorkspacesView: View {
         workspace.isActive = false
         workspace.updatedAt = Date()
         if workspaces.filter({ !$0.isArchived && $0.id != workspace.id }).isEmpty {
-            let fallback = Workspace(name: "Canvas", sortIndex: 0, isActive: true)
-            modelContext.insert(fallback)
+            let workspace = Workspace(name: "Canvas", sortIndex: 0, isActive: true)
+            modelContext.insert(workspace)
         } else {
             AppBootstrap.ensureActiveWorkspace(in: modelContext)
         }
