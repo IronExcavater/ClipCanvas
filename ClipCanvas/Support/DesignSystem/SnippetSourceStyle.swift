@@ -15,7 +15,7 @@ struct SourceGlyph: View {
 extension Snippet {
     var sourceTitle: String {
         switch captureMethod {
-        case .transformResult: "Result"
+        case .transformResult: "AI Result"
         case .quickAction: "Clipboard"
         case .appIntent: "Shortcut"
         case .manualPaste: type.sourceTitle
