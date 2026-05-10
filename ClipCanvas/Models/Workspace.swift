@@ -11,7 +11,6 @@ final class Workspace {
     var sortIndex: Int
     var isActive: Bool
     @Relationship(deleteRule: .cascade, inverse: \WorkspaceCard.workspace) var cards: [WorkspaceCard]
-    @Relationship(deleteRule: .cascade, inverse: \WorkspaceChatThread.workspace) var chatThreads: [WorkspaceChatThread]
 
     init(
         name: String,
@@ -29,7 +28,6 @@ final class Workspace {
         self.sortIndex = sortIndex
         self.isActive = isActive
         self.cards = []
-        self.chatThreads = []
     }
 }
 

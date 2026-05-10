@@ -6,9 +6,7 @@ enum AppBootstrap {
         Snippet.self,
         Workspace.self,
         WorkspaceCard.self,
-        TransformRun.self,
-        WorkspaceChatThread.self,
-        WorkspaceChatMessage.self
+        TransformRun.self
     ]
 
     static func makeModelContainer() throws -> ModelContainer {
