@@ -13,10 +13,13 @@ struct WorkspaceView: View {
 
     @State private var selectedCardIDs = Set<UUID>()
     @State private var editingCard: WorkspaceCard?
+    @State private var showChatPanel = false
     @State private var showSettings = false
     @State private var showLibrary = false
     @State private var feedback: String?
     @State private var runningTransforms = Set<UUID>()
+    @State private var chatContextCardIDs = Set<UUID>()
+    @State private var droppedChatContext: [String] = []
     @State private var lastObservedClipboard: String?
     @State private var showSidebar = false
 
@@ -27,6 +30,11 @@ struct WorkspaceView: View {
     private var selectedCards: [WorkspaceCard] {
         guard let workspace = activeWorkspace else { return [] }
         return workspace.cards.filter { selectedCardIDs.contains($0.id) }
+    }
+
+    private var chatContextCards: [WorkspaceCard] {
+        guard let workspace = activeWorkspace else { return [] }
+        return workspace.cards.filter { chatContextCardIDs.contains($0.id) }
     }
 
     var body: some View {
@@ -50,6 +58,7 @@ struct WorkspaceView: View {
             .task(id: activeWorkspace?.id) {
                 await listenForClipboardChanges()
             }
+            .animation(.snappy(duration: 0.18), value: showChatPanel)
             .animation(.spring(duration: 0.25), value: feedback)
     }
 
@@ -101,6 +110,7 @@ struct WorkspaceView: View {
             selectedCardIDs: $selectedCardIDs,
             editingCard: $editingCard,
             runningTransforms: runningTransforms,
+            openChatForCard: openChat(for:),
             copyCard: copyCard,
             deleteCard: deleteCard,
             duplicateCard: duplicateCard,
@@ -116,14 +126,17 @@ struct WorkspaceView: View {
                 workspace: activeWorkspace,
                 selectedCount: selectedCardIDs.count,
                 isNarrow: isNarrow,
+                isChatVisible: showChatPanel,
                 paste: { pasteToCanvas(method: .manualPaste) },
                 addCard: addBlankCard,
                 transform: runTransform,
+                chat: openChatForSelection,
                 copySelected: copySelectedCards,
                 deleteSelected: deleteSelectedCards,
                 clearSelection: { selectedCardIDs.removeAll() },
                 selectedArePrivate: selectedArePrivate,
                 togglePrivacy: toggleSelectedPrivacy,
+                toggleChat: { showChatPanel.toggle() },
                 openLibrary: { showLibrary = true },
                 openSettings: { showSettings = true },
                 toggleSidebar: toggleSidebar
@@ -135,10 +148,36 @@ struct WorkspaceView: View {
                 if isNarrow {
                     VStack(spacing: 0) {
                         canvasSurface
+
+                        if showChatPanel, let workspace = activeWorkspace {
+                            Divider()
+                            WorkspaceChatPanel(
+                                workspace: workspace,
+                                contextCards: chatContextCards,
+                                extraContext: $droppedChatContext,
+                                insertReply: insertChatReply,
+                                close: { showChatPanel = false }
+                            )
+                            .frame(maxHeight: 330)
+                            .background(.regularMaterial)
+                        }
                     }
                 } else {
                     HStack(spacing: 0) {
-                        canvasSurface
+                    canvasSurface
+
+                    if showChatPanel, let workspace = activeWorkspace {
+                        Divider()
+                        WorkspaceChatPanel(
+                            workspace: workspace,
+                            contextCards: chatContextCards,
+                            extraContext: $droppedChatContext,
+                            insertReply: insertChatReply,
+                            close: { showChatPanel = false }
+                        )
+                        .frame(width: 360)
+                        .background(.regularMaterial)
+                    }
                     }
                 }
 
@@ -259,6 +298,17 @@ struct WorkspaceView: View {
         showFeedback("Copied")
     }
 
+    private func openChatForSelection() {
+        chatContextCardIDs.formUnion(selectedCardIDs)
+        showChatPanel = true
+    }
+
+    private func openChat(for card: WorkspaceCard) {
+        chatContextCardIDs.insert(card.id)
+        selectedCardIDs = [card.id]
+        showChatPanel = true
+    }
+
     private func addBlankCard() {
         guard let workspace = activeWorkspace else { return }
         insertCard(content: .text(""), method: .manualPaste, workspace: workspace, editAfterInsert: true)
@@ -289,6 +339,12 @@ struct WorkspaceView: View {
         workspace.updatedAt = Date()
         selectedCardIDs = [card.id]
         if editAfterInsert { editingCard = card }
+    }
+
+    private func insertChatReply(_ text: String) {
+        guard let workspace = activeWorkspace else { return }
+        insertCard(content: .text(text), method: .transformResult, workspace: workspace, offset: 80)
+        showFeedback("Reply added to canvas")
     }
 
     private func runTransform(_ kind: TransformKind) {
@@ -330,6 +386,7 @@ struct WorkspaceView: View {
                 card.workspace = workspace
                 workspace.cards.append(card)
                 selectedCardIDs = [card.id]
+                chatContextCardIDs.insert(card.id)
                 showFeedback("\(kind.label) complete")
             } catch {
                 run.status = .failed
@@ -609,14 +666,17 @@ private struct WorkspaceTopBar: View {
     let workspace: Workspace?
     let selectedCount: Int
     let isNarrow: Bool
+    let isChatVisible: Bool
     let paste: () -> Void
     let addCard: () -> Void
     let transform: (TransformKind) -> Void
+    let chat: () -> Void
     let copySelected: () -> Void
     let deleteSelected: () -> Void
     let clearSelection: () -> Void
     let selectedArePrivate: Bool
     let togglePrivacy: () -> Void
+    let toggleChat: () -> Void
     let openLibrary: () -> Void
     let openSettings: () -> Void
     let toggleSidebar: (() -> Void)?
@@ -640,17 +700,14 @@ private struct WorkspaceTopBar: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
 
-                Menu {
-                    ForEach(TransformKind.allCases, id: \.self) { kind in
-                        Button(kind.label) { transform(kind) }
-                    }
-                } label: {
+                Button(action: chat) {
                     if isNarrow {
-                        Image(systemName: "wand.and.sparkles")
+                        Image(systemName: "bubble.left.and.bubble.right")
                     } else {
-                        Label("Transform", systemImage: "wand.and.sparkles")
+                        Label("Ask", systemImage: "bubble.left.and.bubble.right")
                     }
                 }
+                .help("Ask AI about selection")
             } else {
                 Button(action: paste) {
                     if isNarrow {
@@ -664,6 +721,11 @@ private struct WorkspaceTopBar: View {
 
             Menu {
                 if selectedCount > 0 {
+                    Menu("Transform", systemImage: "wand.and.sparkles") {
+                        ForEach(TransformKind.allCases, id: \.self) { kind in
+                            Button(kind.label) { transform(kind) }
+                        }
+                    }
                     Button("Copy", systemImage: "doc.on.doc", action: copySelected)
                     Button(
                         selectedArePrivate ? "Unmark Private" : "Mark Private",
@@ -675,6 +737,9 @@ private struct WorkspaceTopBar: View {
                     Divider()
                 } else {
                     Button("New Card", systemImage: "plus", action: addCard)
+                    Button(isChatVisible ? "Hide Chat" : "Show Chat",
+                           systemImage: isChatVisible ? "sidebar.right" : "sparkles",
+                           action: toggleChat)
                     Divider()
                 }
                 Button("History", systemImage: "clock", action: openLibrary)
@@ -695,6 +760,7 @@ private struct CanvasSurface: View {
     @Binding var selectedCardIDs: Set<UUID>
     @Binding var editingCard: WorkspaceCard?
     let runningTransforms: Set<UUID>
+    let openChatForCard: (WorkspaceCard) -> Void
     let copyCard: (WorkspaceCard) -> Void
     let deleteCard: (WorkspaceCard) -> Void
     let duplicateCard: (WorkspaceCard) -> Void
@@ -729,6 +795,7 @@ private struct CanvasSurface: View {
                                 selectedCardIDs: selectedCardIDs,
                                 dragState: dragState,
                                 select: { select(card) },
+                                ask: { openChatForCard(card) },
                                 edit: { editingCard = card },
                                 copy: { copyCard(card) },
                                 duplicate: { duplicateCard(card) },
@@ -883,6 +950,7 @@ private struct CanvasCardView: View {
     let selectedCardIDs: Set<UUID>
     let dragState: CanvasDragState
     let select: () -> Void
+    let ask: () -> Void
     let edit: () -> Void
     let copy: () -> Void
     let duplicate: () -> Void
@@ -973,6 +1041,7 @@ private struct CanvasCardView: View {
         .onTapGesture(perform: select)
         .gesture(cardDrag)
         .contextMenu {
+            Button("Ask About This", systemImage: "bubble.left.and.bubble.right", action: ask)
             Button("Edit", systemImage: "pencil", action: edit)
             Button("Copy", systemImage: "doc.on.doc", action: copy)
             Button("Duplicate", systemImage: "plus.square.on.square", action: duplicate)
