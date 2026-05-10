@@ -5,12 +5,14 @@ enum SnippetType: String, Codable, CaseIterable {
     case text
     case url
     case code
+    case image
 
     var icon: String {
         switch self {
         case .text: "doc.text"
         case .url: "link"
         case .code: "curlybraces"
+        case .image: "photo"
         }
     }
 }
@@ -41,6 +43,8 @@ enum CaptureMethod: String, Codable, CaseIterable {
 final class Snippet {
     var id: UUID
     var text: String
+    var imageData: Data?
+    var imageUTI: String?
     var type: SnippetType
     var sensitivity: Sensitivity
     var captureMethod: CaptureMethod
@@ -50,6 +54,8 @@ final class Snippet {
 
     init(
         text: String,
+        imageData: Data? = nil,
+        imageUTI: String? = nil,
         type: SnippetType = .text,
         sensitivity: Sensitivity = .normal,
         captureMethod: CaptureMethod = .manualPaste,
@@ -59,6 +65,8 @@ final class Snippet {
     ) {
         self.id = UUID()
         self.text = text
+        self.imageData = imageData
+        self.imageUTI = imageUTI
         self.type = type
         self.sensitivity = sensitivity
         self.captureMethod = captureMethod
@@ -80,6 +88,24 @@ extension Snippet {
         )
         ExpiryService.setExpiry(for: snippet)
         return snippet
+    }
+
+    static func make(from content: PasteboardContent, capturedBy method: CaptureMethod) -> Snippet {
+        switch content {
+        case .text(let text):
+            return make(from: text, capturedBy: method)
+        case .image(let data, let uti):
+            let snippet = Snippet(
+                text: "Image from clipboard",
+                imageData: data,
+                imageUTI: uti,
+                type: .image,
+                sensitivity: .normal,
+                captureMethod: method
+            )
+            ExpiryService.setExpiry(for: snippet)
+            return snippet
+        }
     }
 
     static func detectType(for text: String) -> SnippetType {
@@ -110,6 +136,20 @@ extension Snippet {
     }
 
     var preview: String {
-        isMasked ? String(repeating: "•", count: min(max(text.count, 6), 24)) : text
+        if type == .image { return text.isEmpty ? "Image" : text }
+        return isMasked ? String(repeating: "•", count: min(max(text.count, 6), 24)) : text
+    }
+
+    var dragText: String {
+        if type == .image { return text.isEmpty ? "Image from ClipCanvas" : text }
+        return text
+    }
+
+    var defaultCardSize: (width: Double, height: Double) {
+        switch type {
+        case .code: (280, 190)
+        case .image: (260, 210)
+        case .text, .url: (240, 160)
+        }
     }
 }

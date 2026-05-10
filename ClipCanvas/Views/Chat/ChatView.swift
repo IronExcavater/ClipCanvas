@@ -9,6 +9,7 @@ struct WorkspaceChatPanel: View {
     let close: () -> Void
 
     @Environment(\.modelContext) private var modelContext
+    @AppStorage("openAIKey") private var openAIKey = ""
     @State private var thread: WorkspaceChatThread?
     @State private var inputText = ""
     @State private var isSending = false
@@ -40,6 +41,18 @@ struct WorkspaceChatPanel: View {
             ensureThread()
             return true
         }
+        .dropDestination(for: SnippetDragPayload.self) { items, _ in
+            let dropped = items.map { payload in
+                if payload.imageData != nil {
+                    return payload.text.isEmpty ? "Dropped image from ClipCanvas" : payload.text
+                }
+                return payload.text
+            }
+            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
+            extraContext.append(contentsOf: dropped)
+            ensureThread()
+            return !dropped.isEmpty
+        }
         .task { ensureThread() }
         .alert("Chat Error", isPresented: Binding(
             get: { errorMessage != nil },
@@ -70,7 +83,11 @@ struct WorkspaceChatPanel: View {
                 }
                 Spacer()
                 if !extraContext.isEmpty {
-                    Button("Clear dropped") { extraContext.removeAll() }
+                    Button(action: { extraContext.removeAll() }) {
+                        Image(systemName: "xmark.circle")
+                    }
+                    .buttonStyle(.borderless)
+                    .help("Clear dropped context")
                 }
             }
             .font(.caption)
@@ -95,6 +112,10 @@ struct WorkspaceChatPanel: View {
     private func send() {
         let text = inputText.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty, !isSending else { return }
+        guard !openAIKey.isEmpty else {
+            errorMessage = "Add your OpenAI API key in Settings first."
+            return
+        }
         ensureThread()
         guard let thread else { return }
 
@@ -108,21 +129,28 @@ struct WorkspaceChatPanel: View {
         thread.updatedAt = Date()
         modelContext.insert(userMessage)
 
+        let history = messages.dropLast().map { msg in
+            (role: msg.role == .user ? "user" : "assistant", content: msg.content)
+        }
+
         Task {
-            let response = replyText(for: text)
-            let reply = WorkspaceChatMessage(role: .reply, content: response)
-            reply.thread = thread
-            thread.messages.append(reply)
-            thread.updatedAt = Date()
-            modelContext.insert(reply)
+            do {
+                let response = try await OpenAIService.chat(
+                    userPrompt: text,
+                    context: contextText,
+                    history: history,
+                    apiKey: openAIKey
+                )
+                let reply = WorkspaceChatMessage(role: .reply, content: response)
+                reply.thread = thread
+                thread.messages.append(reply)
+                thread.updatedAt = Date()
+                modelContext.insert(reply)
+            } catch {
+                errorMessage = error.localizedDescription
+            }
             isSending = false
         }
-    }
-
-    private func replyText(for text: String) -> String {
-        let trimmedContext = contextText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmedContext.isEmpty else { return text }
-        return [text, trimmedContext].joined(separator: "\n\n")
     }
 }
 
@@ -135,9 +163,9 @@ private struct MessageList: View {
             ScrollView {
                 LazyVStack(spacing: 12) {
                     if messages.isEmpty {
-                        Text("Select cards or drag card text here, then ask.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                        Image(systemName: "bubble.left.and.bubble.right")
+                            .font(.title2)
+                            .foregroundStyle(.tertiary)
                             .frame(maxWidth: .infinity, minHeight: 140)
                     }
                     ForEach(messages) { message in

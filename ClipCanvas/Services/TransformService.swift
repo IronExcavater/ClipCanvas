@@ -1,4 +1,5 @@
 import Foundation
+import FoundationModels
 
 struct TransformService {
     static func perform(
@@ -6,6 +7,10 @@ struct TransformService {
         on text: String
     ) async throws -> String {
         let cleaned = normalize(text)
+        if SystemLanguageModel.default.isAvailable {
+            return try await AppleIntelligenceService.perform(kind, on: cleaned)
+        }
+
         switch kind {
         case .distill:
             return distill(cleaned)
@@ -46,7 +51,7 @@ struct TransformService {
             let lowercased = line.lowercased()
             return markers.contains { lowercased.contains($0) }
         }
-        let items = matches.isEmpty ? lines.prefix(5).map(String.init) : matches
+        let items: [String] = matches.isEmpty ? Array(lines.prefix(5)) : matches
         return items
             .map { "- [ ] \($0.trimmingCharacters(in: .whitespacesAndNewlines))" }
             .joined(separator: "\n")
@@ -64,5 +69,30 @@ struct TransformService {
             .filter { !$0.isEmpty }
             .prefix(8)
         return words.joined(separator: " ")
+    }
+}
+
+private enum AppleIntelligenceService {
+    static func perform(_ kind: TransformKind, on text: String) async throws -> String {
+        let session = LanguageModelSession(
+            instructions: "You rewrite clipboard snippets for a compact canvas app. Return only the result."
+        )
+        let response = try await session.respond(to: prompt(for: kind, text: text))
+        return response.content.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private static func prompt(for kind: TransformKind, text: String) -> String {
+        switch kind {
+        case .distill:
+            "Distill this into at most five concise bullets:\n\n\(text)"
+        case .actionItems:
+            "Extract concrete action items as a checklist. Keep only actionable work:\n\n\(text)"
+        case .cleanUp:
+            "Clean up spacing, grammar, and formatting without changing meaning:\n\n\(text)"
+        case .rewrite:
+            "Rewrite this clearly and concisely:\n\n\(text)"
+        case .title:
+            "Create a short title, eight words or fewer:\n\n\(text)"
+        }
     }
 }

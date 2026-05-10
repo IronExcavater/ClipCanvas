@@ -28,42 +28,29 @@ struct LibraryView: View {
             List {
                 if filteredSnippets.isEmpty {
                     ContentUnavailableView(
-                        searchText.isEmpty ? "Library is empty" : "No matches",
-                        systemImage: "tray",
-                        description: Text("Canvas captures and transform results appear here.")
+                        searchText.isEmpty ? "No clips" : "No matches",
+                        systemImage: "tray"
                     )
                     .listRowBackground(Color.clear)
                 } else {
+                    Section {
+                        HStack {
+                            Label("\(filteredSnippets.count) clips", systemImage: "clock")
+                            Spacer()
+                            Text("\(filteredSnippets.filter { $0.type == .image }.count) images")
+                                .foregroundStyle(.secondary)
+                        }
+                        .font(.caption)
+                    }
                     ForEach(filteredSnippets) { snippet in
-                        LibraryRow(snippet: snippet)
+                        LibraryRow(snippet: snippet, copy: { copy(snippet) }, addToCanvas: { addToCanvas(snippet) })
                             .contextMenu {
                                 Button("Copy", systemImage: "doc.on.doc") { copy(snippet) }
-                                Button("Add to Active Canvas", systemImage: "rectangle.3.group") { addToCanvas(snippet) }
+                                Button("Add to Canvas", systemImage: "rectangle.3.group") { addToCanvas(snippet) }
                                 Divider()
                                 Button("Delete", systemImage: "trash", role: .destructive) {
                                     delete(snippet)
                                 }
-                            }
-                            .swipeActions(edge: .trailing) {
-                                Button(role: .destructive) {
-                                    delete(snippet)
-                                } label: {
-                                    Label("Delete", systemImage: "trash")
-                                }
-                                Button {
-                                    copy(snippet)
-                                } label: {
-                                    Label("Copy", systemImage: "doc.on.doc")
-                                }
-                                .tint(.blue)
-                            }
-                            .swipeActions(edge: .leading) {
-                                Button {
-                                    addToCanvas(snippet)
-                                } label: {
-                                    Label("Canvas", systemImage: "rectangle.3.group")
-                                }
-                                .tint(.green)
                             }
                     }
                 }
@@ -84,7 +71,7 @@ struct LibraryView: View {
     }
 
     private func copy(_ snippet: Snippet) {
-        PasteboardService.writeString(snippet.text)
+        PasteboardService.writeSnippet(snippet)
         showFeedback("Copied")
     }
 
@@ -93,7 +80,14 @@ struct LibraryView: View {
             showFeedback("No active workspace")
             return
         }
-        let card = WorkspaceCard(snippet: snippet, x: 160, y: 180)
+        let card = WorkspaceCard(
+            snippet: snippet,
+            x: 160,
+            y: 180,
+            width: snippet.defaultCardSize.width,
+            height: snippet.defaultCardSize.height,
+            color: snippet.cardVariant
+        )
         card.workspace = workspace
         workspace.cards.append(card)
         workspace.updatedAt = Date()
@@ -120,27 +114,40 @@ struct LibraryView: View {
 
 private struct LibraryRow: View {
     let snippet: Snippet
+    let copy: () -> Void
+    let addToCanvas: () -> Void
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            Image(systemName: snippet.type.icon)
-                .frame(width: 28, height: 28)
-                .background(Color.clipCanvasSecondaryBackground, in: RoundedRectangle(cornerRadius: 6))
-            VStack(alignment: .leading, spacing: 6) {
-                Text(snippet.preview)
-                    .font(.body)
-                    .lineLimit(3)
-                HStack(spacing: 8) {
-                    Text(snippet.captureMethod.label)
-                    Text(snippet.createdAt, style: .relative)
-                    if snippet.isMasked {
-                        Label("Sensitive", systemImage: "lock.fill")
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(alignment: .top, spacing: 10) {
+                SourceGlyph(snippet: snippet)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(snippet.sourceTitle)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                    HStack(spacing: 6) {
+                        Text(snippet.createdAt, style: .relative)
+                        if snippet.isMasked {
+                            Label("Sensitive", systemImage: "lock.fill")
+                        }
                     }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
                 }
-                .font(.caption2)
-                .foregroundStyle(.secondary)
+                Spacer()
+                Menu {
+                    Button("Copy", systemImage: "doc.on.doc", action: copy)
+                    Button("Add to Canvas", systemImage: "rectangle.3.group", action: addToCanvas)
+                } label: {
+                    Image(systemName: "ellipsis.circle")
+                }
+                .buttonStyle(.borderless)
             }
+
+            SnippetPreviewContent(snippet: snippet, lineLimit: 5, imageHeight: 180)
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
+        .snippetDraggable(snippet)
+        .listRowBackground(snippet.cardVariant.background.opacity(0.20))
     }
 }

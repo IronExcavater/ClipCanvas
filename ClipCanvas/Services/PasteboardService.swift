@@ -1,31 +1,52 @@
 import Foundation
-
-#if canImport(UIKit)
 import UIKit
-#elseif canImport(AppKit)
-import AppKit
-#endif
+import UniformTypeIdentifiers
+
+enum PasteboardContent {
+    case text(String)
+    case image(Data, uti: String)
+
+    // Used only to avoid re-importing the same clipboard payload every polling tick.
+    var fingerprint: String {
+        switch self {
+        case .text(let text):
+            "text:\(text)"
+        case .image(let data, let uti):
+            "image:\(uti):\(data.count):\(Data(data.prefix(48)).base64EncodedString())"
+        }
+    }
+}
 
 struct PasteboardService {
-    static func readString() -> String? {
-        #if canImport(UIKit)
-        UIPasteboard.general.string?.trimmingCharacters(in: .whitespacesAndNewlines).nilIfEmpty
-        #elseif canImport(AppKit)
-        NSPasteboard.general.string(forType: .string)?
+    static func readContent() -> PasteboardContent? {
+        if UIPasteboard.general.hasImages,
+           let image = UIPasteboard.general.image,
+           let data = image.pngData() {
+            return .image(data, uti: UTType.png.identifier)
+        }
+
+        return UIPasteboard.general.string?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .nilIfEmpty
-        #else
-        nil
-        #endif
+            .map(PasteboardContent.text)
+    }
+
+    static func writeSnippet(_ snippet: Snippet) {
+        if let data = snippet.imageData {
+            writeImageData(data)
+        } else {
+            writeString(snippet.text)
+        }
     }
 
     static func writeString(_ text: String) {
-        #if canImport(UIKit)
         UIPasteboard.general.string = text
-        #elseif canImport(AppKit)
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
-        #endif
+    }
+
+    private static func writeImageData(_ data: Data) {
+        if let image = UIImage(data: data) {
+            UIPasteboard.general.image = image
+        }
     }
 }
 
