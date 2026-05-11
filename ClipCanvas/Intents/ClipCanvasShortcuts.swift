@@ -1,5 +1,7 @@
 import AppIntents
 
+// AppShortcutsProvider registers Siri phrase patterns and Shortcuts app actions.
+// The OS discovers these at compile time — no runtime registration needed.
 struct ClipCanvasShortcuts: AppShortcutsProvider {
     @AppShortcutsBuilder
     static var appShortcuts: [AppShortcut] {

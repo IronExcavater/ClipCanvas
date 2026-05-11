@@ -3,20 +3,19 @@ import SwiftUI
 
 struct LibraryView: View {
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss
+    @Environment(\.dismiss) private var dismiss  // dismiss() closes this sheet
+
+    // @Query fetches all snippets, newest first, and updates the list automatically on any change.
     @Query(sort: \Snippet.createdAt, order: .reverse) private var snippets: [Snippet]
     @Query(
         filter: #Predicate<Workspace> { $0.isActive && !$0.isArchived },
         sort: [SortDescriptor(\Workspace.createdAt)]
     ) private var activeWorkspaces: [Workspace]
-    @Query private var cards: [WorkspaceCard]
 
     @State private var searchText = ""
     @State private var feedback: String?
 
-    private var activeWorkspace: Workspace? {
-        activeWorkspaces.first
-    }
+    private var activeWorkspace: Workspace? { activeWorkspaces.first }
 
     private var filteredSnippets: [Snippet] {
         guard !searchText.isEmpty else { return snippets }
@@ -48,15 +47,13 @@ struct LibraryView: View {
                                 Button("Copy", systemImage: "doc.on.doc") { copy(snippet) }
                                 Button("Add to Canvas", systemImage: "rectangle.3.group") { addToCanvas(snippet) }
                                 Divider()
-                                Button("Delete", systemImage: "trash", role: .destructive) {
-                                    delete(snippet)
-                                }
+                                Button("Delete", systemImage: "trash", role: .destructive) { delete(snippet) }
                             }
                     }
                 }
             }
             .navigationTitle("Library")
-            .searchable(text: $searchText)
+            .searchable(text: $searchText)  // adds a search bar that binds to searchText
             .overlay(alignment: .top) {
                 if let feedback {
                     Text(feedback)
@@ -80,23 +77,20 @@ struct LibraryView: View {
             showFeedback("No active workspace")
             return
         }
-        let card = WorkspaceCard(
-            snippet: snippet,
-            x: 160,
-            y: 180,
-            width: snippet.defaultCardSize.width,
-            height: snippet.defaultCardSize.height,
-            color: snippet.cardVariant
-        )
-        card.workspace = workspace
-        workspace.cards.append(card)
-        workspace.updatedAt = Date()
+        // Use the stagger helper so library items don't pile on top of each other.
+        let position = workspace.nextCardPosition()
+        workspace.addCard(snippet: snippet, x: position.x, y: position.y)
         showFeedback("Added to canvas")
         dismiss()
     }
 
     private func delete(_ snippet: Snippet) {
-        for card in cards where card.snippet?.id == snippet.id {
+        // Deleting a Snippet sets WorkspaceCard.snippet to nil rather than deleting the card
+        // (the cascade rule runs Workspace → Card, not Snippet → Card). ExpiryService cleans
+        // up orphaned cards on the next app activation, but we also clean up here immediately.
+        let cardDescriptor = FetchDescriptor<WorkspaceCard>()
+        let allCards = (try? modelContext.fetch(cardDescriptor)) ?? []
+        for card in allCards where card.snippet?.id == snippet.id {
             modelContext.delete(card)
         }
         modelContext.delete(snippet)
@@ -126,7 +120,7 @@ private struct LibraryRow: View {
                         .font(.subheadline.weight(.semibold))
                         .lineLimit(1)
                     HStack(spacing: 6) {
-                        Text(snippet.createdAt, style: .relative)
+                        Text(snippet.createdAt, style: .relative)  // e.g. "3 minutes ago"
                         if snippet.isMasked {
                             Label("Sensitive", systemImage: "lock.fill")
                         }
@@ -147,7 +141,7 @@ private struct LibraryRow: View {
             SnippetPreviewContent(snippet: snippet, lineLimit: 5, imageHeight: 180)
         }
         .padding(.vertical, 6)
-        .snippetDraggable(snippet)
+        .snippetDraggable(snippet)  // makes this row draggable to the canvas
         .listRowBackground(snippet.cardVariant.background.opacity(0.20))
     }
 }

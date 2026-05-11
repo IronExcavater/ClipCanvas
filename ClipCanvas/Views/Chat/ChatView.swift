@@ -4,11 +4,13 @@ import SwiftUI
 struct WorkspaceChatPanel: View {
     let workspace: Workspace
     let contextCards: [WorkspaceCard]
+    // @Binding creates a two-way connection — changes here also update the parent's droppedChatContext.
     @Binding var extraContext: [String]
     let insertReply: (String) -> Void
     let close: () -> Void
 
     @Environment(\.modelContext) private var modelContext
+    // @AppStorage is a property wrapper that reads/writes to UserDefaults and re-renders on change.
     @AppStorage("openAIKey") private var openAIKey = ""
     @State private var thread: WorkspaceChatThread?
     @State private var inputText = ""
@@ -16,15 +18,16 @@ struct WorkspaceChatPanel: View {
     @State private var errorMessage: String?
 
     private var contextText: String {
-        let cardText = contextCards
-            .compactMap { $0.snippet?.text }
-            .filter { !$0.isEmpty }
+        // Combine card text and any dropped items into a single context string.
+        // A single filter handles both sources consistently.
+        let cardText = contextCards.compactMap { $0.snippet?.text }
         return (cardText + extraContext)
             .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             .joined(separator: "\n\n")
     }
 
     private var messages: [WorkspaceChatMessage] {
+        // Filter out .system messages — those are only used to prime the model, not shown to users.
         thread?.sortedMessages.filter { $0.role != .system } ?? []
     }
 
@@ -36,24 +39,27 @@ struct WorkspaceChatPanel: View {
             Divider()
             ChatInputBar(text: $inputText, isSending: isSending, send: send)
         }
+        // dropDestination makes this view a valid drag-and-drop target for plain strings.
         .dropDestination(for: String.self) { items, _ in
             extraContext.append(contentsOf: items.filter { !$0.isEmpty })
             ensureThread()
             return true
         }
+        // A second dropDestination handles SnippetDragPayload (ClipCanvas's custom drag type).
         .dropDestination(for: SnippetDragPayload.self) { items, _ in
-            let dropped = items.map { payload in
-                if payload.imageData != nil {
-                    return payload.text.isEmpty ? "Dropped image from ClipCanvas" : payload.text
-                }
-                return payload.text
+            let dropped = items.compactMap { payload -> String? in
+                let text = payload.imageData != nil
+                    ? (payload.text.isEmpty ? "Dropped image from ClipCanvas" : payload.text)
+                    : payload.text
+                return text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? nil : text
             }
-            .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
             extraContext.append(contentsOf: dropped)
             ensureThread()
             return !dropped.isEmpty
         }
         .task { ensureThread() }
+        // Binding(get:set:) manually creates a Binding from arbitrary state — used here
+        // because `.alert(isPresented:)` needs a Bool Binding but we track state as String?.
         .alert("Chat Error", isPresented: Binding(
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
@@ -129,6 +135,8 @@ struct WorkspaceChatPanel: View {
         thread.updatedAt = Date()
         modelContext.insert(userMessage)
 
+        // Pass previous messages as conversation history so the model has context.
+        // Drop the last message (the one we just added) since it's the current prompt.
         let history = messages.dropLast().map { msg in
             (role: msg.role == .user ? "user" : "assistant", content: msg.content)
         }
@@ -159,8 +167,10 @@ private struct MessageList: View {
     let insertReply: (String) -> Void
 
     var body: some View {
+        // ScrollViewReader gives programmatic scroll control via proxy.scrollTo(_:anchor:).
         ScrollViewReader { proxy in
             ScrollView {
+                // LazyVStack only creates views as they scroll into frame — like React virtualisation.
                 LazyVStack(spacing: 12) {
                     if messages.isEmpty {
                         Image(systemName: "bubble.left.and.bubble.right")
@@ -170,7 +180,7 @@ private struct MessageList: View {
                     }
                     ForEach(messages) { message in
                         ChatBubble(message: message, insertReply: insertReply)
-                            .id(message.id)
+                            .id(message.id)     // id lets ScrollViewReader scroll to this view
                     }
                 }
                 .padding(14)
@@ -196,7 +206,7 @@ private struct ChatBubble: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text(message.content)
                     .font(.body)
-                    .textSelection(.enabled)
+                    .textSelection(.enabled)    // lets users copy text with long-press
                 if !isUser {
                     Button {
                         insertReply(message.content)
@@ -226,6 +236,7 @@ private struct ChatInputBar: View {
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 10) {
+            // axis: .vertical makes the TextField grow vertically up to lineLimit rows.
             TextField("Ask, rewrite, compare...", text: $text, axis: .vertical)
                 .lineLimit(1...5)
                 .padding(.horizontal, 12)

@@ -1,6 +1,7 @@
 import Foundation
 import SwiftData
 
+// Which AI transform was requested.
 enum TransformKind: String, Codable, CaseIterable {
     case distill
     case actionItems
@@ -17,7 +18,6 @@ enum TransformKind: String, Codable, CaseIterable {
         case .title: "Title"
         }
     }
-
 }
 
 enum TransformStatus: String, Codable, CaseIterable {
@@ -26,24 +26,23 @@ enum TransformStatus: String, Codable, CaseIterable {
     case failed
 }
 
+// @Model marks this class for SwiftData persistence — it is stored in SQLite on-device.
 @Model
 final class TransformRun {
     var id: UUID
-    var workspace: Workspace?
-    var inputCardIDs: [UUID]
+    var workspace: Workspace?   // nil if the workspace was deleted after the run
+    var inputCardIDs: [UUID]    // UUIDs of source cards; kept even if those cards are later deleted
     var kind: TransformKind
-    var operationLabel: String
     var inputText: String
     var outputText: String
     var status: TransformStatus
     var createdAt: Date
-    var errorMessage: String?
+    var errorMessage: String?   // populated only when status == .failed
 
     init(
         workspace: Workspace?,
         inputCardIDs: [UUID],
         kind: TransformKind,
-        operationLabel: String,
         inputText: String,
         outputText: String = "",
         status: TransformStatus = .pending,
@@ -53,7 +52,6 @@ final class TransformRun {
         self.workspace = workspace
         self.inputCardIDs = inputCardIDs
         self.kind = kind
-        self.operationLabel = operationLabel
         self.inputText = inputText
         self.outputText = outputText
         self.status = status

@@ -7,6 +7,7 @@ struct OpenAIService {
         history: [(role: String, content: String)],
         apiKey: String
     ) async throws -> String {
+        // Force-unwrap is safe here — the URL literal is a compile-time constant.
         let url = URL(string: "https://api.openai.com/v1/chat/completions")!
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
@@ -14,9 +15,9 @@ struct OpenAIService {
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
         let systemContent = context.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-            ? "You are a helpful AI assistant integrated into ClipCanvas, a clipboard manager app. Be concise."
+            ? "You are a helpful assistant integrated into ClipCanvas, a clipboard manager app. Be concise."
             : """
-              You are a helpful AI assistant integrated into ClipCanvas, a clipboard manager app.
+              You are a helpful assistant integrated into ClipCanvas, a clipboard manager app.
               The user has selected the following content from their canvas:
 
               \(context)
@@ -24,6 +25,8 @@ struct OpenAIService {
               Answer the user's question based on this content. Be concise and helpful.
               """
 
+        // Build the messages array that OpenAI's chat completions API expects.
+        // The system message sets the model's persona; history provides conversation context.
         var messages: [[String: String]] = [["role": "system", "content": systemContent]]
         for msg in history {
             messages.append(["role": msg.role, "content": msg.content])
@@ -38,6 +41,8 @@ struct OpenAIService {
 
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
+        // URLSession.shared.data(for:) is the async/await version of the older URLSession
+        // completion handler API — it suspends the current task without blocking a thread.
         let (data, response) = try await URLSession.shared.data(for: request)
 
         guard let http = response as? HTTPURLResponse else {
@@ -58,6 +63,7 @@ struct OpenAIService {
     }
 }
 
+// LocalizedError gives these cases a human-readable description that SwiftUI can display directly.
 enum OpenAIError: LocalizedError {
     case invalidResponse, noContent
     case httpError(Int)
@@ -73,6 +79,7 @@ enum OpenAIError: LocalizedError {
     }
 }
 
+// Codable structs that mirror the JSON shape of OpenAI's chat completions response.
 private struct OpenAIResponse: Decodable {
     let choices: [Choice]
     struct Choice: Decodable {

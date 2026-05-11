@@ -9,12 +9,21 @@ enum AppRoute: Equatable {
     case settings
 }
 
+// @Observable is Swift's observation framework — any view that reads a property of this class
+// will automatically re-render when that property changes. It replaces the older
+// ObservableObject + @Published pattern from UIKit-era SwiftUI.
 @Observable
 final class AppRouter {
+    // Views read these and clear them once consumed. Keeping routing state here means
+    // URL handlers and 3D Touch shortcuts don't need to reach into the view hierarchy.
     var pendingRoute: AppRoute?
     var pendingPasteMethod: CaptureMethod?
 
     func handle(url: URL) {
+        // clipcanvas://copy-to-canvas  → paste clipboard to active workspace
+        // clipcanvas://workspace/<uuid> → switch to a specific workspace
+        // clipcanvas://library          → open the clip history sheet
+        // clipcanvas://settings         → open settings
         switch url.host {
         case "copy-to-canvas", "capture":
             pendingRoute = .copyToCanvas

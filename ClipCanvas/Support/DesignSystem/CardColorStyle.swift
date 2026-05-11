@@ -1,6 +1,8 @@
 import SwiftUI
-import UIKit
 
+// Extends the CardColor enum (defined in Workspace.swift) with SwiftUI Color values.
+// Colours are defined as raw RGB rather than asset catalogue entries so they work
+// without any Xcode asset catalogue setup.
 extension CardColor {
     var background: Color {
         switch self {
@@ -13,10 +15,7 @@ extension CardColor {
         }
     }
 
-    var foreground: Color {
-        .primary
-    }
-
+    // Accent is used for the top border stripe and icon tinting on each card.
     var accent: Color {
         switch self {
         case .default: Color.secondary
@@ -29,20 +28,11 @@ extension CardColor {
     }
 }
 
+// Semantic color aliases that map to iOS system colours.
+// System colours automatically adapt to light/dark mode.
 extension Color {
-    static var clipCanvasPageBackground: Color {
-        Color(.systemGroupedBackground)
-    }
-
-    static var clipCanvasCardBackground: Color {
-        Color(.systemBackground)
-    }
-
-    static var clipCanvasSecondaryBackground: Color {
-        Color(.secondarySystemGroupedBackground)
-    }
-
-    static var clipCanvasInputBackground: Color {
-        Color(.secondarySystemFill)
-    }
+    static var clipCanvasPageBackground: Color { Color(.systemGroupedBackground) }
+    static var clipCanvasCardBackground: Color { Color(.systemBackground) }
+    static var clipCanvasSecondaryBackground: Color { Color(.secondarySystemGroupedBackground) }
+    static var clipCanvasInputBackground: Color { Color(.secondarySystemFill) }
 }

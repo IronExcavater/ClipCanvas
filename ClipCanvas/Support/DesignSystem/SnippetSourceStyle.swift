@@ -1,5 +1,7 @@
 import SwiftUI
 
+// SourceGlyph renders the coloured icon shown in card headers and sidebar rows.
+// The icon and colour are derived from how and what the snippet was captured.
 struct SourceGlyph: View {
     let snippet: Snippet?
 
@@ -12,10 +14,13 @@ struct SourceGlyph: View {
     }
 }
 
+// These computed properties expose display metadata derived from the snippet's
+// capture method and content type. Keeping them here (not in the @Model) avoids
+// mixing UI concerns into the data layer.
 extension Snippet {
     var sourceTitle: String {
         switch captureMethod {
-        case .transformResult: "AI Result"
+        case .transformResult: "Result"
         case .quickAction: "Clipboard"
         case .appIntent: "Shortcut"
         case .manualPaste: type.sourceTitle
@@ -40,6 +45,7 @@ extension Snippet {
         }
     }
 
+    // Maps each capture method and content type to a card colour variant.
     var cardVariant: CardColor {
         switch captureMethod {
         case .transformResult: .green
