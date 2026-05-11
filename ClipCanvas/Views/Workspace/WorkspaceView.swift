@@ -772,13 +772,28 @@ private struct CanvasSurface: View {
     @State private var canvasScale: CGFloat = 1
     @State private var baseScale: CGFloat = 1
     @State private var dragState = CanvasDragState()
+    @State private var drawingModeActive = false
 
     var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .topLeading) {
                 DotGrid(offset: canvasOffset, scale: canvasScale)
-                    .gesture(panGesture)
-                    .onTapGesture { selectedCardIDs.removeAll() }
+                    .gesture(drawingModeActive ? nil : panGesture)
+                    .onTapGesture {
+                        if !drawingModeActive {
+                            selectedCardIDs.removeAll()
+                        }
+                    }
+                DrawingTestView(
+                    isActive: drawingModeActive,
+                    canvasOffset: canvasOffset,
+                    canvasScale: canvasScale,
+                    boardSize: CGSize(width: 5000, height: 5000)
+                )
+                .frame(width: proxy.size.width, height: proxy.size.height)
+                .background(Color.clear)
+                .allowsHitTesting(drawingModeActive)
+                .zIndex(5)
 
                 if let workspace, workspace.cards.isEmpty {
                     EmptyCanvasHint()
@@ -786,6 +801,8 @@ private struct CanvasSurface: View {
 
                 if let workspace {
                     ZStack(alignment: .topLeading) {
+
+
                         ForEach(workspace.cards) { card in
                             CanvasCardView(
                                 card: card,
@@ -805,11 +822,18 @@ private struct CanvasSurface: View {
                             .position(x: card.x, y: card.y)
                             .zIndex(selectedCardIDs.contains(card.id) ? 20 : (card.transformRun == nil ? 1 : 2))
                         }
+                       
                     }
+                    .frame(width: 5000, height: 5000, alignment: .topLeading)
                     .scaleEffect(canvasScale, anchor: .topLeading)
                     .offset(canvasOffset)
+                    .zIndex(10)
+                   
                 }
-
+            }
+            .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
+            .clipped()
+            .overlay(alignment: .bottomTrailing){
                 CanvasControlStrip(
                     scale: canvasScale,
                     zoomOut: { zoom(by: 0.85) },
@@ -819,6 +843,23 @@ private struct CanvasSurface: View {
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
                 .padding(18)
+                .zIndex(1000)
+            }
+            .overlay(alignment: .topLeading){
+                Button {
+                    drawingModeActive.toggle()
+                } label: {
+                    Label(drawingModeActive ? "Done" : "Draw",
+                          systemImage: drawingModeActive ? "checkmark.circle.fill" : "pencil.tip")
+                        .labelStyle(.titleAndIcon)
+                        .font(.caption.weight(.semibold))
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(.regularMaterial, in: Capsule())
+                }
+                .padding(.top, 12)
+                .padding(.leading, 12)
+                .zIndex(1000)
             }
             .dropDestination(for: SnippetDragPayload.self) { items, location in
                 guard let payload = items.first, !payload.text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || payload.imageData != nil else {
@@ -843,11 +884,11 @@ private struct CanvasSurface: View {
                 return true
             }
             .clipped()
-            .simultaneousGesture(zoomGesture(proxy: proxy))
+            .simultaneousGesture(drawingModeActive ? nil : zoomGesture(proxy: proxy))
         }
         .background(Color.clipCanvasPageBackground)
     }
-
+    
     private func select(_ card: WorkspaceCard) {
         if selectedCardIDs.contains(card.id) {
             selectedCardIDs.remove(card.id)
