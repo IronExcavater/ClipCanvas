@@ -113,7 +113,7 @@ struct WorkspaceView: View {
             snippets: Array(snippets.prefix(60)),   // cap to 60 most recent for performance
             activeWorkspace: activeWorkspace,
             selectedCount: selectedCardIDs.count,
-            activateWorkspace: activateWorkspace,
+            activateWorkspace: { activateWorkspace($0.id) },
             createWorkspace: createWorkspace,
             addSnippetToCanvas: addSnippetToCanvas,
             copySnippet: copySnippet,

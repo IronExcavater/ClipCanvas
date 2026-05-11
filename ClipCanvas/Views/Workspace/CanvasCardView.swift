@@ -175,6 +175,8 @@ private struct CanvasCardHeader: View {
 // Zoom and reset controls shown at the bottom-right of the canvas.
 struct CanvasControlStrip: View {
     let scale: CGFloat
+    let canZoomOut: Bool
+    let canZoomIn: Bool
     let zoomOut: () -> Void
     let zoomIn: () -> Void
     let fit: () -> Void
@@ -183,15 +185,20 @@ struct CanvasControlStrip: View {
     var body: some View {
         HStack(spacing: 6) {
             Button(action: zoomOut) { Image(systemName: "minus.magnifyingglass") }
+                .disabled(!canZoomOut)
+                .help("Zoom out")
             Text("\(Int(scale * 100))%")
                 .font(.caption.weight(.semibold))
                 .monospacedDigit()  // fixed-width digits prevent layout shifts as the number changes
                 .frame(width: 48)
             Button(action: zoomIn) { Image(systemName: "plus.magnifyingglass") }
+                .disabled(!canZoomIn)
+                .help("Zoom in")
             Divider().frame(height: 22)
             Button(action: fit) { Image(systemName: "arrow.up.left.and.arrow.down.right") }
                 .help("Fit board")
             Button(action: reset) { Image(systemName: "arrow.counterclockwise") }
+                .help("Reset zoom")
         }
         .buttonStyle(.plain)
         .padding(.horizontal, 10)

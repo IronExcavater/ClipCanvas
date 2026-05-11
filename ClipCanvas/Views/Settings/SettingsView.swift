@@ -77,6 +77,7 @@ struct SettingsView: View {
         for item in workspaces { modelContext.delete(item) }
         let workspace = Workspace(name: "Canvas", sortIndex: 0, isActive: true)
         modelContext.insert(workspace)
+        NotificationCenter.default.post(name: .localDataReset, object: nil)
     }
 
     private var appVersion: String {

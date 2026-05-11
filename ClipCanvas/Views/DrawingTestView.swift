@@ -1,23 +1,17 @@
 import SwiftUI
 import PencilKit
 
-// UIViewRepresentable is a bridge that lets you embed any UIKit view inside SwiftUI.
-// SwiftUI is declarative (describe what you want); UIKit is imperative (set properties, call methods).
-// PencilKit's PKCanvasView is UIKit-only, so we need this bridge to use it in our SwiftUI app.
-struct DrawingTestView: UIViewRepresentable {
+struct CanvasDrawingView: UIViewRepresentable {
     let isActive: Bool          // controlled by the Draw/Done toggle in CanvasSurface
+    @Binding var drawing: PKDrawing
     let canvasOffset: CGSize    // mirrors the SwiftUI canvas pan offset
     let canvasScale: CGFloat    // mirrors the SwiftUI canvas zoom scale
     let boardSize: CGSize
 
-    // makeCoordinator creates a helper object that outlives individual view updates.
-    // We use it here to hold the PKToolPicker, which must stay alive as long as drawing is active.
     func makeCoordinator() -> Coordinator {
-        Coordinator()
+        Coordinator(drawing: $drawing)
     }
 
-    // makeUIView is called ONCE when the view is first inserted into the hierarchy.
-    // Return the UIKit view you want to display. Think of it like a constructor for the UIKit side.
     func makeUIView(context: Context) -> PKCanvasView {
         let canvas = PKCanvasView()
 
@@ -25,35 +19,42 @@ struct DrawingTestView: UIViewRepresentable {
         canvas.isOpaque = false             // required for transparency to work in UIKit
         canvas.drawingPolicy = .anyInput    // accept touch and Apple Pencil (not pencil-only)
         canvas.tool = PKInkingTool(.pen, color: .black, width: 8)   // default drawing tool
-        canvas.contentSize = boardSize // tells pencil kit size of the board extremely important
+        canvas.delegate = context.coordinator
         canvas.minimumZoomScale = 0.35
-        canvas.maximumZoomScale = 3.0 //lets pencil kit match the size of your worksapces zoom range
+        canvas.maximumZoomScale = 3
+        canvas.contentSize = boardSize
         canvas.bounces = false
-        canvas.bouncesZoom = false //prevents the scrolling motino from moving the drawing
+        canvas.bouncesZoom = false
+        canvas.alwaysBounceVertical = false
+        canvas.alwaysBounceHorizontal = false
+        canvas.showsVerticalScrollIndicator = false
+        canvas.showsHorizontalScrollIndicator = false
         canvas.contentInset = .zero
         canvas.scrollIndicatorInsets = .zero
-        canvas.contentInsetAdjustmentBehavior = .never //also helps with making the drawing not act weird. Specifically it prevents the safe-area/inset from shifting the drawing layer
-       
+        canvas.contentInsetAdjustmentBehavior = .never
+        canvas.delaysContentTouches = false
 
         return canvas
     }
 
-    // updateUIView is called every time SwiftUI re-renders this view with new state.
-    // Here we sync the PKCanvasView's scroll/zoom with the SwiftUI canvas pan/zoom.
-    // PKCanvasView is a UIScrollView subclass, so zoom/offset are set via UIScrollView APIs.
     func updateUIView(_ canvas: PKCanvasView, context: Context) {
+        context.coordinator.drawing = $drawing
         canvas.backgroundColor = .clear
         canvas.isOpaque = false
-        
-        // these all are here so the setting we set in the makeUiView
+        canvas.contentSize = boardSize
         canvas.minimumZoomScale = 0.35
-        canvas.maximumZoomScale = 3.0
+        canvas.maximumZoomScale = 3
         canvas.bounces = false
         canvas.bouncesZoom = false
         canvas.contentInset = .zero
         canvas.scrollIndicatorInsets = .zero
         canvas.contentInsetAdjustmentBehavior = .never
-        canvas.contentSize = boardSize
+
+        let drawingData = drawing.dataRepresentation()
+        if context.coordinator.appliedDrawingData != drawingData {
+            canvas.drawing = drawing
+            context.coordinator.appliedDrawingData = drawingData
+        }
 
         // Only update zoom if it's actually changed — avoids triggering unnecessary scroll events.
         if abs(canvas.zoomScale - canvasScale) > 0.001 {
@@ -85,10 +86,18 @@ struct DrawingTestView: UIViewRepresentable {
         }
     }
 
-    // Coordinator is a plain Swift class that acts as a stable storage across view updates.
-    // We hold the PKToolPicker here because it must not be recreated on every render —
-    // recreating it would dismiss the floating toolbar mid-draw.
-    final class Coordinator {
+    final class Coordinator: NSObject, PKCanvasViewDelegate {
         let toolPicker = PKToolPicker()
+        var drawing: Binding<PKDrawing>
+        var appliedDrawingData: Data?
+
+        init(drawing: Binding<PKDrawing>) {
+            self.drawing = drawing
+        }
+
+        func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
+            appliedDrawingData = canvasView.drawing.dataRepresentation()
+            drawing.wrappedValue = canvasView.drawing
+        }
     }
 }

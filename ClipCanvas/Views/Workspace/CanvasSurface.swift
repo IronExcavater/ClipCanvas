@@ -1,5 +1,6 @@
 import SwiftData
 import SwiftUI
+import PencilKit
 
 struct CanvasSurface: View {
     let workspace: Workspace?
@@ -27,6 +28,10 @@ struct CanvasSurface: View {
     @State private var dragState = CanvasDragState()
     // When true, pan/zoom gestures are disabled and the PencilKit drawing overlay is active.
     @State private var drawingModeActive = false
+    @State private var drawingsByWorkspace: [UUID: PKDrawing] = [:]
+    @State private var fallbackDrawing = PKDrawing()
+
+    private let boardSize = CGSize(width: 5000, height: 5000)
 
     var body: some View {
         // GeometryReader gives us the surface's size so we can compute zoom anchors
@@ -40,14 +45,15 @@ struct CanvasSurface: View {
                         if !drawingModeActive { selectedCardIDs.removeAll() }
                     }
 
-                // DrawingTestView is a UIViewRepresentable wrapping PencilKit's PKCanvasView.
+                // CanvasDrawingView is a UIViewRepresentable wrapping PencilKit's PKCanvasView.
                 // It sits above the dot grid (zIndex 5) but below cards (zIndex 10+).
                 // allowsHitTesting controls whether touches reach this view or pass through.
-                DrawingTestView(
+                CanvasDrawingView(
                     isActive: drawingModeActive,
+                    drawing: activeDrawing,
                     canvasOffset: canvasOffset,
                     canvasScale: canvasScale,
-                    boardSize: CGSize(width: 5000, height: 5000)
+                    boardSize: boardSize
                 )
                 .frame(width: proxy.size.width, height: proxy.size.height)
                 .background(Color.clear)
@@ -82,7 +88,7 @@ struct CanvasSurface: View {
                             .zIndex(selectedCardIDs.contains(card.id) ? 20 : (card.transformRun == nil ? 1 : 2))
                         }
                     }
-                    .frame(width: 5000, height: 5000, alignment: .topLeading)
+                    .frame(width: boardSize.width, height: boardSize.height, alignment: .topLeading)
                     .scaleEffect(canvasScale, anchor: .topLeading)  // zoom from the top-left origin
                     .offset(canvasOffset)
                     .zIndex(10)
@@ -91,8 +97,10 @@ struct CanvasSurface: View {
                 // Zoom/reset controls pinned to the bottom-right corner.
                 CanvasControlStrip(
                     scale: canvasScale,
-                    zoomOut: { zoom(by: 0.85) },
-                    zoomIn: { zoom(by: 1.15) },
+                    canZoomOut: canvasScale > 0.35,
+                    canZoomIn: canvasScale < 3,
+                    zoomOut: { zoom(by: 0.85, in: proxy) },
+                    zoomIn: { zoom(by: 1.15, in: proxy) },
                     fit: { fitWorkspace(in: proxy) },
                     reset: resetView
                 )
@@ -100,20 +108,7 @@ struct CanvasSurface: View {
                 .padding(18)
                 .zIndex(1000)
 
-                // Draw / Done toggle button pinned to the top-left corner.
-                Button {
-                    drawingModeActive.toggle()
-                } label: {
-                    Label(
-                        drawingModeActive ? "Done" : "Draw",
-                        systemImage: drawingModeActive ? "checkmark.circle.fill" : "pencil.tip"
-                    )
-                    .labelStyle(.titleAndIcon)
-                    .font(.caption.weight(.semibold))
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(.regularMaterial, in: Capsule())
-                }
+                drawingControls
                 .padding(.top, 12)
                 .padding(.leading, 12)
                 .zIndex(1000)
@@ -138,8 +133,58 @@ struct CanvasSurface: View {
             // gesture on DotGrid — without this, one gesture would steal priority.
             // Disabled when drawing so pinch gestures don't interfere with PencilKit strokes.
             .simultaneousGesture(drawingModeActive ? nil : zoomGesture(proxy: proxy))
+            .onChange(of: workspace?.id) { _, _ in
+                drawingModeActive = false
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .localDataReset)) { _ in
+                clearAllDrawings()
+            }
         }
         .background(Color.clipCanvasPageBackground)
+    }
+
+    private var activeDrawing: Binding<PKDrawing> {
+        Binding {
+            guard let id = workspace?.id else { return fallbackDrawing }
+            return drawingsByWorkspace[id] ?? PKDrawing()
+        } set: { newValue in
+            guard let id = workspace?.id else {
+                fallbackDrawing = newValue
+                return
+            }
+            drawingsByWorkspace[id] = newValue
+        }
+    }
+
+    private var hasActiveDrawing: Bool {
+        guard let id = workspace?.id else { return !fallbackDrawing.bounds.isEmpty }
+        return !(drawingsByWorkspace[id]?.bounds.isEmpty ?? true)
+    }
+
+    private var drawingControls: some View {
+        HStack(spacing: 6) {
+            Button {
+                drawingModeActive.toggle()
+            } label: {
+                Label(
+                    drawingModeActive ? "Done" : "Draw",
+                    systemImage: drawingModeActive ? "checkmark.circle.fill" : "pencil.tip"
+                )
+            }
+
+            if hasActiveDrawing {
+                Button(role: .destructive, action: clearActiveDrawing) {
+                    Image(systemName: "eraser")
+                }
+                .help("Clear drawing")
+            }
+        }
+        .labelStyle(.titleAndIcon)
+        .font(.caption.weight(.semibold))
+        .buttonStyle(.plain)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(.regularMaterial, in: Capsule())
     }
 
     private func select(_ card: WorkspaceCard) {
@@ -183,11 +228,18 @@ struct CanvasSurface: View {
             }
     }
 
-    private func zoom(by factor: CGFloat) {
+    private func zoom(by factor: CGFloat, in proxy: GeometryProxy) {
         let nextScale = clampedScale(canvasScale * factor)
+        let center = CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
+        let nextOffset = CGSize(
+            width: center.x - (center.x - canvasOffset.width) * nextScale / canvasScale,
+            height: center.y - (center.y - canvasOffset.height) * nextScale / canvasScale
+        )
         withAnimation(.snappy(duration: 0.16)) {
             canvasScale = nextScale
             baseScale = nextScale
+            canvasOffset = nextOffset
+            baseOffset = nextOffset
         }
     }
 
@@ -234,6 +286,17 @@ struct CanvasSurface: View {
             canvasScale  = 1
             baseScale    = 1
         }
+    }
+
+    private func clearActiveDrawing() {
+        activeDrawing.wrappedValue = PKDrawing()
+        drawingModeActive = false
+    }
+
+    private func clearAllDrawings() {
+        drawingsByWorkspace.removeAll()
+        fallbackDrawing = PKDrawing()
+        drawingModeActive = false
     }
 
     private func canvasPoint(for location: CGPoint) -> CGPoint {

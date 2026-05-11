@@ -25,4 +25,5 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
 extension Notification.Name {
     // Custom notification name — using a reverse-DNS string avoids collisions with system names.
     static let copyToCanvasRequested = Notification.Name("clipcanvas.copyToCanvasRequested")
+    static let localDataReset = Notification.Name("clipcanvas.localDataReset")
 }
