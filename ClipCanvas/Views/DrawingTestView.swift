@@ -25,6 +25,15 @@ struct DrawingTestView: UIViewRepresentable {
         canvas.isOpaque = false             // required for transparency to work in UIKit
         canvas.drawingPolicy = .anyInput    // accept touch and Apple Pencil (not pencil-only)
         canvas.tool = PKInkingTool(.pen, color: .black, width: 8)   // default drawing tool
+        canvas.contentSize = boardSize // tells pencil kit size of the board extremely important
+        canvas.minimumZoomScale = 0.35
+        canvas.maximumZoomScale = 3.0 //lets pencil kit match the size of your worksapces zoom range
+        canvas.bounces = false
+        canvas.bouncesZoom = false //prevents the scrolling motino from moving the drawing
+        canvas.contentInset = .zero
+        canvas.scrollIndicatorInsets = .zero
+        canvas.contentInsetAdjustmentBehavior = .never //also helps with making the drawing not act weird. Specifically it prevents the safe-area/inset from shifting the drawing layer
+       
 
         return canvas
     }
@@ -35,6 +44,16 @@ struct DrawingTestView: UIViewRepresentable {
     func updateUIView(_ canvas: PKCanvasView, context: Context) {
         canvas.backgroundColor = .clear
         canvas.isOpaque = false
+        
+        // these all are here so the setting we set in the makeUiView
+        canvas.minimumZoomScale = 0.35
+        canvas.maximumZoomScale = 3.0
+        canvas.bounces = false
+        canvas.bouncesZoom = false
+        canvas.contentInset = .zero
+        canvas.scrollIndicatorInsets = .zero
+        canvas.contentInsetAdjustmentBehavior = .never
+        canvas.contentSize = boardSize
 
         // Only update zoom if it's actually changed — avoids triggering unnecessary scroll events.
         if abs(canvas.zoomScale - canvasScale) > 0.001 {
