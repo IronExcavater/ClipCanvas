@@ -19,7 +19,7 @@ struct ClipCanvasApp: App {
 
     var body: some Scene {
         WindowGroup {
-            RootView()
+            DrawingTestView()
                 .environment(router)
                 .onOpenURL { router.handle(url: $0) }
                 .onReceive(NotificationCenter.default.publisher(for: .copyToCanvasRequested)) { note in
@@ -39,3 +39,4 @@ struct ClipCanvasApp: App {
         }
     }
 }
+
