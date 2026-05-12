@@ -1,0 +1,58 @@
+import Foundation
+import SwiftData
+
+@Model
+final class Workspace {
+    var id: UUID = UUID()
+    var name: String
+    var isActive: Bool = false
+    var sortIndex: Int = 0
+    var createdAt: Date = Date()
+    var updatedAt: Date = Date()
+
+    @Relationship(deleteRule: .cascade, inverse: \CanvasPlacement.workspace)
+    var placements: [CanvasPlacement] = []
+
+    init(name: String, sortIndex: Int = 0, isActive: Bool = false) {
+        self.name = name
+        self.sortIndex = sortIndex
+        self.isActive = isActive
+    }
+
+    // Staggers new cards so they don't all land on top of each other
+    func nextPosition() -> CGPoint {
+        let i = Double(placements.count)
+        return CGPoint(
+            x: 200 + i.truncatingRemainder(dividingBy: 6) * 30,
+            y: 180 + i.truncatingRemainder(dividingBy: 8) * 24
+        )
+    }
+
+    @discardableResult
+    func place(clip: Clip, at position: CGPoint? = nil) -> CanvasPlacement {
+        let pos = position ?? nextPosition()
+        let p = CanvasPlacement(clip: clip, x: pos.x, y: pos.y)
+        p.workspace = self
+        placements.append(p)
+        updatedAt = Date()
+        return p
+    }
+}
+
+@Model
+final class CanvasPlacement {
+    var id: UUID = UUID()
+    var workspace: Workspace?
+    var clip: Clip?           // nullify on clip delete — placement disappears naturally
+    var x: Double
+    var y: Double
+    var width: Double = 220
+    var height: Double = 150
+    var createdAt: Date = Date()
+
+    init(clip: Clip?, x: Double, y: Double) {
+        self.clip = clip
+        self.x = x
+        self.y = y
+    }
+}
