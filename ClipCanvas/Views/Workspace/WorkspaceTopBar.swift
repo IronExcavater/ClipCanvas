@@ -1,7 +1,5 @@
 import SwiftUI
 
-// WorkspaceTopBar is a pure display component — it receives all state and callbacks from
-// WorkspaceView and never reads from the environment or performs its own model mutations.
 struct WorkspaceTopBar: View {
     let workspace: Workspace?
     let selectedCount: Int
@@ -19,124 +17,126 @@ struct WorkspaceTopBar: View {
     let toggleChat: () -> Void
     let openLibrary: () -> Void
     let openSettings: () -> Void
-    let toggleSidebar: (() -> Void)?   // nil on wide layouts where the sidebar is always visible
+    let toggleSidebar: (() -> Void)?
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 8) {
             if let toggleSidebar {
                 Button(action: toggleSidebar) {
                     Image(systemName: "sidebar.left")
                 }
             }
 
-            Text(workspace?.name ?? "Canvas")
-                .font(.headline)
-                .lineLimit(1)
+            if selectedCount == 0 {
+                Text(workspace?.name ?? "Canvas")
+                    .font(.headline)
+                    .lineLimit(1)
+            }
 
             Spacer()
 
             if selectedCount > 0 {
-                Text("\(selectedCount) selected")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
-
-                // On narrow (phone) screens show just the icon; on wide screens show a label too.
-                Button(action: chat) {
-                    if isNarrow {
-                        Image(systemName: "bubble.left.and.bubble.right")
-                    } else {
-                        Label("Ask", systemImage: "bubble.left.and.bubble.right")
-                    }
-                }
-                .help("Ask about selection")
+                selectionActions
             } else {
-                Button(action: paste) {
-                    if isNarrow {
-                        Image(systemName: "doc.on.clipboard")
-                    } else {
-                        Label("Clipboard", systemImage: "doc.on.clipboard")
-                    }
-                }
-                .help("Add clipboard to canvas")
+                idleActions
             }
-
-            WorkspaceActionMenu(
-                selectedCount: selectedCount,
-                isChatVisible: isChatVisible,
-                selectedArePrivate: selectedArePrivate,
-                addCard: addCard,
-                transform: transform,
-                copySelected: copySelected,
-                deleteSelected: deleteSelected,
-                clearSelection: clearSelection,
-                togglePrivacy: togglePrivacy,
-                toggleChat: toggleChat,
-                openLibrary: openLibrary,
-                openSettings: openSettings
-            )
         }
         .buttonStyle(.bordered)
         .padding(.horizontal, 14)
         .padding(.vertical, 10)
-        .background(.bar)   // adaptive material that matches the system toolbar appearance
+        .background(.bar)
+        .animation(.snappy(duration: 0.18), value: selectedCount > 0)
     }
-}
 
-private struct WorkspaceActionMenu: View {
-    let selectedCount: Int
-    let isChatVisible: Bool
-    let selectedArePrivate: Bool
-    let addCard: () -> Void
-    let transform: (TransformKind) -> Void
-    let copySelected: () -> Void
-    let deleteSelected: () -> Void
-    let clearSelection: () -> Void
-    let togglePrivacy: () -> Void
-    let toggleChat: () -> Void
-    let openLibrary: () -> Void
-    let openSettings: () -> Void
+    // MARK: Selection active — prominent inline buttons
 
-    var body: some View {
+    @ViewBuilder
+    private var selectionActions: some View {
+        // Badge showing how many cards are selected
+        HStack(spacing: 4) {
+            Text("\(selectedCount)")
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(.white)
+                .frame(width: 20, height: 20)
+                .background(Color.accentColor, in: Circle())
+            Text(selectedCount == 1 ? "card" : "cards")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+        }
+
+        // AI / chat
+        Button(action: chat) {
+            Image(systemName: "sparkles")
+        }
+        .help("Ask AI about selection")
+
+        // Copy
+        Button(action: copySelected) {
+            Image(systemName: "doc.on.doc")
+        }
+        .help("Copy selected")
+
+        // Transform submenu (kept in a small menu to avoid crowding)
         Menu {
-            if selectedCount > 0 {
-                selectionActions
-            } else {
-                emptySelectionActions
+            ForEach(TransformKind.allCases, id: \.self) { kind in
+                Button(kind.label) { transform(kind) }
             }
-            Button("History", systemImage: "clock", action: openLibrary)
-            Button("Settings", systemImage: "gearshape", action: openSettings)
+        } label: {
+            Image(systemName: "wand.and.sparkles")
+        }
+        .help("Transform selected")
+
+        // Delete
+        Button(role: .destructive, action: deleteSelected) {
+            Image(systemName: "trash")
+        }
+        .help("Delete selected")
+
+        // Deselect — always the last button, acts as a clear affordance
+        Button(action: clearSelection) {
+            Image(systemName: "xmark.circle.fill")
+                .foregroundStyle(.secondary)
+        }
+        .buttonStyle(.plain)   // plain so it doesn't get the bordered style
+        .help("Deselect all")
+
+        // Overflow for less common actions
+        Menu {
+            Button(
+                selectedArePrivate ? "Unmark Private" : "Mark Private",
+                systemImage: selectedArePrivate ? "lock.open" : "lock",
+                action: togglePrivacy
+            )
         } label: {
             Image(systemName: "ellipsis.circle")
         }
     }
 
-    // @ViewBuilder lets a computed property return different view types from each branch.
-    @ViewBuilder
-    private var selectionActions: some View {
-        Menu("Transform", systemImage: "wand.and.sparkles") {
-            ForEach(TransformKind.allCases, id: \.self) { kind in
-                Button(kind.label) { transform(kind) }
-            }
-        }
-        Button("Copy", systemImage: "doc.on.doc", action: copySelected)
-        Button(
-            selectedArePrivate ? "Unmark Private" : "Mark Private",
-            systemImage: selectedArePrivate ? "lock.open" : "lock",
-            action: togglePrivacy
-        )
-        Button("Clear Selection", systemImage: "xmark.circle", action: clearSelection)
-        Button("Delete", systemImage: "trash", role: .destructive, action: deleteSelected)
-        Divider()
-    }
+    // MARK: Nothing selected — idle actions
 
     @ViewBuilder
-    private var emptySelectionActions: some View {
-        Button("New Card", systemImage: "plus", action: addCard)
-        Button(
-            isChatVisible ? "Hide Chat" : "Show Chat",
-            systemImage: isChatVisible ? "sidebar.right" : "sparkles",
-            action: toggleChat
-        )
-        Divider()
+    private var idleActions: some View {
+        Button(action: paste) {
+            if isNarrow {
+                Image(systemName: "doc.on.clipboard")
+            } else {
+                Label("Clipboard", systemImage: "doc.on.clipboard")
+            }
+        }
+        .help("Add clipboard to canvas")
+
+        Menu {
+            Button("New Card", systemImage: "plus", action: addCard)
+            Button(
+                isChatVisible ? "Hide Chat" : "Chat",
+                systemImage: isChatVisible ? "sidebar.right" : "sparkles",
+                action: toggleChat
+            )
+            Divider()
+            Button("History", systemImage: "clock", action: openLibrary)
+            Button("Settings", systemImage: "gearshape", action: openSettings)
+        } label: {
+            Image(systemName: "ellipsis.circle")
+        }
     }
 }

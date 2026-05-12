@@ -2,14 +2,12 @@ import SwiftData
 import SwiftUI
 
 struct CanvasCardView: View {
-    // @Bindable wraps an @Observable model class and creates two-way Bindings from its properties.
-    // Unlike @Binding (which connects two views), @Bindable connects a view to an observable model.
     @Bindable var card: WorkspaceCard
     let canvasScale: CGFloat
     let isSelected: Bool
     let isRunning: Bool
     let selectedCardIDs: Set<UUID>
-    let dragState: CanvasDragState  // shared object so all selected cards move together during drag
+    let dragState: CanvasDragState
     let select: () -> Void
     let ask: () -> Void
     let edit: () -> Void
@@ -18,11 +16,10 @@ struct CanvasCardView: View {
     let delete: () -> Void
     let moveCards: (Set<UUID>, CGSize, CGFloat) -> Void
 
-    // @State for visual offset during drag/resize — not persisted, resets when the gesture ends.
     @State private var dragOffset: CGSize = .zero
     @State private var resizeOffset: CGSize = .zero
+    @State private var isDragging = false
 
-    // Compute the display size including any in-progress resize gesture delta.
     private var renderedWidth: CGFloat {
         clampedCardWidth(card.width + resizeOffset.width / canvasScale)
     }
@@ -41,14 +38,12 @@ struct CanvasCardView: View {
         .frame(width: renderedWidth, height: renderedHeight, alignment: .topLeading)
         .background(card.color.background, in: RoundedRectangle(cornerRadius: 8))
         .overlay(alignment: .top) {
-            // Top colour stripe acts as a visual accent bar.
             Rectangle()
                 .fill(card.color.accent)
                 .frame(height: 3)
                 .clipShape(.rect(topLeadingRadius: 8, topTrailingRadius: 8))
         }
         .overlay {
-            // Selection ring — thicker and uses accent colour when selected.
             RoundedRectangle(cornerRadius: 8)
                 .stroke(isSelected ? Color.accentColor : card.color.accent.opacity(0.22), lineWidth: isSelected ? 2.5 : 1)
         }
@@ -61,24 +56,25 @@ struct CanvasCardView: View {
         }
         .overlay {
             if isRunning {
-                // Semi-transparent overlay with a spinner while the transform runs.
                 RoundedRectangle(cornerRadius: 8)
                     .fill(.regularMaterial)
                 ProgressView()
             }
         }
-        // Apply drag offset: use this card's own dragOffset if dragging solo;
-        // otherwise follow the shared selectionOffset when part of a multi-select drag.
+        // Scale up slightly during drag — makes it feel like you're physically lifting the card.
+        .scaleEffect(isDragging ? 1.04 : 1.0)
+        .animation(.interactiveSpring(duration: 0.2), value: isDragging)
         .offset(dragOffset != .zero ? dragOffset : (isSelected ? dragState.selectionOffset : .zero))
-        .shadow(color: .black.opacity(dragOffset != .zero ? 0.22 : (isSelected ? 0.16 : 0.08)),
-                radius: dragOffset != .zero ? 18 : (isSelected ? 12 : 5),
-                y: dragOffset != .zero ? 12 : (isSelected ? 7 : 2))
-        // .contentShape makes the entire frame tappable, including any transparent areas.
+        .shadow(
+            color: .black.opacity(isDragging ? 0.26 : (isSelected ? 0.16 : 0.08)),
+            radius: isDragging ? 22 : (isSelected ? 12 : 5),
+            y: isDragging ? 14 : (isSelected ? 7 : 2)
+        )
         .contentShape(Rectangle())
         .onTapGesture(perform: select)
         .gesture(cardDrag)
         .contextMenu {
-            Button("Ask About This", systemImage: "bubble.left.and.bubble.right", action: ask)
+            Button("Ask About This", systemImage: "sparkles", action: ask)
             Button("Edit", systemImage: "pencil", action: edit)
             Button("Copy", systemImage: "doc.on.doc", action: copy)
             Button("Duplicate", systemImage: "plus.square.on.square", action: duplicate)
@@ -92,23 +88,24 @@ struct CanvasCardView: View {
         }
     }
 
-    // DragGesture tracks a finger or Apple Pencil drag across the screen.
+    // MARK: Gestures
+
     private var cardDrag: some Gesture {
-        DragGesture(minimumDistance: 6)
+        DragGesture(minimumDistance: 4)
             .onChanged { value in
+                if !isDragging {
+                    withAnimation(.interactiveSpring(duration: 0.15)) { isDragging = true }
+                }
                 dragOffset = value.translation
-                // Broadcast to all selected cards so they preview the same movement.
                 if isSelected { dragState.selectionOffset = value.translation }
             }
             .onEnded { value in
+                withAnimation(.interactiveSpring(duration: 0.2)) { isDragging = false }
                 dragState.selectionOffset = .zero
                 let movingIDs = isSelected ? selectedCardIDs : [card.id]
                 if movingIDs.count > 1 {
-                    // Multi-card move — let WorkspaceView update all model coordinates.
                     moveCards(movingIDs, value.translation, canvasScale)
                 } else {
-                    // Single card — update model coordinates directly.
-                    // Divide by canvasScale to convert screen pixels → canvas coordinates.
                     card.x += value.translation.width / canvasScale
                     card.y += value.translation.height / canvasScale
                     card.updatedAt = Date()
@@ -119,9 +116,7 @@ struct CanvasCardView: View {
 
     private var resizeDrag: some Gesture {
         DragGesture(minimumDistance: 4)
-            .onChanged { value in
-                resizeOffset = value.translation
-            }
+            .onChanged { value in resizeOffset = value.translation }
             .onEnded { value in
                 card.width = clampedCardWidth(card.width + value.translation.width / canvasScale)
                 card.height = clampedCardHeight(card.height + value.translation.height / canvasScale)
@@ -133,6 +128,8 @@ struct CanvasCardView: View {
     private func clampedCardWidth(_ width: CGFloat) -> CGFloat { min(max(170, width), 420) }
     private func clampedCardHeight(_ height: CGFloat) -> CGFloat { min(max(120, height), 360) }
 }
+
+// MARK: - Card header
 
 private struct CanvasCardHeader: View {
     @Bindable var card: WorkspaceCard
@@ -147,8 +144,8 @@ private struct CanvasCardHeader: View {
                 if let snippet = card.snippet {
                     HStack(spacing: 4) {
                         Text(snippet.sourceDetail)
-                        Text("-")
-                        Text(snippet.createdAt, style: .relative)    // e.g. "3 min ago"
+                        Text("·")
+                        Text(snippet.createdAt, style: .relative)
                     }
                     .font(.caption2)
                     .foregroundStyle(.secondary)
@@ -165,14 +162,15 @@ private struct CanvasCardHeader: View {
                     .foregroundStyle(.secondary)
                     .frame(width: 24, height: 24)
                     .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 6))
-                    .snippetDraggable(snippet)  // makes this icon a drag handle for other apps
+                    .snippetDraggable(snippet)
                     .help("Drag into another app")
             }
         }
     }
 }
 
-// Zoom and reset controls shown at the bottom-right of the canvas.
+// MARK: - Canvas controls strip
+
 struct CanvasControlStrip: View {
     let scale: CGFloat
     let canZoomOut: Bool
@@ -189,7 +187,7 @@ struct CanvasControlStrip: View {
                 .help("Zoom out")
             Text("\(Int(scale * 100))%")
                 .font(.caption.weight(.semibold))
-                .monospacedDigit()  // fixed-width digits prevent layout shifts as the number changes
+                .monospacedDigit()
                 .frame(width: 48)
             Button(action: zoomIn) { Image(systemName: "plus.magnifyingglass") }
                 .disabled(!canZoomIn)
@@ -211,6 +209,8 @@ struct CanvasControlStrip: View {
     }
 }
 
+// MARK: - Resize handle
+
 private struct ResizeHandle: View {
     var body: some View {
         Image(systemName: "arrow.down.right.and.arrow.up.left")
@@ -222,27 +222,84 @@ private struct ResizeHandle: View {
     }
 }
 
+// MARK: - Card edit sheet
+
 struct CardEditSheet: View {
     @Bindable var card: WorkspaceCard
     @Environment(\.dismiss) private var dismiss
+    @FocusState private var editorFocused: Bool
     @State private var text = ""
 
     var body: some View {
         NavigationStack {
-            TextEditor(text: $text)
-                .padding()
-                .navigationTitle("Edit Card")
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        Button("Cancel") { dismiss() }
+            VStack(spacing: 0) {
+                // Metadata header mirrors the card's own header so it's clear what you're editing.
+                if let snippet = card.snippet {
+                    HStack(spacing: 12) {
+                        SourceGlyph(snippet: snippet)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(snippet.sourceTitle)
+                                .font(.subheadline.weight(.semibold))
+                            Text(snippet.createdAt, style: .relative)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Text(typeLabel(for: snippet))
+                            .font(.caption.weight(.medium))
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(card.color.accent.opacity(0.15), in: Capsule())
+                            .foregroundStyle(card.color.accent)
                     }
-                    ToolbarItem(placement: .confirmationAction) {
-                        Button("Done", action: save)
-                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .background(card.color.background)
+                    Divider()
                 }
-                // .onAppear runs once when the view first appears — used here to seed the
-                // TextEditor with the card's current text before the user starts editing.
-                .onAppear { text = card.snippet?.text ?? "" }
+
+                TextEditor(text: $text)
+                    .font(card.snippet?.type == .code ? .system(.body, design: .monospaced) : .body)
+                    .padding(12)
+                    .focused($editorFocused)
+
+                Divider()
+
+                // Footer: character count + word count
+                HStack(spacing: 12) {
+                    Text("\(text.count) characters")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    let words = text.split(whereSeparator: \.isWhitespace).count
+                    if words > 0 {
+                        Text("·")
+                            .foregroundStyle(.tertiary)
+                        Text("\(words) words")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                }
+                .padding(.horizontal, 16)
+                .padding(.vertical, 8)
+            }
+            .navigationTitle("Edit Card")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    Button("Cancel") { dismiss() }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Save", action: save)
+                        .fontWeight(.semibold)
+                }
+            }
+            .onAppear {
+                text = card.snippet?.text ?? ""
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    editorFocused = true
+                }
+            }
         }
     }
 
@@ -250,5 +307,14 @@ struct CardEditSheet: View {
         card.snippet?.text = text
         card.updatedAt = Date()
         dismiss()
+    }
+
+    private func typeLabel(for snippet: Snippet) -> String {
+        switch snippet.type {
+        case .text:  "Text"
+        case .url:   "URL"
+        case .code:  "Code"
+        case .image: "Image"
+        }
     }
 }

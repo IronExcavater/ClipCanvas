@@ -3,9 +3,8 @@ import SwiftUI
 
 struct LibraryView: View {
     @Environment(\.modelContext) private var modelContext
-    @Environment(\.dismiss) private var dismiss  // dismiss() closes this sheet
+    @Environment(\.dismiss) private var dismiss
 
-    // @Query fetches all snippets, newest first, and updates the list automatically on any change.
     @Query(sort: \Snippet.createdAt, order: .reverse) private var snippets: [Snippet]
     @Query(
         filter: #Predicate<Workspace> { $0.isActive && !$0.isArchived },
@@ -22,50 +21,117 @@ struct LibraryView: View {
         return snippets.filter { $0.text.localizedCaseInsensitiveContains(searchText) }
     }
 
+    // Groups snippets into date buckets for section headers.
+    private var groupedSnippets: [(label: String, snippets: [Snippet])] {
+        let calendar = Calendar.current
+        let now = Date()
+        var today: [Snippet] = []
+        var yesterday: [Snippet] = []
+        var thisWeek: [Snippet] = []
+        var older: [Snippet] = []
+
+        for snippet in filteredSnippets {
+            if calendar.isDateInToday(snippet.createdAt) {
+                today.append(snippet)
+            } else if calendar.isDateInYesterday(snippet.createdAt) {
+                yesterday.append(snippet)
+            } else if let weekAgo = calendar.date(byAdding: .day, value: -7, to: now),
+                      snippet.createdAt > weekAgo {
+                thisWeek.append(snippet)
+            } else {
+                older.append(snippet)
+            }
+        }
+
+        return [
+            ("Today", today),
+            ("Yesterday", yesterday),
+            ("This Week", thisWeek),
+            ("Older", older),
+        ].filter { !$0.snippets.isEmpty }
+    }
+
     var body: some View {
         NavigationStack {
-            List {
+            Group {
                 if filteredSnippets.isEmpty {
                     ContentUnavailableView(
-                        searchText.isEmpty ? "No clips" : "No matches",
-                        systemImage: "tray"
+                        searchText.isEmpty ? "No clips yet" : "No matches",
+                        systemImage: searchText.isEmpty ? "doc.on.clipboard" : "magnifyingglass",
+                        description: searchText.isEmpty
+                            ? Text("Copied text and images appear here automatically.")
+                            : nil
                     )
-                    .listRowBackground(Color.clear)
                 } else {
-                    Section {
-                        HStack {
-                            Label("\(filteredSnippets.count) clips", systemImage: "clock")
-                            Spacer()
-                            Text("\(filteredSnippets.filter { $0.type == .image }.count) images")
-                                .foregroundStyle(.secondary)
-                        }
-                        .font(.caption)
-                    }
-                    ForEach(filteredSnippets) { snippet in
-                        LibraryRow(snippet: snippet, copy: { copy(snippet) }, addToCanvas: { addToCanvas(snippet) })
-                            .contextMenu {
-                                Button("Copy", systemImage: "doc.on.doc") { copy(snippet) }
-                                Button("Add to Canvas", systemImage: "rectangle.3.group") { addToCanvas(snippet) }
-                                Divider()
-                                Button("Delete", systemImage: "trash", role: .destructive) { delete(snippet) }
+                    List {
+                        summaryRow
+                        ForEach(groupedSnippets, id: \.label) { group in
+                            Section(group.label) {
+                                ForEach(group.snippets) { snippet in
+                                    LibraryRow(snippet: snippet, copy: { copy(snippet) }, addToCanvas: { addToCanvas(snippet) })
+                                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                            Button(role: .destructive) { delete(snippet) } label: {
+                                                Label("Delete", systemImage: "trash")
+                                            }
+                                        }
+                                        .swipeActions(edge: .leading) {
+                                            Button { addToCanvas(snippet) } label: {
+                                                Label("Canvas", systemImage: "plus.square")
+                                            }
+                                            .tint(.blue)
+                                            Button { copy(snippet) } label: {
+                                                Label("Copy", systemImage: "doc.on.doc")
+                                            }
+                                            .tint(.green)
+                                        }
+                                        .contextMenu {
+                                            Button("Copy", systemImage: "doc.on.doc") { copy(snippet) }
+                                            Button("Add to Canvas", systemImage: "rectangle.3.group") { addToCanvas(snippet) }
+                                            Divider()
+                                            Button("Delete", systemImage: "trash", role: .destructive) { delete(snippet) }
+                                        }
+                                }
                             }
+                        }
                     }
                 }
             }
-            .navigationTitle("Library")
-            .searchable(text: $searchText)  // adds a search bar that binds to searchText
+            .navigationTitle("History")
+            .searchable(text: $searchText, prompt: "Search clips…")
             .overlay(alignment: .top) {
                 if let feedback {
                     Text(feedback)
-                        .font(.caption)
+                        .font(.caption.weight(.medium))
                         .padding(.horizontal, 12)
                         .padding(.vertical, 7)
                         .background(.regularMaterial, in: Capsule())
                         .padding(.top, 8)
+                        .transition(.move(edge: .top).combined(with: .opacity))
                 }
             }
+            .animation(.easeInOut(duration: 0.22), value: feedback != nil)
         }
     }
+
+    // Summary row shows total counts at a glance.
+    private var summaryRow: some View {
+        HStack(spacing: 16) {
+            Label("\(snippets.count) clips", systemImage: "doc.on.clipboard")
+            let imageCount = snippets.filter { $0.type == .image }.count
+            if imageCount > 0 {
+                Label("\(imageCount) images", systemImage: "photo.on.rectangle")
+            }
+            let pinned = snippets.filter { $0.isPinned }.count
+            if pinned > 0 {
+                Label("\(pinned) pinned", systemImage: "pin")
+            }
+        }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+        .listRowBackground(Color.clear)
+    }
+
+    // MARK: Actions
 
     private func copy(_ snippet: Snippet) {
         PasteboardService.writeSnippet(snippet)
@@ -77,7 +143,6 @@ struct LibraryView: View {
             showFeedback("No active workspace")
             return
         }
-        // Use the stagger helper so library items don't pile on top of each other.
         let position = workspace.nextCardPosition()
         workspace.addCard(snippet: snippet, x: position.x, y: position.y)
         showFeedback("Added to canvas")
@@ -85,16 +150,12 @@ struct LibraryView: View {
     }
 
     private func delete(_ snippet: Snippet) {
-        // Deleting a Snippet sets WorkspaceCard.snippet to nil rather than deleting the card
-        // (the cascade rule runs Workspace → Card, not Snippet → Card). ExpiryService cleans
-        // up orphaned cards on the next app activation, but we also clean up here immediately.
         let cardDescriptor = FetchDescriptor<WorkspaceCard>()
         let allCards = (try? modelContext.fetch(cardDescriptor)) ?? []
         for card in allCards where card.snippet?.id == snippet.id {
             modelContext.delete(card)
         }
         modelContext.delete(snippet)
-        showFeedback("Deleted")
     }
 
     private func showFeedback(_ message: String) {
@@ -105,6 +166,8 @@ struct LibraryView: View {
         }
     }
 }
+
+// MARK: - Library row
 
 private struct LibraryRow: View {
     let snippet: Snippet
@@ -120,9 +183,14 @@ private struct LibraryRow: View {
                         .font(.subheadline.weight(.semibold))
                         .lineLimit(1)
                     HStack(spacing: 6) {
-                        Text(snippet.createdAt, style: .relative)  // e.g. "3 minutes ago"
+                        Text(snippet.createdAt, style: .relative)
                         if snippet.isMasked {
                             Label("Sensitive", systemImage: "lock.fill")
+                                .foregroundStyle(.orange)
+                        }
+                        if snippet.isPinned {
+                            Image(systemName: "pin.fill")
+                                .foregroundStyle(Color.accentColor)
                         }
                     }
                     .font(.caption)
@@ -134,14 +202,15 @@ private struct LibraryRow: View {
                     Button("Add to Canvas", systemImage: "rectangle.3.group", action: addToCanvas)
                 } label: {
                     Image(systemName: "ellipsis.circle")
+                        .foregroundStyle(.secondary)
                 }
                 .buttonStyle(.borderless)
             }
 
-            SnippetPreviewContent(snippet: snippet, lineLimit: 5, imageHeight: 180)
+            SnippetPreviewContent(snippet: snippet, lineLimit: 4, imageHeight: 160)
         }
         .padding(.vertical, 6)
-        .snippetDraggable(snippet)  // makes this row draggable to the canvas
-        .listRowBackground(snippet.cardVariant.background.opacity(0.20))
+        .snippetDraggable(snippet)
+        .listRowBackground(snippet.cardVariant.background.opacity(0.18))
     }
 }

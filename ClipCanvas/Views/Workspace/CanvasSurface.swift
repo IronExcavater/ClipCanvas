@@ -4,8 +4,6 @@ import PencilKit
 
 struct CanvasSurface: View {
     let workspace: Workspace?
-    // @Binding creates a two-way data connection with the parent (WorkspaceView).
-    // Changes here propagate up; changes in the parent propagate down.
     @Binding var selectedCardIDs: Set<UUID>
     @Binding var editingCard: WorkspaceCard?
     let runningTransforms: Set<UUID>
@@ -16,38 +14,42 @@ struct CanvasSurface: View {
     let moveCards: (Set<UUID>, CGSize, CGFloat) -> Void
     let addDroppedContent: (SnippetDragPayload, CGPoint) -> Void
 
-    // Canvas view state — tracks the current pan offset and zoom scale.
-    // We keep both a "base" and a "live" value: the live value updates during the gesture
-    // and the base is committed when the gesture ends, so the next gesture starts correctly.
     @State private var canvasOffset: CGSize = .zero
     @State private var baseOffset: CGSize = .zero
     @State private var canvasScale: CGFloat = 1
     @State private var baseScale: CGFloat = 1
-    // @State on a class — CanvasDragState is @Observable so all selected cards react
-    // to selectionOffset changes without passing Bindings to each card individually.
     @State private var dragState = CanvasDragState()
-    // When true, pan/zoom gestures are disabled and the PencilKit drawing overlay is active.
     @State private var drawingModeActive = false
-    @State private var drawingsByWorkspace: [UUID: PKDrawing] = [:]
-    @State private var fallbackDrawing = PKDrawing()
 
     private let boardSize = CGSize(width: 5000, height: 5000)
 
+    // Reads the active workspace's persisted drawing, decoding it from Data on demand.
+    private var activeDrawing: Binding<PKDrawing> {
+        Binding {
+            guard let data = workspace?.drawingData,
+                  let drawing = try? PKDrawing(data: data) else { return PKDrawing() }
+            return drawing
+        } set: { newValue in
+            let data = newValue.dataRepresentation()
+            // Store nil when the drawing is empty so hasActiveDrawing stays correct.
+            workspace?.drawingData = newValue.bounds.isEmpty ? nil : data
+        }
+    }
+
+    private var hasActiveDrawing: Bool {
+        workspace?.drawingData != nil
+    }
+
     var body: some View {
-        // GeometryReader gives us the surface's size so we can compute zoom anchors
-        // and card bounds for the fit-to-workspace feature.
         GeometryReader { proxy in
             ZStack(alignment: .topLeading) {
                 DotGrid(offset: canvasOffset, scale: canvasScale)
-                    // Disable pan when drawing so finger/pencil strokes go to PencilKit instead.
                     .gesture(drawingModeActive ? nil : panGesture)
                     .onTapGesture {
                         if !drawingModeActive { selectedCardIDs.removeAll() }
                     }
 
-                // CanvasDrawingView is a UIViewRepresentable wrapping PencilKit's PKCanvasView.
-                // It sits above the dot grid (zIndex 5) but below cards (zIndex 10+).
-                // allowsHitTesting controls whether touches reach this view or pass through.
+                // PencilKit overlay — transparent when drawing is inactive so gestures pass through.
                 CanvasDrawingView(
                     isActive: drawingModeActive,
                     drawing: activeDrawing,
@@ -82,19 +84,16 @@ struct CanvasSurface: View {
                                 delete: { deleteCard(card) },
                                 moveCards: moveCards
                             )
-                            // .position places the view's centre at (card.x, card.y) in canvas coords.
                             .position(x: card.x, y: card.y)
-                            // Higher zIndex floats a view above others — selected cards stay on top.
                             .zIndex(selectedCardIDs.contains(card.id) ? 20 : (card.transformRun == nil ? 1 : 2))
                         }
                     }
                     .frame(width: boardSize.width, height: boardSize.height, alignment: .topLeading)
-                    .scaleEffect(canvasScale, anchor: .topLeading)  // zoom from the top-left origin
+                    .scaleEffect(canvasScale, anchor: .topLeading)
                     .offset(canvasOffset)
                     .zIndex(10)
                 }
 
-                // Zoom/reset controls pinned to the bottom-right corner.
                 CanvasControlStrip(
                     scale: canvasScale,
                     canZoomOut: canvasScale > 0.35,
@@ -109,18 +108,16 @@ struct CanvasSurface: View {
                 .zIndex(1000)
 
                 drawingControls
-                .padding(.top, 12)
-                .padding(.leading, 12)
-                .zIndex(1000)
+                    .padding(.top, 12)
+                    .padding(.leading, 12)
+                    .zIndex(1000)
             }
             .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
-            // Accept drops of ClipCanvas's own drag type (SnippetDragPayload).
             .dropDestination(for: SnippetDragPayload.self) { items, location in
                 guard let payload = items.first, payload.hasContent else { return false }
                 addDroppedContent(payload, canvasPoint(for: location))
                 return true
             }
-            // Also accept plain-text drops from other apps.
             .dropDestination(for: String.self) { items, location in
                 guard let text = items.first?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty else {
                     return false
@@ -128,49 +125,36 @@ struct CanvasSurface: View {
                 addDroppedContent(SnippetDragPayload(text: text, imageData: nil), canvasPoint(for: location))
                 return true
             }
-            .clipped()  // clip cards that have been panned/zoomed outside the visible frame
-            // .simultaneousGesture lets the zoom recogniser run at the same time as the pan
-            // gesture on DotGrid — without this, one gesture would steal priority.
-            // Disabled when drawing so pinch gestures don't interfere with PencilKit strokes.
+            .clipped()
             .simultaneousGesture(drawingModeActive ? nil : zoomGesture(proxy: proxy))
             .onChange(of: workspace?.id) { _, _ in
+                // Deactivate drawing when switching workspaces so the new workspace
+                // loads its own drawing fresh without the old tool picker showing.
                 drawingModeActive = false
             }
             .onReceive(NotificationCenter.default.publisher(for: .localDataReset)) { _ in
-                clearAllDrawings()
+                // When all local data is cleared, wipe the active workspace drawing and
+                // reset drawing mode. Other workspaces are cleaned up by SwiftData cascade.
+                workspace?.drawingData = nil
+                drawingModeActive = false
             }
         }
         .background(Color.clipCanvasPageBackground)
     }
 
-    private var activeDrawing: Binding<PKDrawing> {
-        Binding {
-            guard let id = workspace?.id else { return fallbackDrawing }
-            return drawingsByWorkspace[id] ?? PKDrawing()
-        } set: { newValue in
-            guard let id = workspace?.id else {
-                fallbackDrawing = newValue
-                return
-            }
-            drawingsByWorkspace[id] = newValue
-        }
-    }
-
-    private var hasActiveDrawing: Bool {
-        guard let id = workspace?.id else { return !fallbackDrawing.bounds.isEmpty }
-        return !(drawingsByWorkspace[id]?.bounds.isEmpty ?? true)
-    }
+    // MARK: Drawing controls
 
     private var drawingControls: some View {
         HStack(spacing: 6) {
             Button {
-                drawingModeActive.toggle()
+                withAnimation(.snappy(duration: 0.14)) { drawingModeActive.toggle() }
             } label: {
                 Label(
                     drawingModeActive ? "Done" : "Draw",
                     systemImage: drawingModeActive ? "checkmark.circle.fill" : "pencil.tip"
                 )
             }
+            .foregroundStyle(drawingModeActive ? Color.accentColor : .primary)
 
             if hasActiveDrawing {
                 Button(role: .destructive, action: clearActiveDrawing) {
@@ -187,8 +171,9 @@ struct CanvasSurface: View {
         .background(.regularMaterial, in: Capsule())
     }
 
+    // MARK: Card selection
+
     private func select(_ card: WorkspaceCard) {
-        // Tap a selected card to deselect it; tap an unselected card to add it to the selection.
         if selectedCardIDs.contains(card.id) {
             selectedCardIDs.remove(card.id)
         } else {
@@ -196,7 +181,8 @@ struct CanvasSurface: View {
         }
     }
 
-    // DragGesture on the background — pans the entire canvas.
+    // MARK: Pan & zoom
+
     private var panGesture: some Gesture {
         DragGesture(minimumDistance: 6)
             .onChanged { value in
@@ -208,14 +194,11 @@ struct CanvasSurface: View {
             .onEnded { _ in baseOffset = canvasOffset }
     }
 
-    // MagnificationGesture is the two-finger pinch-to-zoom recogniser.
-    // We zoom around the screen centre so the user's focal point stays fixed.
     private func zoomGesture(proxy: GeometryProxy) -> some Gesture {
         MagnificationGesture()
             .onChanged { value in
                 let nextScale = clampedScale(baseScale * value)
                 let center = CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
-                // Adjust the pan offset so the point under the screen centre stays in place.
                 canvasOffset = CGSize(
                     width: center.x - (center.x - baseOffset.width) * nextScale / baseScale,
                     height: center.y - (center.y - baseOffset.height) * nextScale / baseScale
@@ -248,8 +231,6 @@ struct CanvasSurface: View {
             resetView()
             return
         }
-
-        // Compute the bounding box of all cards in canvas coordinates.
         let bounds = cards.reduce(CGRect.null) { rect, card in
             rect.union(CGRect(
                 x: CGFloat(card.x - card.width / 2),
@@ -263,14 +244,11 @@ struct CanvasSurface: View {
         let padding: CGFloat = 96
         let availableWidth  = max(proxy.size.width  - padding, 240)
         let availableHeight = max(proxy.size.height - padding, 180)
-        // Scale to fit the bounding box, clamped between 35% and 135%.
         let nextScale = min(max(min(availableWidth / bounds.width, availableHeight / bounds.height), 0.35), 1.35)
-        // Translate so the bounding box centre aligns with the screen centre.
         let nextOffset = CGSize(
             width:  proxy.size.width  / 2 - bounds.midX * nextScale,
             height: proxy.size.height / 2 - bounds.midY * nextScale
         )
-
         withAnimation(.snappy(duration: 0.22)) {
             canvasScale  = nextScale
             baseScale    = nextScale
@@ -289,19 +267,11 @@ struct CanvasSurface: View {
     }
 
     private func clearActiveDrawing() {
-        activeDrawing.wrappedValue = PKDrawing()
-        drawingModeActive = false
-    }
-
-    private func clearAllDrawings() {
-        drawingsByWorkspace.removeAll()
-        fallbackDrawing = PKDrawing()
-        drawingModeActive = false
+        workspace?.drawingData = nil
+        withAnimation(.snappy(duration: 0.14)) { drawingModeActive = false }
     }
 
     private func canvasPoint(for location: CGPoint) -> CGPoint {
-        // Drop locations arrive in screen coordinates. Convert to canvas coordinates
-        // by undoing the pan offset and zoom scale that are currently applied.
         CGPoint(
             x: (location.x - canvasOffset.width)  / canvasScale,
             y: (location.y - canvasOffset.height) / canvasScale
@@ -311,26 +281,21 @@ struct CanvasSurface: View {
     private func clampedScale(_ scale: CGFloat) -> CGFloat { min(max(scale, 0.35), 3) }
 }
 
-// @Observable makes this class work with SwiftUI's observation system — any view that
-// reads selectionOffset will re-render when it changes, without needing @Published.
 @Observable
 final class CanvasDragState {
     var selectionOffset: CGSize = .zero
 }
 
-// DotGrid draws the canvas background using SwiftUI's Canvas — a lower-level, imperative
-// 2D drawing API similar to HTML Canvas. Drawing dots manually is more efficient than
-// laying out hundreds of small View instances in a grid.
 private struct DotGrid: View {
     let offset: CGSize
     let scale: CGFloat
 
     var body: some View {
         Canvas { context, size in
-            let spacing = max(24 * scale, 12)   // dots get closer as you zoom out
-            let radius = min(1.2 * scale, 2)    // dots get smaller as you zoom out
+            let spacing = max(24 * scale, 12)
+            let radius = min(1.2 * scale, 2)
             var x = offset.width.truncatingRemainder(dividingBy: spacing)
-            if x < 0 { x += spacing }          // handle negative offsets (panned left)
+            if x < 0 { x += spacing }
             while x < size.width + spacing {
                 var y = offset.height.truncatingRemainder(dividingBy: spacing)
                 if y < 0 { y += spacing }
@@ -358,8 +323,6 @@ private struct EmptyCanvasHint: View {
         }
         .padding()
         .frame(maxWidth: .infinity, maxHeight: .infinity)
-        // allowsHitTesting(false) makes this view transparent to gestures —
-        // taps pass through to the DotGrid beneath it.
         .allowsHitTesting(false)
     }
 }

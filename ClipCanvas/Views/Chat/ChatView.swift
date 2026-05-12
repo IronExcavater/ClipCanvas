@@ -4,13 +4,11 @@ import SwiftUI
 struct WorkspaceChatPanel: View {
     let workspace: Workspace
     let contextCards: [WorkspaceCard]
-    // @Binding creates a two-way connection — changes here also update the parent's droppedChatContext.
     @Binding var extraContext: [String]
     let insertReply: (String) -> Void
     let close: () -> Void
 
     @Environment(\.modelContext) private var modelContext
-    // @AppStorage is a property wrapper that reads/writes to UserDefaults and re-renders on change.
     @AppStorage("openAIKey") private var openAIKey = ""
     @State private var thread: WorkspaceChatThread?
     @State private var inputText = ""
@@ -18,8 +16,6 @@ struct WorkspaceChatPanel: View {
     @State private var errorMessage: String?
 
     private var contextText: String {
-        // Combine card text and any dropped items into a single context string.
-        // A single filter handles both sources consistently.
         let cardText = contextCards.compactMap { $0.snippet?.text }
         return (cardText + extraContext)
             .filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
@@ -27,7 +23,6 @@ struct WorkspaceChatPanel: View {
     }
 
     private var messages: [WorkspaceChatMessage] {
-        // Filter out .system messages — those are only used to prime the model, not shown to users.
         thread?.sortedMessages.filter { $0.role != .system } ?? []
     }
 
@@ -35,17 +30,15 @@ struct WorkspaceChatPanel: View {
         VStack(spacing: 0) {
             header
             Divider()
-            MessageList(messages: messages, insertReply: insertReply)
+            MessageList(messages: messages, isSending: isSending, insertReply: insertReply)
             Divider()
             ChatInputBar(text: $inputText, isSending: isSending, send: send)
         }
-        // dropDestination makes this view a valid drag-and-drop target for plain strings.
         .dropDestination(for: String.self) { items, _ in
             extraContext.append(contentsOf: items.filter { !$0.isEmpty })
             ensureThread()
             return true
         }
-        // A second dropDestination handles SnippetDragPayload (ClipCanvas's custom drag type).
         .dropDestination(for: SnippetDragPayload.self) { items, _ in
             let dropped = items.compactMap { payload -> String? in
                 let text = payload.imageData != nil
@@ -58,8 +51,6 @@ struct WorkspaceChatPanel: View {
             return !dropped.isEmpty
         }
         .task { ensureThread() }
-        // Binding(get:set:) manually creates a Binding from arbitrary state — used here
-        // because `.alert(isPresented:)` needs a Bool Binding but we track state as String?.
         .alert("Chat Error", isPresented: Binding(
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
@@ -70,10 +61,12 @@ struct WorkspaceChatPanel: View {
         }
     }
 
+    // MARK: Header
+
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
-                Label("Workspace Chat", systemImage: "bubble.left.and.bubble.right")
+                Label("Workspace Chat", systemImage: "sparkles")
                     .font(.headline)
                 Spacer()
                 Button(action: close) {
@@ -101,6 +94,8 @@ struct WorkspaceChatPanel: View {
         }
         .padding(14)
     }
+
+    // MARK: Actions
 
     private func ensureThread() {
         guard thread == nil else { return }
@@ -135,8 +130,6 @@ struct WorkspaceChatPanel: View {
         thread.updatedAt = Date()
         modelContext.insert(userMessage)
 
-        // Pass previous messages as conversation history so the model has context.
-        // Drop the last message (the one we just added) since it's the current prompt.
         let history = messages.dropLast().map { msg in
             (role: msg.role == .user ? "user" : "assistant", content: msg.content)
         }
@@ -162,37 +155,87 @@ struct WorkspaceChatPanel: View {
     }
 }
 
+// MARK: - Message list
+
 private struct MessageList: View {
     let messages: [WorkspaceChatMessage]
+    let isSending: Bool
     let insertReply: (String) -> Void
 
     var body: some View {
-        // ScrollViewReader gives programmatic scroll control via proxy.scrollTo(_:anchor:).
         ScrollViewReader { proxy in
             ScrollView {
-                // LazyVStack only creates views as they scroll into frame — like React virtualisation.
                 LazyVStack(spacing: 12) {
-                    if messages.isEmpty {
-                        Image(systemName: "bubble.left.and.bubble.right")
-                            .font(.title2)
-                            .foregroundStyle(.tertiary)
-                            .frame(maxWidth: .infinity, minHeight: 140)
+                    if messages.isEmpty && !isSending {
+                        VStack(spacing: 12) {
+                            Image(systemName: "sparkles")
+                                .font(.title2)
+                                .foregroundStyle(.tertiary)
+                            Text("Ask about your canvas cards,\ndrop text to add context.")
+                                .font(.caption)
+                                .foregroundStyle(.tertiary)
+                                .multilineTextAlignment(.center)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 140)
                     }
                     ForEach(messages) { message in
                         ChatBubble(message: message, insertReply: insertReply)
-                            .id(message.id)     // id lets ScrollViewReader scroll to this view
+                            .id(message.id)
+                    }
+                    if isSending {
+                        TypingIndicator()
+                            .id("typing-indicator")
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
                     }
                 }
                 .padding(14)
+                .animation(.easeInOut(duration: 0.2), value: isSending)
             }
             .onChange(of: messages.count) { _, _ in
                 if let id = messages.last?.id {
                     withAnimation { proxy.scrollTo(id, anchor: .bottom) }
                 }
             }
+            .onChange(of: isSending) { _, sending in
+                if sending {
+                    withAnimation { proxy.scrollTo("typing-indicator", anchor: .bottom) }
+                }
+            }
         }
     }
 }
+
+// MARK: - Typing indicator (three bouncing dots)
+
+private struct TypingIndicator: View {
+    @State private var animating = false
+
+    var body: some View {
+        HStack(alignment: .bottom) {
+            HStack(spacing: 5) {
+                ForEach(0..<3, id: \.self) { i in
+                    Circle()
+                        .fill(Color.secondary.opacity(0.55))
+                        .frame(width: 8, height: 8)
+                        .offset(y: animating ? -5 : 0)
+                        .animation(
+                            .easeInOut(duration: 0.45)
+                                .repeatForever(autoreverses: true)
+                                .delay(Double(i) * 0.15),
+                            value: animating
+                        )
+                }
+            }
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(Color.clipCanvasSecondaryBackground, in: RoundedRectangle(cornerRadius: 16))
+            Spacer(minLength: 48)
+        }
+        .onAppear { animating = true }
+    }
+}
+
+// MARK: - Chat bubble
 
 private struct ChatBubble: View {
     let message: WorkspaceChatMessage
@@ -201,12 +244,19 @@ private struct ChatBubble: View {
     private var isUser: Bool { message.role == .user }
 
     var body: some View {
-        HStack {
+        HStack(alignment: .bottom, spacing: 8) {
             if isUser { Spacer(minLength: 36) }
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: isUser ? .trailing : .leading, spacing: 6) {
                 Text(message.content)
                     .font(.body)
-                    .textSelection(.enabled)    // lets users copy text with long-press
+                    .textSelection(.enabled)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 10)
+                    .background(
+                        isUser ? Color.accentColor : Color.clipCanvasSecondaryBackground,
+                        in: RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    )
+                    .foregroundStyle(isUser ? .white : .primary)
                 if !isUser {
                     Button {
                         insertReply(message.content)
@@ -215,19 +265,15 @@ private struct ChatBubble: View {
                             .font(.caption)
                     }
                     .buttonStyle(.borderless)
+                    .padding(.leading, 4)
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(
-                isUser ? Color.accentColor : Color.clipCanvasSecondaryBackground,
-                in: RoundedRectangle(cornerRadius: 10)
-            )
-            .foregroundStyle(isUser ? .white : .primary)
             if !isUser { Spacer(minLength: 36) }
         }
     }
 }
+
+// MARK: - Input bar
 
 private struct ChatInputBar: View {
     @Binding var text: String
@@ -236,19 +282,37 @@ private struct ChatInputBar: View {
 
     var body: some View {
         HStack(alignment: .bottom, spacing: 10) {
-            // axis: .vertical makes the TextField grow vertically up to lineLimit rows.
-            TextField("Ask, rewrite, compare...", text: $text, axis: .vertical)
+            TextField("Ask, rewrite, compare…", text: $text, axis: .vertical)
                 .lineLimit(1...5)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 8)
                 .background(Color.clipCanvasInputBackground, in: RoundedRectangle(cornerRadius: 10))
                 .disabled(isSending)
+                .onSubmit { if !isSending { send() } }
+
             Button(action: send) {
-                Image(systemName: isSending ? "hourglass" : "arrow.up.circle.fill")
-                    .font(.system(size: 28))
+                ZStack {
+                    Circle()
+                        .fill(canSend ? Color.accentColor : Color.secondary.opacity(0.25))
+                        .frame(width: 34, height: 34)
+                    if isSending {
+                        ProgressView()
+                            .tint(.white)
+                            .scaleEffect(0.75)
+                    } else {
+                        Image(systemName: "arrow.up")
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                }
             }
-            .disabled(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || isSending)
+            .disabled(!canSend)
+            .animation(.easeInOut(duration: 0.15), value: isSending)
         }
         .padding(12)
+    }
+
+    private var canSend: Bool {
+        !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && !isSending
     }
 }

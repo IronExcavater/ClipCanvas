@@ -1,8 +1,5 @@
 import SwiftUI
 
-// WorkspaceSidebar receives all its data and actions from WorkspaceView via plain let
-// properties and closures — it owns no state of its own except the search field.
-// This keeps it a "dumb" view: easy to test and reason about in isolation.
 struct WorkspaceSidebar: View {
     let workspaces: [Workspace]
     let snippets: [Snippet]
@@ -23,123 +20,95 @@ struct WorkspaceSidebar: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            WorkspaceSidebarHeader(
-                activeWorkspace: activeWorkspace,
-                createWorkspace: createWorkspace,
-                openLibrary: openLibrary
-            )
-            WorkspaceList(
-                workspaces: workspaces,
-                activeWorkspace: activeWorkspace,
-                activateWorkspace: activateWorkspace
-            )
+            sidebarHeader
             Divider()
-            RecentSnippetsHeader(
-                snippetCount: snippets.count,
-                searchText: $searchText,
-                openLibrary: openLibrary
-            )
-            RecentSnippetList(
-                snippets: filteredSnippets,
-                addSnippetToCanvas: addSnippetToCanvas,
-                copySnippet: copySnippet
-            )
+            workspaceList
+            Divider()
+            recentHeader
+            recentSnippetList
         }
-        .background(.regularMaterial)   // frosted glass that adapts to light/dark mode
+        .background(.regularMaterial)
     }
-}
 
-private struct WorkspaceSidebarHeader: View {
-    let activeWorkspace: Workspace?
-    let createWorkspace: () -> Void
-    let openLibrary: () -> Void
+    // MARK: Header
 
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(activeWorkspace?.name ?? "Canvas")
-                        .font(.headline)
-                        .lineLimit(1)
-                    Text("\(activeWorkspace?.cards.count ?? 0) cards")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                HStack(spacing: 6) {
-                    Button(action: createWorkspace) { Image(systemName: "plus") }
-                    Button(action: openLibrary)     { Image(systemName: "clock") }
+    private var sidebarHeader: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(activeWorkspace?.name ?? "Canvas")
+                    .font(.headline)
+                    .lineLimit(1)
+                Text("\(activeWorkspace?.cards.count ?? 0) cards")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            Button(action: createWorkspace) {
+                Image(systemName: "plus")
+            }
+            .buttonStyle(.borderless)
+            .help("New workspace")
+        }
+        .padding(.horizontal, 14)
+        .padding(.vertical, 12)
+    }
+
+    // MARK: Workspace list — plain ScrollView rows, no List chrome
+
+    private var workspaceList: some View {
+        ScrollView {
+            VStack(spacing: 0) {
+                ForEach(workspaces) { workspace in
+                    WorkspaceRow(
+                        workspace: workspace,
+                        isActive: workspace.id == activeWorkspace?.id,
+                        onTap: { activateWorkspace(workspace) }
+                    )
+                    if workspace.id != workspaces.last?.id {
+                        Divider().padding(.leading, 38)
+                    }
                 }
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
+        .frame(maxHeight: min(CGFloat(workspaces.count) * 52 + 8, 200))
     }
-}
 
-private struct WorkspaceList: View {
-    let workspaces: [Workspace]
-    let activeWorkspace: Workspace?
-    let activateWorkspace: (Workspace) -> Void
+    // MARK: Recent snippets
 
-    var body: some View {
-        List {
-            ForEach(workspaces) { workspace in
-                WorkspaceSidebarRow(workspace: workspace, isActive: workspace.id == activeWorkspace?.id)
-                    .contentShape(Rectangle())  // makes the full row tappable, not just the text
-                    .onTapGesture { activateWorkspace(workspace) }
-            }
-        }
-        .listStyle(.sidebar)
-        // Cap the workspace list height so the recent snippet section is always visible.
-        .frame(height: min(CGFloat(max(workspaces.count, 1)) * 44 + 12, 156))
-    }
-}
-
-private struct RecentSnippetsHeader: View {
-    let snippetCount: Int
-    @Binding var searchText: String
-    let openLibrary: () -> Void
-
-    var body: some View {
+    private var recentHeader: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
                 Text("Recent")
                     .font(.subheadline.weight(.semibold))
                 Spacer()
-                Button(action: openLibrary) { Image(systemName: "arrow.up.forward.app") }
-                    .buttonStyle(.borderless)
-                    .help("Open history")
-                Text("\(snippetCount)")
+                Text("\(snippets.count)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
+                Button(action: openLibrary) {
+                    Image(systemName: "arrow.up.right.square")
+                }
+                .buttonStyle(.borderless)
+                .help("Open history")
             }
             TextField("Search history", text: $searchText)
                 .textFieldStyle(.roundedBorder)
+                .font(.subheadline)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 10)
     }
-}
 
-private struct RecentSnippetList: View {
-    let snippets: [Snippet]
-    let addSnippetToCanvas: (Snippet) -> Void
-    let copySnippet: (Snippet) -> Void
-
-    var body: some View {
+    private var recentSnippetList: some View {
         ScrollView {
-            // LazyVStack only creates rows as they scroll into frame — important for
-            // long snippet lists where creating all views upfront would be slow.
             LazyVStack(spacing: 6) {
-                if snippets.isEmpty {
+                if filteredSnippets.isEmpty {
                     Image(systemName: "doc.on.clipboard")
                         .font(.title2)
                         .foregroundStyle(.tertiary)
-                        .frame(maxWidth: .infinity, minHeight: 120)
+                        .frame(maxWidth: .infinity, minHeight: 100)
                 } else {
-                    ForEach(snippets) { snippet in
-                        SnippetLibraryCard(
+                    ForEach(filteredSnippets) { snippet in
+                        SidebarSnippetCard(
                             snippet: snippet,
                             addToCanvas: { addSnippetToCanvas(snippet) },
                             copy: { copySnippet(snippet) }
@@ -153,27 +122,48 @@ private struct RecentSnippetList: View {
     }
 }
 
-private struct WorkspaceSidebarRow: View {
+// MARK: - Workspace row
+
+private struct WorkspaceRow: View {
     let workspace: Workspace
     let isActive: Bool
+    let onTap: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
-            Circle()
-                .fill(isActive ? Color.accentColor : Color.secondary.opacity(0.35))
-                .frame(width: 8, height: 8)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(workspace.name).lineLimit(1)
-                Text("\(workspace.cards.count) cards")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+        Button(action: onTap) {
+            HStack(spacing: 10) {
+                Image(systemName: isActive ? "rectangle.fill" : "rectangle")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(isActive ? Color.accentColor : Color.secondary)
+                    .frame(width: 20)
+                Text(workspace.name)
+                    .font(.subheadline)
+                    .fontWeight(isActive ? .semibold : .regular)
+                    .foregroundStyle(isActive ? .primary : .secondary)
+                    .lineLimit(1)
+                Spacer()
+                if isActive {
+                    Image(systemName: "checkmark")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(Color.accentColor)
+                } else {
+                    Text("\(workspace.cards.count)")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
+                }
             }
-            Spacer()
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
+            .background(isActive ? Color.accentColor.opacity(0.08) : Color.clear)
+            .contentShape(Rectangle())
         }
+        .buttonStyle(.plain)
     }
 }
 
-private struct SnippetLibraryCard: View {
+// MARK: - Snippet card
+
+private struct SidebarSnippetCard: View {
     let snippet: Snippet
     let addToCanvas: () -> Void
     let copy: () -> Void
@@ -195,6 +185,7 @@ private struct SnippetLibraryCard: View {
                 }
                 HStack(spacing: 4) {
                     Text(snippet.sourceTitle)
+                    Text("·")
                     Text(snippet.createdAt, style: .relative)
                 }
                 .font(.caption2)
@@ -215,6 +206,6 @@ private struct SnippetLibraryCard: View {
             Button("Add to Canvas", systemImage: "plus.square.on.square", action: addToCanvas)
             Button("Copy", systemImage: "doc.on.doc", action: copy)
         }
-        .snippetDraggable(snippet)  // drag this card onto the canvas
+        .snippetDraggable(snippet)
     }
 }
