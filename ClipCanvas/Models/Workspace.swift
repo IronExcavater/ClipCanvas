@@ -13,6 +13,9 @@ final class Workspace {
     @Relationship(deleteRule: .cascade, inverse: \CanvasPlacement.workspace)
     var placements: [CanvasPlacement] = []
 
+    @Relationship(deleteRule: .cascade, inverse: \AIChat.workspace)
+    var chats: [AIChat] = []
+
     init(name: String, sortIndex: Int = 0, isActive: Bool = false) {
         self.name = name
         self.sortIndex = sortIndex

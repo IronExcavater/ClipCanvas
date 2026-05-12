@@ -68,6 +68,10 @@ final class Clip {
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
 
+    // Cascade-delete all canvas placements when this clip is removed
+    @Relationship(deleteRule: .cascade, inverse: \CanvasPlacement.clip)
+    var placements: [CanvasPlacement] = []
+
     init(
         content: String,
         imageData: Data? = nil,
