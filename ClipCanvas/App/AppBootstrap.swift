@@ -2,25 +2,36 @@ import SwiftData
 import Foundation
 
 enum AppBootstrap {
-    // Ensures at least one workspace exists and exactly one is active.
-    // Call once at app launch from the SwiftData context.
     static func ensureActiveWorkspace(in context: ModelContext) {
         let all = (try? context.fetch(
-            FetchDescriptor<Workspace>(sortBy: [SortDescriptor(\Workspace.sortIndex)])
+            FetchDescriptor<Workspace>(
+                predicate: #Predicate { $0.deletedAt == nil },
+                sortBy: [SortDescriptor(\Workspace.sortIndex)]
+            )
         )) ?? []
 
         if all.isEmpty {
-            let ws = Workspace(name: "Canvas", sortIndex: 0, isActive: true)
-            context.insert(ws)
-            return
+            context.insert(Workspace(name: "Canvas", sortIndex: 0, isActive: true))
+        } else {
+            let active = all.filter(\.isActive)
+            if active.isEmpty {
+                all[0].isActive = true
+            } else if active.count > 1 {
+                active.dropFirst().forEach { $0.isActive = false }
+            }
         }
 
-        let active = all.filter(\.isActive)
-        if active.isEmpty {
-            all[0].isActive = true
-        } else if active.count > 1 {
-            // Repair state: keep only the first active
-            for ws in active.dropFirst() { ws.isActive = false }
+        seedBuiltInTags(in: context)
+    }
+
+    private static func seedBuiltInTags(in context: ModelContext) {
+        let existing = (try? context.fetch(
+            FetchDescriptor<ClipTag>(predicate: #Predicate { $0.isBuiltIn == true })
+        )) ?? []
+        guard existing.isEmpty else { return }
+
+        for def in ClipTag.builtInDefinitions {
+            context.insert(ClipTag(name: def.name, colorHex: def.hex, isBuiltIn: true, sortIndex: def.sortIndex))
         }
     }
 }

@@ -2,13 +2,14 @@ import Foundation
 import SwiftData
 
 @Model
-final class Workspace {
+final class Workspace: SoftDeletable {
     var id: UUID = UUID()
     var name: String
     var isActive: Bool = false
     var sortIndex: Int = 0
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
+    var deletedAt: Date? = nil
 
     @Relationship(deleteRule: .cascade, inverse: \CanvasPlacement.workspace)
     var placements: [CanvasPlacement] = []
@@ -20,6 +21,11 @@ final class Workspace {
         self.name = name
         self.sortIndex = sortIndex
         self.isActive = isActive
+    }
+
+    func softDelete() {
+        deletedAt = Date()
+        isActive = false
     }
 
     // Staggers new cards so they don't all land on top of each other

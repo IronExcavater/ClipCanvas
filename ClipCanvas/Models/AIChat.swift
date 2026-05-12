@@ -6,7 +6,12 @@ enum ChatRole: String, Codable {
     case assistant
 }
 
-// A chat session scoped to one workspace. Chats cascade-delete with their workspace.
+enum AttachmentState {
+    case live        // clip is active
+    case softDeleted // clip is in trash; can be restored
+    case hardDeleted // clip is permanently gone; UI shows a deleted placeholder
+}
+
 @Model
 final class AIChat {
     var id: UUID = UUID()
@@ -50,31 +55,19 @@ final class ChatMessage {
     }
 }
 
-// Attaches a clip to a message. When the clip is deleted, `clip` is nullified but
-// the snapshots (content, image, type, color) are kept so chat history stays readable.
-// The user can tap the attachment to see the snapshot in an overlay, or restore the clip.
 @Model
 final class ChatAttachment {
     var id: UUID = UUID()
     var message: ChatMessage?
-
-    // Live reference — nullified if clip is deleted
-    var clip: Clip?
-
-    // Preserved snapshots
-    var contentSnapshot: String
-    var imageDataSnapshot: Data?
-    var typeSnapshot: ClipType
-    var colorSnapshot: CardColor
+    var clip: Clip?   // nullified on hard delete
     var createdAt: Date = Date()
 
-    init(from clip: Clip) {
+    init(clip: Clip) {
         self.clip = clip
-        self.contentSnapshot = clip.content
-        self.imageDataSnapshot = clip.imageData
-        self.typeSnapshot = clip.type
-        self.colorSnapshot = clip.color
     }
 
-    var isDeleted: Bool { clip == nil }
+    var state: AttachmentState {
+        guard let clip else { return .hardDeleted }
+        return clip.deletedAt != nil ? .softDeleted : .live
+    }
 }

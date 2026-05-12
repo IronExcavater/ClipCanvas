@@ -27,12 +27,24 @@ import Testing
         #expect(SensitivityService.detect("api_key=abc123secretxyz") == .privateContent)
     }
 
-    @Test func tokenKeyword() {
+    @Test func apiTokenKeyword() {
+        #expect(SensitivityService.detect("api_token=abc123") == .privateContent)
+    }
+
+    @Test func bearerKeyword() {
         #expect(SensitivityService.detect("bearer token: eyJhbGciOiJIUzI") == .privateContent)
     }
 
     @Test func privateKeywordWinsOverPII() {
-        // if text has both a password keyword AND an email, privateContent wins
         #expect(SensitivityService.detect("password for foo@bar.com is hunter2") == .privateContent)
+    }
+
+    @Test func wordBoundaryPreventsPartialMatch() {
+        // "tokenize" should NOT match the "token" rule (no standalone "token" word)
+        #expect(SensitivityService.detect("I need to tokenize this text") == .normal)
+    }
+
+    @Test func clientSecretDetected() {
+        #expect(SensitivityService.detect("client_secret=abc123xyz") == .privateContent)
     }
 }

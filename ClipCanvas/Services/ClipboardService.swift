@@ -1,3 +1,4 @@
+import SwiftData
 import UIKit
 
 // A value representing what's on the clipboard right now
@@ -52,5 +53,29 @@ extension Clip {
         case .image(let data, let uti):
             return Clip(content: "", imageData: data, imageUTI: uti, origin: origin)
         }
+    }
+
+    static func findOrMake(
+        from content: ClipboardContent,
+        origin: ClipOrigin,
+        in context: ModelContext
+    ) -> (clip: Clip, isNew: Bool) {
+        switch content {
+        case .text(let text):
+            let fingerprint = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let existing = try? context.fetch(
+                FetchDescriptor<Clip>(
+                    predicate: #Predicate { $0.content == fingerprint && $0.deletedAt == nil }
+                )
+            )
+            if let first = existing?.first {
+                first.updatedAt = Date()
+                return (first, false)
+            }
+        case .image:
+            break
+        }
+
+        return (Clip.make(from: content, origin: origin), true)
     }
 }

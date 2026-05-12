@@ -55,7 +55,7 @@ enum CardColor: String, Codable, CaseIterable {
 // MARK: - Model
 
 @Model
-final class Clip {
+final class Clip: SoftDeletable {
     var id: UUID = UUID()
     var content: String
     var imageData: Data?
@@ -67,10 +67,13 @@ final class Clip {
     var isPinned: Bool = false
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
+    var deletedAt: Date? = nil
 
-    // Cascade-delete all canvas placements when this clip is removed
     @Relationship(deleteRule: .cascade, inverse: \CanvasPlacement.clip)
     var placements: [CanvasPlacement] = []
+
+    @Relationship(deleteRule: .nullify)
+    var tags: [ClipTag] = []
 
     init(
         content: String,
@@ -99,6 +102,11 @@ final class Clip {
         return content
     }
 
+    func softDelete() {
+        deletedAt = Date()
+        isPinned = false
+    }
+
     // MARK: - Type detection
 
     static func detect(content: String, imageData: Data?) -> ClipType {
@@ -108,21 +116,44 @@ final class Clip {
         return .text
     }
 
+    // Pre-compiled patterns
+    private static let urlPrefixRegex = try! NSRegularExpression(
+        pattern: #"^(?:https?://|www\.)\S"#,
+        options: .caseInsensitive
+    )
+    private static let codeKeywordRegex = try! NSRegularExpression(
+        pattern: #"\b(?:func|class|struct|enum|import|def|async|function|const|interface|extends|implements|public|private|protected|static|return|override|void|#include|#import|SELECT|FROM|WHERE|INSERT|UPDATE|DELETE|CREATE|ALTER)\b"#
+    )
+    private static let codeOperatorRegex = try! NSRegularExpression(
+        pattern: #"(?:->|=>|::|===|!==|\?\?|&&|\|\||\+=|-=|\*=|/=)"#
+    )
+
     private static func looksLikeURL(_ text: String) -> Bool {
-        guard let url = URL(string: text) else { return false }
-        return url.scheme == "https" || url.scheme == "http"
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.contains("\n"), (4...2048).contains(trimmed.count) else { return false }
+        let range = NSRange(trimmed.startIndex..., in: trimmed)
+        guard urlPrefixRegex.firstMatch(in: trimmed, range: range) != nil else { return false }
+        let candidate = trimmed.lowercased().hasPrefix("www.") ? "https://\(trimmed)" : trimmed
+        guard let url = URL(string: candidate), let host = url.host else { return false }
+        return host.contains(".")
     }
 
     private static func looksLikeCode(_ text: String) -> Bool {
         let lines = text.components(separatedBy: .newlines)
-        guard lines.count > 1 else { return false }
-        let keywords = [
-            "func ", "class ", "struct ", "enum ", "import ",
-            "def ", "async ", "function ", "const ", "public ",
-            "private ", "#include", "SELECT ", "->", "=>"
-        ]
-        let hits = keywords.filter { text.contains($0) }.count
-        let hasIndent = lines.dropFirst().contains { $0.hasPrefix("  ") || $0.hasPrefix("\t") }
-        return hits >= 2 || (hits >= 1 && hasIndent)
+        guard lines.count >= 2 else { return false }
+        let range = NSRange(text.startIndex..., in: text)
+        let keywords = codeKeywordRegex.numberOfMatches(in: text, range: range)
+        let operators = codeOperatorRegex.numberOfMatches(in: text, range: range)
+        let braces = text.filter { "{}[]".contains($0) }.count
+        let hasIndent = lines.dropFirst().contains { $0.hasPrefix("    ") || $0.hasPrefix("\t") }
+        let semicolons = text.filter { $0 == ";" }.count
+
+        var score = 0
+        score += min(keywords, 3)
+        score += min(operators, 2)
+        score += braces >= 4 ? 2 : braces >= 2 ? 1 : 0
+        if hasIndent { score += 1 }
+        if semicolons >= 2 { score += 1 }
+        return score >= 3
     }
 }
