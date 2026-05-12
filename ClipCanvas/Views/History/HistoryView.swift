@@ -1,7 +1,7 @@
 import SwiftData
 import SwiftUI
 
-struct LibraryView: View {
+struct HistoryView: View {
     @Environment(\.modelContext) private var modelContext
     @Environment(\.dismiss) private var dismiss
 
@@ -68,7 +68,7 @@ struct LibraryView: View {
                         ForEach(groupedSnippets, id: \.label) { group in
                             Section(group.label) {
                                 ForEach(group.snippets) { snippet in
-                                    LibraryRow(snippet: snippet, copy: { copy(snippet) }, addToCanvas: { addToCanvas(snippet) })
+                                    HistoryRow(snippet: snippet, copy: { copy(snippet) }, addToCanvas: { addToCanvas(snippet) })
                                         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                                             Button(role: .destructive) { delete(snippet) } label: {
                                                 Label("Delete", systemImage: "trash")
@@ -169,7 +169,7 @@ struct LibraryView: View {
 
 // MARK: - Library row
 
-private struct LibraryRow: View {
+private struct HistoryRow: View {
     let snippet: Snippet
     let copy: () -> Void
     let addToCanvas: () -> Void

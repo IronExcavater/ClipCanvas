@@ -15,7 +15,7 @@ struct WorkspaceTopBar: View {
     let selectedArePrivate: Bool
     let togglePrivacy: () -> Void
     let toggleChat: () -> Void
-    let openLibrary: () -> Void
+    let openHistory: () -> Void
     let openSettings: () -> Void
     let toggleSidebar: (() -> Void)?
 
@@ -92,14 +92,6 @@ struct WorkspaceTopBar: View {
         }
         .help("Delete selected")
 
-        // Deselect — always the last button, acts as a clear affordance
-        Button(action: clearSelection) {
-            Image(systemName: "xmark.circle.fill")
-                .foregroundStyle(.secondary)
-        }
-        .buttonStyle(.plain)   // plain so it doesn't get the bordered style
-        .help("Deselect all")
-
         // Overflow for less common actions
         Menu {
             Button(
@@ -110,6 +102,10 @@ struct WorkspaceTopBar: View {
         } label: {
             Image(systemName: "ellipsis.circle")
         }
+
+        // Done exits selection mode — standard iOS pattern, visually clean
+        Button("Done", action: clearSelection)
+            .fontWeight(.semibold)
     }
 
     // MARK: Nothing selected — idle actions
@@ -133,7 +129,7 @@ struct WorkspaceTopBar: View {
                 action: toggleChat
             )
             Divider()
-            Button("History", systemImage: "clock", action: openLibrary)
+            Button("History", systemImage: "clock", action: openHistory)
             Button("Settings", systemImage: "gearshape", action: openSettings)
         } label: {
             Image(systemName: "ellipsis.circle")

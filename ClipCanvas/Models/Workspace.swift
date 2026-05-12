@@ -13,7 +13,6 @@ final class Workspace {
     var isActive: Bool  // only one workspace should be active at a time
     // @Relationship with .cascade means deleting a Workspace also deletes all its cards and threads.
     // `inverse` tells SwiftData which property on the child points back to this parent.
-    var drawingData: Data?  // serialised PKDrawing — nil means no drawing on this workspace
     @Relationship(deleteRule: .cascade, inverse: \WorkspaceCard.workspace) var cards: [WorkspaceCard]
     @Relationship(deleteRule: .cascade, inverse: \WorkspaceChatThread.workspace) var chatThreads: [WorkspaceChatThread]
 
@@ -32,7 +31,6 @@ final class Workspace {
         self.isArchived = isArchived
         self.sortIndex = sortIndex
         self.isActive = isActive
-        self.drawingData = nil
         self.cards = []
         self.chatThreads = []
     }

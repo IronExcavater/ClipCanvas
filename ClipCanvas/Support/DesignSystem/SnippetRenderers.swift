@@ -41,7 +41,7 @@ extension View {
     }
 }
 
-// Renders the content of a Snippet — used on canvas cards, sidebar rows, and the library.
+// Renders the content of a Snippet — used on canvas cards, sidebar rows, and the history sheet.
 struct SnippetPreviewContent: View {
     let snippet: Snippet?
     let lineLimit: Int

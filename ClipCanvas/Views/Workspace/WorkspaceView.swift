@@ -21,7 +21,7 @@ struct WorkspaceView: View {
     @State private var editingCard: WorkspaceCard?
     @State private var showChatPanel = false
     @State private var showSettings = false
-    @State private var showLibrary = false
+    @State private var showHistory = false
     @State private var feedback: String?
     @State private var runningTransforms = Set<UUID>()
     @State private var chatContextCardIDs = Set<UUID>()
@@ -52,8 +52,8 @@ struct WorkspaceView: View {
             .sheet(isPresented: $showSettings) {
                 SettingsView()
             }
-            .sheet(isPresented: $showLibrary) {
-                LibraryView()
+            .sheet(isPresented: $showHistory) {
+                HistoryView()
             }
             // .onChange fires whenever the observed value changes, giving both old and new values.
             .onChange(of: router.pendingRoute) { _, route in
@@ -117,7 +117,7 @@ struct WorkspaceView: View {
             createWorkspace: createWorkspace,
             addSnippetToCanvas: addSnippetToCanvas,
             copySnippet: copySnippet,
-            openLibrary: { showLibrary = true }
+            openHistory: { showHistory = true }
         )
         .frame(width: 252)
     }
@@ -125,7 +125,7 @@ struct WorkspaceView: View {
     private var canvasSurface: some View {
         CanvasSurface(
             workspace: activeWorkspace,
-            selectedCardIDs: $selectedCardIDs,  // $ passes a Binding — two-way connection
+            selectedCardIDs: $selectedCardIDs,
             editingCard: $editingCard,
             runningTransforms: runningTransforms,
             openChatForCard: openChat(for:),
@@ -133,7 +133,8 @@ struct WorkspaceView: View {
             deleteCard: deleteCard,
             duplicateCard: duplicateCard,
             moveCards: moveCards,
-            addDroppedContent: addDroppedContent
+            addDroppedContent: addDroppedContent,
+            paste: { pasteToCanvas(method: .manualPaste) }
         )
     }
 
@@ -172,7 +173,7 @@ struct WorkspaceView: View {
                 selectedArePrivate: selectedArePrivate,
                 togglePrivacy: toggleSelectedPrivacy,
                 toggleChat: { showChatPanel.toggle() },
-                openLibrary: { showLibrary = true },
+                openHistory: { showHistory = true },
                 openSettings: { showSettings = true },
                 toggleSidebar: toggleSidebar
             )
@@ -218,7 +219,7 @@ struct WorkspaceView: View {
             router.pendingRoute = nil
             router.pendingPasteMethod = nil
         case .library:
-            showLibrary = true
+            showHistory = true
             router.pendingRoute = nil
         case .settings:
             showSettings = true

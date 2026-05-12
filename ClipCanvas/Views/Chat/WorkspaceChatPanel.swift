@@ -69,10 +69,8 @@ struct WorkspaceChatPanel: View {
                 Label("Workspace Chat", systemImage: "sparkles")
                     .font(.headline)
                 Spacer()
-                Button(action: close) {
-                    Image(systemName: "xmark.circle.fill")
-                        .foregroundStyle(.secondary)
-                }
+                Button("Close", action: close)
+                    .font(.subheadline)
             }
 
             HStack(spacing: 8) {

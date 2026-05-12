@@ -9,7 +9,7 @@ struct WorkspaceSidebar: View {
     let createWorkspace: () -> Void
     let addSnippetToCanvas: (Snippet) -> Void
     let copySnippet: (Snippet) -> Void
-    let openLibrary: () -> Void
+    let openHistory: () -> Void
 
     @State private var searchText = ""
 
@@ -84,11 +84,9 @@ struct WorkspaceSidebar: View {
                 Text("\(snippets.count)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
-                Button(action: openLibrary) {
-                    Image(systemName: "arrow.up.right.square")
-                }
-                .buttonStyle(.borderless)
-                .help("Open history")
+                Button("All", action: openHistory)
+                    .buttonStyle(.borderless)
+                    .help("Open full history")
             }
             TextField("Search history", text: $searchText)
                 .textFieldStyle(.roundedBorder)

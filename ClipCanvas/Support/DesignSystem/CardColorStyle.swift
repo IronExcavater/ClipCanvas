@@ -15,7 +15,7 @@ extension CardColor {
         }
     }
 
-    // Accent is used for the top border stripe and icon tinting on each card.
+    // Accent is used for icon tinting and type badges on each card.
     var accent: Color {
         switch self {
         case .default: Color.secondary

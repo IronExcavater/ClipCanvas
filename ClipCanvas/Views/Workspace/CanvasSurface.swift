@@ -2,6 +2,12 @@ import SwiftData
 import SwiftUI
 import PencilKit
 
+// The two canvas interaction modes.
+enum CanvasTool: Equatable {
+    case select   // default — drag cards, pan/zoom canvas
+    case draw     // PencilKit overlay active, touch goes to drawing
+}
+
 struct CanvasSurface: View {
     let workspace: Workspace?
     @Binding var selectedCardIDs: Set<UUID>
@@ -13,32 +19,25 @@ struct CanvasSurface: View {
     let duplicateCard: (WorkspaceCard) -> Void
     let moveCards: (Set<UUID>, CGSize, CGFloat) -> Void
     let addDroppedContent: (SnippetDragPayload, CGPoint) -> Void
+    let paste: () -> Void
 
     @State private var canvasOffset: CGSize = .zero
     @State private var baseOffset: CGSize = .zero
     @State private var canvasScale: CGFloat = 1
     @State private var baseScale: CGFloat = 1
     @State private var dragState = CanvasDragState()
-    @State private var drawingModeActive = false
+    @State private var activeTool: CanvasTool = .select
+
+    // Drawing lives in @State (fast) and is saved to disk via DrawingService (no SwiftData).
+    // This is the key performance fix — previously storing PKDrawing in SwiftData caused
+    // every pen stroke to trigger re-renders across all canvas cards.
+    @State private var currentDrawing = PKDrawing()
+    @State private var drawingVersion = 0      // bumped when content actually changes
+    @State private var saveTask: Task<Void, Never>?
 
     private let boardSize = CGSize(width: 5000, height: 5000)
-
-    // Reads the active workspace's persisted drawing, decoding it from Data on demand.
-    private var activeDrawing: Binding<PKDrawing> {
-        Binding {
-            guard let data = workspace?.drawingData,
-                  let drawing = try? PKDrawing(data: data) else { return PKDrawing() }
-            return drawing
-        } set: { newValue in
-            let data = newValue.dataRepresentation()
-            // Store nil when the drawing is empty so hasActiveDrawing stays correct.
-            workspace?.drawingData = newValue.bounds.isEmpty ? nil : data
-        }
-    }
-
-    private var hasActiveDrawing: Bool {
-        workspace?.drawingData != nil
-    }
+    private var drawingModeActive: Bool { activeTool == .draw }
+    private var hasActiveDrawing: Bool { !currentDrawing.bounds.isEmpty }
 
     var body: some View {
         GeometryReader { proxy in
@@ -49,10 +48,10 @@ struct CanvasSurface: View {
                         if !drawingModeActive { selectedCardIDs.removeAll() }
                     }
 
-                // PencilKit overlay — transparent when drawing is inactive so gestures pass through.
                 CanvasDrawingView(
                     isActive: drawingModeActive,
-                    drawing: activeDrawing,
+                    drawing: Binding(get: { currentDrawing }, set: { onDrawingChanged($0) }),
+                    drawingVersion: drawingVersion,
                     canvasOffset: canvasOffset,
                     canvasScale: canvasScale,
                     boardSize: boardSize
@@ -62,9 +61,7 @@ struct CanvasSurface: View {
                 .allowsHitTesting(drawingModeActive)
                 .zIndex(5)
 
-                if let workspace, workspace.cards.isEmpty {
-                    EmptyCanvasHint()
-                }
+                if let workspace, workspace.cards.isEmpty { EmptyCanvasHint() }
 
                 if let workspace {
                     ZStack(alignment: .topLeading) {
@@ -94,6 +91,7 @@ struct CanvasSurface: View {
                     .zIndex(10)
                 }
 
+                // Bottom-right: zoom controls
                 CanvasControlStrip(
                     scale: canvasScale,
                     canZoomOut: canvasScale > 0.35,
@@ -104,13 +102,20 @@ struct CanvasSurface: View {
                     reset: resetView
                 )
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                .padding(18)
+                .padding(.trailing, 18)
+                .padding(.bottom, 18)
                 .zIndex(1000)
 
-                drawingControls
-                    .padding(.top, 12)
-                    .padding(.leading, 12)
-                    .zIndex(1000)
+                // Bottom-centre: Miro-style tool strip
+                CanvasToolbar(
+                    activeTool: $activeTool,
+                    hasDrawing: hasActiveDrawing,
+                    paste: paste,
+                    clearDrawing: clearActiveDrawing
+                )
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+                .padding(.bottom, 18)
+                .zIndex(1001)
             }
             .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
             .dropDestination(for: SnippetDragPayload.self) { items, location in
@@ -127,48 +132,58 @@ struct CanvasSurface: View {
             }
             .clipped()
             .simultaneousGesture(drawingModeActive ? nil : zoomGesture(proxy: proxy))
-            .onChange(of: workspace?.id) { _, _ in
-                // Deactivate drawing when switching workspaces so the new workspace
-                // loads its own drawing fresh without the old tool picker showing.
-                drawingModeActive = false
+            .onChange(of: workspace?.id) { oldID, newID in
+                // Force-save before switching so the outgoing workspace drawing is not lost.
+                if let oldID {
+                    saveTask?.cancel()
+                    DrawingService.save(currentDrawing, for: oldID)
+                }
+                activeTool = .select
+                loadDrawing(for: newID)
             }
             .onReceive(NotificationCenter.default.publisher(for: .localDataReset)) { _ in
-                // When all local data is cleared, wipe the active workspace drawing and
-                // reset drawing mode. Other workspaces are cleaned up by SwiftData cascade.
-                workspace?.drawingData = nil
-                drawingModeActive = false
+                DrawingService.deleteAll()
+                currentDrawing = PKDrawing()
+                drawingVersion += 1
+                activeTool = .select
             }
+            .task { loadDrawing(for: workspace?.id) }
         }
         .background(Color.clipCanvasPageBackground)
     }
 
-    // MARK: Drawing controls
+    // MARK: Drawing — file-based persistence
 
-    private var drawingControls: some View {
-        HStack(spacing: 6) {
-            Button {
-                withAnimation(.snappy(duration: 0.14)) { drawingModeActive.toggle() }
-            } label: {
-                Label(
-                    drawingModeActive ? "Done" : "Draw",
-                    systemImage: drawingModeActive ? "checkmark.circle.fill" : "pencil.tip"
-                )
-            }
-            .foregroundStyle(drawingModeActive ? Color.accentColor : .primary)
+    private func onDrawingChanged(_ newDrawing: PKDrawing) {
+        currentDrawing = newDrawing
+        drawingVersion &+= 1    // wrapping increment — avoids overflow on long sessions
+        scheduleSave(newDrawing)
+    }
 
-            if hasActiveDrawing {
-                Button(role: .destructive, action: clearActiveDrawing) {
-                    Image(systemName: "eraser")
-                }
-                .help("Clear drawing")
-            }
+    private func scheduleSave(_ drawing: PKDrawing) {
+        saveTask?.cancel()
+        guard let id = workspace?.id else { return }
+        saveTask = Task {
+            try? await Task.sleep(for: .milliseconds(400))
+            guard !Task.isCancelled else { return }
+            // Move the file write off the main actor.
+            let d = drawing
+            let i = id
+            DispatchQueue.global(qos: .utility).async { DrawingService.save(d, for: i) }
         }
-        .labelStyle(.titleAndIcon)
-        .font(.caption.weight(.semibold))
-        .buttonStyle(.plain)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(.regularMaterial, in: Capsule())
+    }
+
+    private func loadDrawing(for id: UUID?) {
+        let loaded = id.map { DrawingService.load(for: $0) } ?? PKDrawing()
+        currentDrawing = loaded
+        drawingVersion &+= 1
+    }
+
+    private func clearActiveDrawing() {
+        if let id = workspace?.id { DrawingService.delete(for: id) }
+        currentDrawing = PKDrawing()
+        drawingVersion &+= 1
+        withAnimation(.snappy(duration: 0.15)) { activeTool = .select }
     }
 
     // MARK: Card selection
@@ -197,89 +212,121 @@ struct CanvasSurface: View {
     private func zoomGesture(proxy: GeometryProxy) -> some Gesture {
         MagnificationGesture()
             .onChanged { value in
-                let nextScale = clampedScale(baseScale * value)
-                let center = CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
+                let next = clampedScale(baseScale * value)
+                let c = CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
                 canvasOffset = CGSize(
-                    width: center.x - (center.x - baseOffset.width) * nextScale / baseScale,
-                    height: center.y - (center.y - baseOffset.height) * nextScale / baseScale
+                    width:  c.x - (c.x - baseOffset.width)  * next / baseScale,
+                    height: c.y - (c.y - baseOffset.height) * next / baseScale
                 )
-                canvasScale = nextScale
+                canvasScale = next
             }
-            .onEnded { _ in
-                baseScale = canvasScale
-                baseOffset = canvasOffset
-            }
+            .onEnded { _ in baseScale = canvasScale; baseOffset = canvasOffset }
     }
 
     private func zoom(by factor: CGFloat, in proxy: GeometryProxy) {
-        let nextScale = clampedScale(canvasScale * factor)
-        let center = CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
-        let nextOffset = CGSize(
-            width: center.x - (center.x - canvasOffset.width) * nextScale / canvasScale,
-            height: center.y - (center.y - canvasOffset.height) * nextScale / canvasScale
+        let next = clampedScale(canvasScale * factor)
+        let c = CGPoint(x: proxy.size.width / 2, y: proxy.size.height / 2)
+        let offset = CGSize(
+            width:  c.x - (c.x - canvasOffset.width)  * next / canvasScale,
+            height: c.y - (c.y - canvasOffset.height) * next / canvasScale
         )
         withAnimation(.snappy(duration: 0.16)) {
-            canvasScale = nextScale
-            baseScale = nextScale
-            canvasOffset = nextOffset
-            baseOffset = nextOffset
+            canvasScale = next; baseScale = next
+            canvasOffset = offset; baseOffset = offset
         }
     }
 
     private func fitWorkspace(in proxy: GeometryProxy) {
-        guard let cards = workspace?.cards, !cards.isEmpty else {
-            resetView()
-            return
-        }
-        let bounds = cards.reduce(CGRect.null) { rect, card in
-            rect.union(CGRect(
-                x: CGFloat(card.x - card.width / 2),
-                y: CGFloat(card.y - card.height / 2),
-                width: CGFloat(card.width),
-                height: CGFloat(card.height)
-            ))
+        guard let cards = workspace?.cards, !cards.isEmpty else { resetView(); return }
+        let bounds = cards.reduce(CGRect.null) { r, c in
+            r.union(CGRect(x: c.x - c.width / 2, y: c.y - c.height / 2, width: c.width, height: c.height))
         }
         guard !bounds.isNull, bounds.width > 0, bounds.height > 0 else { return }
-
-        let padding: CGFloat = 96
-        let availableWidth  = max(proxy.size.width  - padding, 240)
-        let availableHeight = max(proxy.size.height - padding, 180)
-        let nextScale = min(max(min(availableWidth / bounds.width, availableHeight / bounds.height), 0.35), 1.35)
-        let nextOffset = CGSize(
-            width:  proxy.size.width  / 2 - bounds.midX * nextScale,
-            height: proxy.size.height / 2 - bounds.midY * nextScale
-        )
+        let pad: CGFloat = 96
+        let scale = min(max(min((proxy.size.width - pad) / bounds.width,
+                               (proxy.size.height - pad) / bounds.height), 0.35), 1.35)
+        let offset = CGSize(width:  proxy.size.width  / 2 - bounds.midX * scale,
+                            height: proxy.size.height / 2 - bounds.midY * scale)
         withAnimation(.snappy(duration: 0.22)) {
-            canvasScale  = nextScale
-            baseScale    = nextScale
-            canvasOffset = nextOffset
-            baseOffset   = nextOffset
+            canvasScale = scale; baseScale = scale
+            canvasOffset = offset; baseOffset = offset
         }
     }
 
     private func resetView() {
         withAnimation(.snappy(duration: 0.18)) {
-            canvasOffset = .zero
-            baseOffset   = .zero
-            canvasScale  = 1
-            baseScale    = 1
+            canvasOffset = .zero; baseOffset = .zero
+            canvasScale = 1; baseScale = 1
         }
     }
 
-    private func clearActiveDrawing() {
-        workspace?.drawingData = nil
-        withAnimation(.snappy(duration: 0.14)) { drawingModeActive = false }
-    }
-
     private func canvasPoint(for location: CGPoint) -> CGPoint {
-        CGPoint(
-            x: (location.x - canvasOffset.width)  / canvasScale,
-            y: (location.y - canvasOffset.height) / canvasScale
-        )
+        CGPoint(x: (location.x - canvasOffset.width)  / canvasScale,
+                y: (location.y - canvasOffset.height) / canvasScale)
     }
 
-    private func clampedScale(_ scale: CGFloat) -> CGFloat { min(max(scale, 0.35), 3) }
+    private func clampedScale(_ s: CGFloat) -> CGFloat { min(max(s, 0.35), 3) }
 }
+
+// MARK: - Miro-style canvas toolbar
+
+private struct CanvasToolbar: View {
+    @Binding var activeTool: CanvasTool
+    let hasDrawing: Bool
+    let paste: () -> Void
+    let clearDrawing: () -> Void
+
+    var body: some View {
+        HStack(spacing: 2) {
+            ToolButton(systemImage: "cursorarrow", label: "Select", isActive: activeTool == .select) {
+                withAnimation(.snappy(duration: 0.15)) { activeTool = .select }
+            }
+            ToolButton(systemImage: "pencil.tip", label: "Draw", isActive: activeTool == .draw) {
+                withAnimation(.snappy(duration: 0.15)) { activeTool = .draw }
+            }
+
+            Divider().frame(height: 22).padding(.horizontal, 4)
+
+            ToolButton(systemImage: "doc.on.clipboard", label: "Paste", isActive: false) {
+                paste()
+            }
+
+            if hasDrawing {
+                ToolButton(systemImage: "eraser.fill", label: "Clear Drawing", isActive: false, tint: .red) {
+                    clearDrawing()
+                }
+                .transition(.opacity.combined(with: .scale(scale: 0.8)))
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background(.regularMaterial, in: Capsule())
+        .shadow(color: .black.opacity(0.14), radius: 10, y: 4)
+        .animation(.snappy(duration: 0.18), value: hasDrawing)
+    }
+}
+
+private struct ToolButton: View {
+    let systemImage: String
+    let label: String
+    let isActive: Bool
+    var tint: Color = .primary
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 15, weight: .medium))
+                .foregroundStyle(isActive ? .white : tint)
+                .frame(width: 38, height: 38)
+                .background(isActive ? Color.accentColor : Color.clear, in: RoundedRectangle(cornerRadius: 9))
+        }
+        .buttonStyle(.plain)
+        .help(label)
+    }
+}
+
+// MARK: - Shared canvas types
 
 @Observable
 final class CanvasDragState {
@@ -293,7 +340,7 @@ private struct DotGrid: View {
     var body: some View {
         Canvas { context, size in
             let spacing = max(24 * scale, 12)
-            let radius = min(1.2 * scale, 2)
+            let radius  = min(1.2 * scale, 2)
             var x = offset.width.truncatingRemainder(dividingBy: spacing)
             if x < 0 { x += spacing }
             while x < size.width + spacing {
@@ -301,7 +348,8 @@ private struct DotGrid: View {
                 if y < 0 { y += spacing }
                 while y < size.height + spacing {
                     context.fill(
-                        Path(ellipseIn: CGRect(x: x - radius, y: y - radius, width: radius * 2, height: radius * 2)),
+                        Path(ellipseIn: CGRect(x: x - radius, y: y - radius,
+                                               width: radius * 2, height: radius * 2)),
                         with: .color(.secondary.opacity(0.22))
                     )
                     y += spacing
@@ -320,8 +368,12 @@ private struct EmptyCanvasHint: View {
                 .foregroundStyle(.tertiary)
             Text("Empty canvas")
                 .font(.headline)
+            Text("Paste from the toolbar below, or drag a clip from the sidebar")
+                .font(.caption)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
         }
-        .padding()
+        .padding(24)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .allowsHitTesting(false)
     }
