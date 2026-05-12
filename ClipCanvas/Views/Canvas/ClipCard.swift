@@ -3,25 +3,44 @@ import SwiftUI
 struct ClipCard: View {
     let clip: Clip
     let isSelected: Bool
+    let isSelectMode: Bool
     let onTap: () -> Void
+    let onLongPress: () -> Void
     let onDelete: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            content
-            Divider()
-                .background(clip.color.dividerColor)
-            footer
+        ZStack(alignment: .topLeading) {
+            VStack(alignment: .leading, spacing: 0) {
+                content
+                Divider().overlay(Color.primary.opacity(0.06))
+                footer
+            }
+            .background(clip.color.background, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay(selectionRing)
+            .shadow(color: .black.opacity(isSelected ? 0.18 : 0.08),
+                    radius: isSelected ? 12 : 5,
+                    y: isSelected ? 4 : 2)
+
+            // Selection checkmark — only visible in select mode
+            if isSelectMode {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.system(size: 20, weight: .semibold))
+                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary.opacity(0.7))
+                    .padding(8)
+                    .background(.regularMaterial, in: Circle())
+                    .padding(6)
+                    .transition(.scale.combined(with: .opacity))
+            }
         }
-        .background(clip.color.background, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .overlay(selectionRing)
-        .shadow(color: .black.opacity(isSelected ? 0.18 : 0.08), radius: isSelected ? 12 : 5, y: isSelected ? 4 : 2)
         .onTapGesture { onTap() }
+        .onLongPressGesture(minimumDuration: 0.35) { onLongPress() }
         .contextMenu {
             Button("Copy", systemImage: "doc.on.doc") {
                 ClipboardService.write(clip: clip)
             }
-
+            Button("Select", systemImage: "checkmark.circle") {
+                onLongPress()
+            }
             Menu("Color", systemImage: "paintpalette") {
                 ForEach(CardColor.allCases, id: \.self) { color in
                     Button {
@@ -31,13 +50,11 @@ struct ClipCard: View {
                     }
                 }
             }
-
             Divider()
-
-            Button("Delete", systemImage: "trash", role: .destructive) {
-                onDelete()
-            }
+            Button("Delete", systemImage: "trash", role: .destructive) { onDelete() }
         }
+        .animation(.spring(response: 0.2, dampingFraction: 0.75), value: isSelectMode)
+        .animation(.spring(response: 0.15), value: isSelected)
     }
 
     // MARK: - Subviews
@@ -65,15 +82,12 @@ struct ClipCard: View {
 
     private var footer: some View {
         HStack(spacing: 5) {
-            Image(systemName: clip.type.icon)
-                .font(.system(size: 10))
-            Text(clip.origin.label)
-                .font(.system(size: 10))
+            Image(systemName: clip.type.icon).font(.system(size: 10))
+            Text(clip.origin.label).font(.system(size: 10))
             Spacer()
-            Text(clip.createdAt, style: .relative)
-                .font(.system(size: 10))
+            Text(clip.createdAt, style: .relative).font(.system(size: 10))
         }
-        .foregroundStyle(clip.color.footerColor)
+        .foregroundStyle(Color.primary.opacity(0.5))
         .padding(.horizontal, 10)
         .padding(.vertical, 6)
     }
@@ -88,19 +102,32 @@ struct ClipCard: View {
 
 extension CardColor {
     var background: Color {
-        switch self {
-        case .cloud:    return Color(red: 0.96, green: 0.96, blue: 0.94)
-        case .banana:   return Color(red: 1.00, green: 0.95, blue: 0.46)
-        case .flamingo: return Color(red: 1.00, green: 0.67, blue: 0.67)
-        case .sage:     return Color(red: 0.71, green: 0.92, blue: 0.84)
-        case .sky:      return Color(red: 0.68, green: 0.84, blue: 0.95)
-        case .lavender: return Color(red: 0.84, green: 0.74, blue: 0.89)
-        case .peach:    return Color(red: 1.00, green: 0.85, blue: 0.76)
-        }
+        Color(UIColor(dynamicProvider: { traits in
+            switch self {
+            case .cloud:    return traits.userInterfaceStyle == .dark
+                ? UIColor(red: 0.22, green: 0.22, blue: 0.21, alpha: 1)
+                : UIColor(red: 0.96, green: 0.96, blue: 0.94, alpha: 1)
+            case .banana:   return traits.userInterfaceStyle == .dark
+                ? UIColor(red: 0.42, green: 0.38, blue: 0.03, alpha: 1)
+                : UIColor(red: 1.00, green: 0.95, blue: 0.46, alpha: 1)
+            case .flamingo: return traits.userInterfaceStyle == .dark
+                ? UIColor(red: 0.50, green: 0.17, blue: 0.17, alpha: 1)
+                : UIColor(red: 1.00, green: 0.67, blue: 0.67, alpha: 1)
+            case .sage:     return traits.userInterfaceStyle == .dark
+                ? UIColor(red: 0.10, green: 0.36, blue: 0.26, alpha: 1)
+                : UIColor(red: 0.71, green: 0.92, blue: 0.84, alpha: 1)
+            case .sky:      return traits.userInterfaceStyle == .dark
+                ? UIColor(red: 0.10, green: 0.29, blue: 0.44, alpha: 1)
+                : UIColor(red: 0.68, green: 0.84, blue: 0.95, alpha: 1)
+            case .lavender: return traits.userInterfaceStyle == .dark
+                ? UIColor(red: 0.30, green: 0.18, blue: 0.40, alpha: 1)
+                : UIColor(red: 0.84, green: 0.74, blue: 0.89, alpha: 1)
+            case .peach:    return traits.userInterfaceStyle == .dark
+                ? UIColor(red: 0.45, green: 0.20, blue: 0.10, alpha: 1)
+                : UIColor(red: 1.00, green: 0.85, blue: 0.76, alpha: 1)
+            }
+        }))
     }
-
-    var dividerColor: Color { background.opacity(0.6) }
-    var footerColor: Color { Color.black.opacity(0.45) }
 }
 
 // MARK: - Preview
@@ -109,17 +136,15 @@ extension CardColor {
     VStack(spacing: 16) {
         ClipCard(
             clip: Clip(content: "Buy oat milk and check the PR before standup tomorrow morning.", origin: .clipboard),
-            isSelected: false,
-            onTap: {},
-            onDelete: {}
+            isSelected: false, isSelectMode: false,
+            onTap: {}, onLongPress: {}, onDelete: {}
         )
         .frame(width: 220)
 
         ClipCard(
             clip: Clip(content: "https://developer.apple.com/documentation/swiftui", origin: .clipboard),
-            isSelected: true,
-            onTap: {},
-            onDelete: {}
+            isSelected: true, isSelectMode: true,
+            onTap: {}, onLongPress: {}, onDelete: {}
         )
         .frame(width: 220)
     }

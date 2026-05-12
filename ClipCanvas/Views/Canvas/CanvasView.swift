@@ -3,24 +3,35 @@ import SwiftData
 
 struct CanvasView: View {
     let workspace: Workspace
-    @Binding var selectedID: UUID?
+    let mode: CanvasMode
+    @Binding var selectedIDs: Set<UUID>
+    let onCopyClip: (Clip) -> Void
+    let onSelectModeEntry: (UUID) -> Void   // called on long-press: enter select mode with this placement ID
 
     @Environment(\.modelContext) private var context
     @State private var canvasOffset: CGSize = .zero
     @State private var canvasScale: CGFloat = 1.0
     @GestureState private var dragDelta: CGSize = .zero
     @GestureState private var pinchScale: CGFloat = 1.0
-    @State private var feedback: String?
+    // Tracks drag start position per placement to compute delta correctly
+    @State private var cardDragOrigin: (id: UUID, x: Double, y: Double)?
 
     private var placements: [CanvasPlacement] { workspace.placements }
+    private var effectiveScale: CGFloat { canvasScale * pinchScale }
+    private var effectiveOffset: CGSize {
+        CGSize(width: canvasOffset.width + dragDelta.width,
+               height: canvasOffset.height + dragDelta.height)
+    }
 
     var body: some View {
         GeometryReader { geo in
             ZStack {
                 dotGrid(in: geo)
                     .contentShape(Rectangle())
-                    .onTapGesture { selectedID = nil }
-                    .gesture(canvasPanGesture)
+                    .onTapGesture {
+                        if mode == .select { selectedIDs.removeAll() }
+                    }
+                    .gesture(mode != .select ? canvasPanGesture : nil)
 
                 ForEach(placements) { placement in
                     if let clip = placement.clip {
@@ -32,21 +43,18 @@ struct CanvasView: View {
             .clipped()
         }
         .simultaneousGesture(canvasPinchGesture)
-        .overlay(alignment: .top) {
-            if let feedback {
-                FeedbackBanner(message: feedback).padding(.top, 10)
-            }
+        .onChange(of: mode) { _, newMode in
+            if newMode != .select { selectedIDs.removeAll() }
         }
-        .animation(.easeInOut(duration: 0.15), value: feedback != nil)
     }
 
-    // MARK: - Dot grid background
+    // MARK: - Dot grid
 
     private func dotGrid(in geo: GeometryProxy) -> some View {
         Canvas { ctx, size in
-            let spacing = 28.0 * canvasScale * pinchScale
-            let ox = (canvasOffset.width + dragDelta.width).truncatingRemainder(dividingBy: spacing)
-            let oy = (canvasOffset.height + dragDelta.height).truncatingRemainder(dividingBy: spacing)
+            let spacing = 28.0 * effectiveScale
+            let ox = effectiveOffset.width.truncatingRemainder(dividingBy: spacing)
+            let oy = effectiveOffset.height.truncatingRemainder(dividingBy: spacing)
             var x = ox; while x < size.width + spacing { defer { x += spacing }
                 var y = oy; while y < size.height + spacing { defer { y += spacing }
                     ctx.fill(
@@ -62,34 +70,39 @@ struct CanvasView: View {
     // MARK: - Card positioning
 
     private func positionedCard(placement: CanvasPlacement, clip: Clip) -> some View {
-        let effectiveScale = canvasScale * pinchScale
-        let effectiveOffset = CGSize(
-            width: canvasOffset.width + dragDelta.width,
-            height: canvasOffset.height + dragDelta.height
-        )
-        let screenX = placement.x * effectiveScale + effectiveOffset.width
-        let screenY = placement.y * effectiveScale + effectiveOffset.height
+        let scale = effectiveScale
+        let offset = effectiveOffset
+        let screenCenterX = placement.x * scale + offset.width + (placement.width * scale) / 2
+        let screenCenterY = placement.y * scale + offset.height + (placement.height * scale) / 2
+        let isSelected = selectedIDs.contains(placement.id)
 
         return ClipCard(
             clip: clip,
-            isSelected: selectedID == placement.id,
-            onTap: { selectedID = (selectedID == placement.id) ? nil : placement.id },
+            isSelected: isSelected,
+            isSelectMode: mode == .select,
+            onTap: {
+                if mode == .select {
+                    if isSelected { selectedIDs.remove(placement.id) }
+                    else { selectedIDs.insert(placement.id) }
+                } else {
+                    onCopyClip(clip)
+                }
+            },
+            onLongPress: { onSelectModeEntry(placement.id) },
             onDelete: { deletePlacement(placement) }
         )
         .frame(width: placement.width, height: placement.height)
+        .scaleEffect(scale)
+        .frame(width: placement.width * scale, height: placement.height * scale)
         .gesture(cardDragGesture(for: placement))
-        .position(x: screenX + placement.width / 2, y: screenY + placement.height / 2)
-        .scaleEffect(effectiveScale, anchor: .topLeading)
-        .frame(width: placement.width * effectiveScale, height: placement.height * effectiveScale)
+        .position(x: screenCenterX, y: screenCenterY)
     }
 
     // MARK: - Gestures
 
     private var canvasPanGesture: some Gesture {
         DragGesture(minimumDistance: 4)
-            .updating($dragDelta) { value, state, _ in
-                state = value.translation
-            }
+            .updating($dragDelta) { value, state, _ in state = value.translation }
             .onEnded { value in
                 canvasOffset.width += value.translation.width
                 canvasOffset.height += value.translation.height
@@ -98,9 +111,7 @@ struct CanvasView: View {
 
     private var canvasPinchGesture: some Gesture {
         MagnificationGesture()
-            .updating($pinchScale) { value, state, _ in
-                state = value
-            }
+            .updating($pinchScale) { value, state, _ in state = value }
             .onEnded { value in
                 canvasScale = (canvasScale * value).clamped(to: 0.2...4.0)
             }
@@ -109,33 +120,24 @@ struct CanvasView: View {
     private func cardDragGesture(for placement: CanvasPlacement) -> some Gesture {
         DragGesture(minimumDistance: 4)
             .onChanged { value in
-                let scale = canvasScale * pinchScale
-                placement.x += value.translation.width / scale
-                placement.y += value.translation.height / scale
+                let scale = effectiveScale
+                // Capture start position on first change event
+                if cardDragOrigin == nil || cardDragOrigin?.id != placement.id {
+                    cardDragOrigin = (placement.id, placement.x, placement.y)
+                }
+                if let origin = cardDragOrigin, origin.id == placement.id {
+                    placement.x = origin.x + value.translation.width / scale
+                    placement.y = origin.y + value.translation.height / scale
+                }
             }
+            .onEnded { _ in cardDragOrigin = nil }
     }
 
     // MARK: - Actions
 
     private func deletePlacement(_ placement: CanvasPlacement) {
-        if selectedID == placement.id { selectedID = nil }
+        selectedIDs.remove(placement.id)
         context.delete(placement)
         workspace.updatedAt = Date()
-    }
-
-    private func showFeedback(_ msg: String) {
-        withAnimation { feedback = msg }
-        Task {
-            try? await Task.sleep(for: .seconds(1.7))
-            withAnimation { feedback = nil }
-        }
-    }
-}
-
-// MARK: - Helpers
-
-extension Comparable {
-    func clamped(to range: ClosedRange<Self>) -> Self {
-        Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
     }
 }
