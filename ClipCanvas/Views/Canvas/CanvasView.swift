@@ -113,7 +113,7 @@ struct CanvasView: View {
         MagnificationGesture()
             .updating($pinchScale) { value, state, _ in state = value }
             .onEnded { value in
-                canvasScale = (canvasScale * value).clamped(to: 0.2...4.0)
+                canvasScale = min(max(canvasScale * value, 0.2), 4.0)
             }
     }
 
