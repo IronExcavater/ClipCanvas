@@ -15,25 +15,27 @@ struct RootView: View {
     // MARK: - iPhone: canvas-first + overlay sidebar drawer
 
     private var iPhoneLayout: some View {
-        ZStack(alignment: .leading) {
-            CanvasHost(onToggleSidebar: { withAnimation { sidebarOpen.toggle() } })
+        GeometryReader { proxy in
+            ZStack(alignment: .leading) {
+                CanvasHost(onToggleSidebar: { withAnimation { sidebarOpen.toggle() } })
 
-            if sidebarOpen {
-                Color.black.opacity(0.35)
+                if sidebarOpen {
+                    Color.black.opacity(0.35)
+                        .ignoresSafeArea()
+                        .onTapGesture { withAnimation { sidebarOpen = false } }
+                        .transition(.opacity)
+
+                    NavigationStack {
+                        SidebarView(onClose: { withAnimation { sidebarOpen = false } })
+                    }
+                    .frame(width: min(proxy.size.width * 0.86, 360))
+                    .background(.regularMaterial)
                     .ignoresSafeArea()
-                    .onTapGesture { withAnimation { sidebarOpen = false } }
-                    .transition(.opacity)
-
-                NavigationStack {
-                    SidebarView(onClose: { withAnimation { sidebarOpen = false } })
+                    .transition(.move(edge: .leading).combined(with: .opacity))
                 }
-                .frame(width: min(UIScreen.main.bounds.width * 0.86, 360))
-                .background(.regularMaterial)
-                .ignoresSafeArea()
-                .transition(.move(edge: .leading).combined(with: .opacity))
             }
+            .animation(.spring(response: 0.32, dampingFraction: 0.88), value: sidebarOpen)
         }
-        .animation(.spring(response: 0.32, dampingFraction: 0.88), value: sidebarOpen)
     }
 
     // MARK: - iPad / Mac: NavigationSplitView
