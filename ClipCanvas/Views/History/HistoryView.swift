@@ -21,7 +21,6 @@ struct HistoryView: View {
         return snippets.filter { $0.text.localizedCaseInsensitiveContains(searchText) }
     }
 
-    // Groups snippets into date buckets for section headers.
     private var groupedSnippets: [(label: String, snippets: [Snippet])] {
         let calendar = Calendar.current
         let now = Date()
@@ -68,32 +67,41 @@ struct HistoryView: View {
                         ForEach(groupedSnippets, id: \.label) { group in
                             Section(group.label) {
                                 ForEach(group.snippets) { snippet in
-                                    HistoryRow(snippet: snippet, copy: { copy(snippet) }, addToCanvas: { addToCanvas(snippet) })
-                                        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                                            Button(role: .destructive) { delete(snippet) } label: {
-                                                Label("Delete", systemImage: "trash")
-                                            }
+                                    HistoryRow(
+                                        snippet: snippet,
+                                        copy: { copy(snippet) },
+                                        addToCanvas: { addToCanvas(snippet) }
+                                    )
+                                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                                        Button(role: .destructive) { delete(snippet) } label: {
+                                            Label("Delete", systemImage: "trash")
                                         }
-                                        .swipeActions(edge: .leading) {
-                                            Button { addToCanvas(snippet) } label: {
-                                                Label("Canvas", systemImage: "plus.square")
-                                            }
-                                            .tint(.blue)
-                                            Button { copy(snippet) } label: {
-                                                Label("Copy", systemImage: "doc.on.doc")
-                                            }
-                                            .tint(.green)
+                                    }
+                                    .swipeActions(edge: .leading) {
+                                        Button { addToCanvas(snippet) } label: {
+                                            Label("Canvas", systemImage: "plus.square")
                                         }
-                                        .contextMenu {
-                                            Button("Copy", systemImage: "doc.on.doc") { copy(snippet) }
-                                            Button("Add to Canvas", systemImage: "rectangle.3.group") { addToCanvas(snippet) }
-                                            Divider()
-                                            Button("Delete", systemImage: "trash", role: .destructive) { delete(snippet) }
+                                        .tint(.blue)
+                                        Button { copy(snippet) } label: {
+                                            Label("Copy", systemImage: "doc.on.doc")
                                         }
+                                        .tint(.green)
+                                    }
+                                    .contextMenu {
+                                        Button("Copy", systemImage: "doc.on.doc") { copy(snippet) }
+                                        Button("Add to Canvas", systemImage: "rectangle.3.group") { addToCanvas(snippet) }
+                                        Divider()
+                                        Button("Delete", systemImage: "trash", role: .destructive) { delete(snippet) }
+                                    }
+                                    .listRowBackground(
+                                        snippet.cardVariant.background.opacity(0.25)
+                                    )
+                                    .listRowSeparatorTint(snippet.cardVariant.accent.opacity(0.15))
                                 }
                             }
                         }
                     }
+                    .listStyle(.insetGrouped)
                 }
             }
             .navigationTitle("History")
@@ -113,9 +121,10 @@ struct HistoryView: View {
         }
     }
 
-    // Summary row shows total counts at a glance.
+    // MARK: Summary row
+
     private var summaryRow: some View {
-        HStack(spacing: 16) {
+        HStack(spacing: 14) {
             Label("\(snippets.count) clips", systemImage: "doc.on.clipboard")
             let imageCount = snippets.filter { $0.type == .image }.count
             if imageCount > 0 {
@@ -167,7 +176,7 @@ struct HistoryView: View {
     }
 }
 
-// MARK: - Library row
+// MARK: - History row
 
 private struct HistoryRow: View {
     let snippet: Snippet
@@ -175,42 +184,44 @@ private struct HistoryRow: View {
     let addToCanvas: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top, spacing: 10) {
-                SourceGlyph(snippet: snippet)
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(snippet.sourceTitle)
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(1)
-                    HStack(spacing: 6) {
-                        Text(snippet.createdAt, style: .relative)
-                        if snippet.isMasked {
-                            Label("Sensitive", systemImage: "lock.fill")
-                                .foregroundStyle(.orange)
-                        }
-                        if snippet.isPinned {
-                            Image(systemName: "pin.fill")
-                                .foregroundStyle(Color.accentColor)
-                        }
-                    }
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                }
-                Spacer()
-                Menu {
-                    Button("Copy", systemImage: "doc.on.doc", action: copy)
-                    Button("Add to Canvas", systemImage: "rectangle.3.group", action: addToCanvas)
-                } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.borderless)
-            }
+        HStack(alignment: .top, spacing: 10) {
+            SourceGlyph(snippet: snippet)
 
-            SnippetPreviewContent(snippet: snippet, lineLimit: 4, imageHeight: 160)
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(snippet.sourceTitle)
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(1)
+                        HStack(spacing: 5) {
+                            Text(snippet.createdAt, style: .relative)
+                            if snippet.isMasked {
+                                Label("Sensitive", systemImage: "lock.fill")
+                                    .foregroundStyle(.orange)
+                            }
+                            if snippet.isPinned {
+                                Image(systemName: "pin.fill")
+                                    .foregroundStyle(Color.accentColor)
+                            }
+                        }
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    }
+                    Spacer()
+                    Menu {
+                        Button("Copy", systemImage: "doc.on.doc", action: copy)
+                        Button("Add to Canvas", systemImage: "rectangle.3.group", action: addToCanvas)
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.borderless)
+                }
+
+                SnippetPreviewContent(snippet: snippet, lineLimit: 4, imageHeight: 140)
+            }
         }
-        .padding(.vertical, 6)
+        .padding(.vertical, 4)
         .snippetDraggable(snippet)
-        .listRowBackground(snippet.cardVariant.background.opacity(0.18))
     }
 }

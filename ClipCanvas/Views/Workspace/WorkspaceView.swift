@@ -22,9 +22,9 @@ struct WorkspaceView: View {
     @State private var showChatPanel = false
     @State private var showSettings = false
     @State private var showHistory = false
+    @State private var showChatHistory = false
     @State private var feedback: String?
     @State private var runningTransforms = Set<UUID>()
-    @State private var chatContextCardIDs = Set<UUID>()
     @State private var droppedChatContext: [String] = []
     @State private var lastObservedClipboard: String?
     @State private var showSidebar = false
@@ -38,10 +38,7 @@ struct WorkspaceView: View {
         return workspace.cards.filter { selectedCardIDs.contains($0.id) }
     }
 
-    private var chatContextCards: [WorkspaceCard] {
-        guard let workspace = activeWorkspace else { return [] }
-        return workspace.cards.filter { chatContextCardIDs.contains($0.id) }
-    }
+    private var chatContextCards: [WorkspaceCard] { selectedCards }
 
     var body: some View {
         mainContent
@@ -54,6 +51,9 @@ struct WorkspaceView: View {
             }
             .sheet(isPresented: $showHistory) {
                 HistoryView()
+            }
+            .sheet(isPresented: $showChatHistory) {
+                ChatHistoryView()
             }
             // .onChange fires whenever the observed value changes, giving both old and new values.
             .onChange(of: router.pendingRoute) { _, route in
@@ -110,14 +110,18 @@ struct WorkspaceView: View {
     private var sidebar: some View {
         WorkspaceSidebar(
             workspaces: workspaces,
-            snippets: Array(snippets.prefix(60)),   // cap to 60 most recent for performance
+            snippets: Array(snippets.prefix(60)),
             activeWorkspace: activeWorkspace,
             selectedCount: selectedCardIDs.count,
             activateWorkspace: { activateWorkspace($0.id) },
             createWorkspace: createWorkspace,
+            renameWorkspace: renameWorkspace,
+            deleteWorkspace: deleteWorkspace,
             addSnippetToCanvas: addSnippetToCanvas,
             copySnippet: copySnippet,
-            openHistory: { showHistory = true }
+            openHistory: { showHistory = true },
+            openSettings: { showSettings = true },
+            openChat: { showChatHistory = true }
         )
         .frame(width: 252)
     }
@@ -134,7 +138,8 @@ struct WorkspaceView: View {
             duplicateCard: duplicateCard,
             moveCards: moveCards,
             addDroppedContent: addDroppedContent,
-            paste: { pasteToCanvas(method: .manualPaste) }
+            paste: { pasteToCanvas(method: .manualPaste) },
+            addCard: addBlankCard
         )
     }
 
@@ -160,18 +165,7 @@ struct WorkspaceView: View {
         VStack(spacing: 0) {
             WorkspaceTopBar(
                 workspace: activeWorkspace,
-                selectedCount: selectedCardIDs.count,
-                isNarrow: isNarrow,
                 isChatVisible: showChatPanel,
-                paste: { pasteToCanvas(method: .manualPaste) },
-                addCard: addBlankCard,
-                transform: runTransform,
-                chat: openChatForSelection,
-                copySelected: copySelectedCards,
-                deleteSelected: deleteSelectedCards,
-                clearSelection: { selectedCardIDs.removeAll() },
-                selectedArePrivate: selectedArePrivate,
-                togglePrivacy: toggleSelectedPrivacy,
                 toggleChat: { showChatPanel.toggle() },
                 openHistory: { showHistory = true },
                 openSettings: { showSettings = true },
@@ -180,7 +174,6 @@ struct WorkspaceView: View {
 
             Divider()
 
-            // ZStack layers views on top of each other — the feedback toast floats above the canvas.
             ZStack(alignment: .top) {
                 if isNarrow {
                     VStack(spacing: 0) {
@@ -194,17 +187,104 @@ struct WorkspaceView: View {
                     }
                 }
 
-                if let feedback {
-                    Text(feedback)
-                        .font(.caption.weight(.medium))
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 7)
-                        .background(.regularMaterial, in: Capsule())
-                        .padding(.top, 10)
-                        .transition(.move(edge: .top).combined(with: .opacity))
+                VStack(spacing: 6) {
+                    if selectedCardIDs.count > 0 {
+                        selectionBar
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    }
+
+                    if let feedback {
+                        Text(feedback)
+                            .font(.caption.weight(.medium))
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 7)
+                            .background(.regularMaterial, in: Capsule())
+                            .transition(.move(edge: .top).combined(with: .opacity))
+                    }
                 }
+                .padding(.top, 10)
+                .animation(.snappy(duration: 0.2), value: selectedCardIDs.count > 0)
             }
         }
+    }
+
+    private var selectionBar: some View {
+        HStack(spacing: 2) {
+            // Count badge
+            HStack(spacing: 5) {
+                Text("\(selectedCardIDs.count)")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 20, height: 20)
+                    .background(Color.accentColor, in: Circle())
+                Text(selectedCardIDs.count == 1 ? "selected" : "selected")
+                    .font(.caption.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+            .padding(.leading, 4)
+            .padding(.trailing, 6)
+
+            selectionDivider
+
+            selectionIconButton("sparkles", help: "Ask AI") { openChatForSelection() }
+            selectionIconButton("doc.on.doc", help: "Copy") { copySelectedCards() }
+
+            Menu {
+                ForEach(TransformKind.allCases, id: \.self) { kind in
+                    Button(kind.label) { runTransform(kind) }
+                }
+            } label: {
+                Image(systemName: "wand.and.sparkles")
+                    .font(.system(size: 14, weight: .medium))
+                    .frame(width: 34, height: 32)
+                    .contentShape(Rectangle())
+            }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .help("Apple Intelligence transforms")
+
+            selectionDivider
+
+            selectionIconButton("trash", help: "Delete", tint: .red) { deleteSelectedCards() }
+
+            Menu {
+                Button(
+                    selectedArePrivate ? "Unmark Private" : "Mark Private",
+                    systemImage: selectedArePrivate ? "lock.open" : "lock",
+                    action: toggleSelectedPrivacy
+                )
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 13, weight: .medium))
+                    .frame(width: 28, height: 32)
+                    .contentShape(Rectangle())
+            }
+            .menuStyle(.button)
+            .buttonStyle(.plain)
+            .padding(.trailing, 4)
+        }
+        .frame(height: 40)
+        .background(.regularMaterial, in: Capsule())
+        .shadow(color: .black.opacity(0.14), radius: 10, y: 4)
+    }
+
+    private func selectionIconButton(_ icon: String, help label: String, tint: Color = .primary, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .medium))
+                .foregroundStyle(tint)
+                .frame(width: 34, height: 32)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(label)
+    }
+
+    private var selectionDivider: some View {
+        Rectangle()
+            .fill(Color.primary.opacity(0.1))
+            .frame(width: 1, height: 20)
+            .padding(.horizontal, 3)
     }
 
     // MARK: Routing
@@ -255,6 +335,21 @@ struct WorkspaceView: View {
     }
 
     // MARK: Workspace management
+
+    private func renameWorkspace(_ workspace: Workspace, name: String) {
+        workspace.name = name
+        workspace.updatedAt = Date()
+    }
+
+    private func deleteWorkspace(_ workspace: Workspace) {
+        let wasActive = workspace.isActive
+        modelContext.delete(workspace)
+        if wasActive, let next = workspaces.first(where: { $0.id != workspace.id }) {
+            next.isActive = true
+            next.updatedAt = Date()
+        }
+        selectedCardIDs.removeAll()
+    }
 
     private func activateWorkspace(_ id: UUID) {
         guard workspaces.contains(where: { $0.id == id }) else { return }
@@ -326,12 +421,10 @@ struct WorkspaceView: View {
     }
 
     private func openChatForSelection() {
-        chatContextCardIDs.formUnion(selectedCardIDs)
         showChatPanel = true
     }
 
     private func openChat(for card: WorkspaceCard) {
-        chatContextCardIDs.insert(card.id)
         selectedCardIDs = [card.id]
         showChatPanel = true
     }
@@ -405,7 +498,6 @@ struct WorkspaceView: View {
                     height: 180
                 )
                 selectedCardIDs = [card.id]
-                chatContextCardIDs.insert(card.id)
                 showFeedback("\(kind.label) complete")
             } catch {
                 run.status = .failed

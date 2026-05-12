@@ -2,10 +2,9 @@ import SwiftData
 import SwiftUI
 import PencilKit
 
-// The two canvas interaction modes.
 enum CanvasTool: Equatable {
-    case select   // default — drag cards, pan/zoom canvas
-    case draw     // PencilKit overlay active, touch goes to drawing
+    case select
+    case draw
 }
 
 struct CanvasSurface: View {
@@ -20,6 +19,7 @@ struct CanvasSurface: View {
     let moveCards: (Set<UUID>, CGSize, CGFloat) -> Void
     let addDroppedContent: (SnippetDragPayload, CGPoint) -> Void
     let paste: () -> Void
+    let addCard: () -> Void
 
     @State private var canvasOffset: CGSize = .zero
     @State private var baseOffset: CGSize = .zero
@@ -28,11 +28,8 @@ struct CanvasSurface: View {
     @State private var dragState = CanvasDragState()
     @State private var activeTool: CanvasTool = .select
 
-    // Drawing lives in @State (fast) and is saved to disk via DrawingService (no SwiftData).
-    // This is the key performance fix — previously storing PKDrawing in SwiftData caused
-    // every pen stroke to trigger re-renders across all canvas cards.
     @State private var currentDrawing = PKDrawing()
-    @State private var drawingVersion = 0      // bumped when content actually changes
+    @State private var drawingVersion = 0
     @State private var saveTask: Task<Void, Never>?
 
     private let boardSize = CGSize(width: 5000, height: 5000)
@@ -42,7 +39,9 @@ struct CanvasSurface: View {
     var body: some View {
         GeometryReader { proxy in
             ZStack(alignment: .topLeading) {
-                DotGrid(offset: canvasOffset, scale: canvasScale)
+                // Transparent background layer: captures pan + deselect taps
+                Color.clear
+                    .contentShape(Rectangle())
                     .gesture(drawingModeActive ? nil : panGesture)
                     .onTapGesture {
                         if !drawingModeActive { selectedCardIDs.removeAll() }
@@ -91,31 +90,6 @@ struct CanvasSurface: View {
                     .zIndex(10)
                 }
 
-                // Bottom-right: zoom controls
-                CanvasControlStrip(
-                    scale: canvasScale,
-                    canZoomOut: canvasScale > 0.35,
-                    canZoomIn: canvasScale < 3,
-                    zoomOut: { zoom(by: 0.85, in: proxy) },
-                    zoomIn: { zoom(by: 1.15, in: proxy) },
-                    fit: { fitWorkspace(in: proxy) },
-                    reset: resetView
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-                .padding(.trailing, 18)
-                .padding(.bottom, 18)
-                .zIndex(1000)
-
-                // Bottom-centre: Miro-style tool strip
-                CanvasToolbar(
-                    activeTool: $activeTool,
-                    hasDrawing: hasActiveDrawing,
-                    paste: paste,
-                    clearDrawing: clearActiveDrawing
-                )
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
-                .padding(.bottom, 18)
-                .zIndex(1001)
             }
             .frame(width: proxy.size.width, height: proxy.size.height, alignment: .topLeading)
             .dropDestination(for: SnippetDragPayload.self) { items, location in
@@ -131,9 +105,25 @@ struct CanvasSurface: View {
                 return true
             }
             .clipped()
+            .overlay(alignment: .bottom) {
+                CanvasBottomBar(
+                    activeTool: $activeTool,
+                    scale: canvasScale,
+                    hasDrawing: hasActiveDrawing,
+                    canZoomOut: canvasScale > 0.35,
+                    canZoomIn: canvasScale < 3,
+                    paste: paste,
+                    addCard: addCard,
+                    clearDrawing: clearActiveDrawing,
+                    zoomOut: { zoom(by: 0.85, in: proxy) },
+                    zoomIn: { zoom(by: 1.15, in: proxy) },
+                    fit: { fitWorkspace(in: proxy) },
+                    resetZoom: resetView
+                )
+                .padding(.bottom, 20)
+            }
             .simultaneousGesture(drawingModeActive ? nil : zoomGesture(proxy: proxy))
             .onChange(of: workspace?.id) { oldID, newID in
-                // Force-save before switching so the outgoing workspace drawing is not lost.
                 if let oldID {
                     saveTask?.cancel()
                     DrawingService.save(currentDrawing, for: oldID)
@@ -149,14 +139,21 @@ struct CanvasSurface: View {
             }
             .task { loadDrawing(for: workspace?.id) }
         }
-        .background(Color.clipCanvasPageBackground)
+        // DotGrid and background color extend behind the home indicator for a seamless canvas edge
+        .background(
+            ZStack {
+                Color.clipCanvasPageBackground
+                DotGrid(offset: canvasOffset, scale: canvasScale)
+            }
+            .ignoresSafeArea()
+        )
     }
 
-    // MARK: Drawing — file-based persistence
+    // MARK: Drawing
 
     private func onDrawingChanged(_ newDrawing: PKDrawing) {
         currentDrawing = newDrawing
-        drawingVersion &+= 1    // wrapping increment — avoids overflow on long sessions
+        drawingVersion &+= 1
         scheduleSave(newDrawing)
     }
 
@@ -166,7 +163,6 @@ struct CanvasSurface: View {
         saveTask = Task {
             try? await Task.sleep(for: .milliseconds(400))
             guard !Task.isCancelled else { return }
-            // Move the file write off the main actor.
             let d = drawing
             let i = id
             DispatchQueue.global(qos: .utility).async { DrawingService.save(d, for: i) }
@@ -268,16 +264,25 @@ struct CanvasSurface: View {
     private func clampedScale(_ s: CGFloat) -> CGFloat { min(max(s, 0.35), 3) }
 }
 
-// MARK: - Miro-style canvas toolbar
+// MARK: - Unified bottom toolbar (fixed width — always the same buttons)
 
-private struct CanvasToolbar: View {
+private struct CanvasBottomBar: View {
     @Binding var activeTool: CanvasTool
+    let scale: CGFloat
     let hasDrawing: Bool
+    let canZoomOut: Bool
+    let canZoomIn: Bool
     let paste: () -> Void
+    let addCard: () -> Void
     let clearDrawing: () -> Void
+    let zoomOut: () -> Void
+    let zoomIn: () -> Void
+    let fit: () -> Void
+    let resetZoom: () -> Void
 
     var body: some View {
-        HStack(spacing: 2) {
+        HStack(spacing: 0) {
+            // Tool selection
             ToolButton(systemImage: "cursorarrow", label: "Select", isActive: activeTool == .select) {
                 withAnimation(.snappy(duration: 0.15)) { activeTool = .select }
             }
@@ -285,24 +290,58 @@ private struct CanvasToolbar: View {
                 withAnimation(.snappy(duration: 0.15)) { activeTool = .draw }
             }
 
-            Divider().frame(height: 22).padding(.horizontal, 4)
+            barDivider
 
-            ToolButton(systemImage: "doc.on.clipboard", label: "Paste", isActive: false) {
-                paste()
-            }
+            // Content
+            ToolButton(systemImage: "doc.on.clipboard", label: "Paste from clipboard", isActive: false) { paste() }
+            ToolButton(systemImage: "note.text.badge.plus", label: "New card", isActive: false) { addCard() }
 
-            if hasDrawing {
-                ToolButton(systemImage: "eraser.fill", label: "Clear Drawing", isActive: false, tint: .red) {
-                    clearDrawing()
-                }
-                .transition(.opacity.combined(with: .scale(scale: 0.8)))
+            barDivider
+
+            // Zoom
+            ToolButton(systemImage: "minus.magnifyingglass", label: "Zoom out", isActive: false) { zoomOut() }
+                .disabled(!canZoomOut)
+                .opacity(canZoomOut ? 1 : 0.4)
+
+            Button(action: resetZoom) {
+                Text("\(Int(scale * 100))%")
+                    .font(.caption.weight(.semibold))
+                    .monospacedDigit()
+                    .frame(width: 38, height: 36)
+                    .foregroundStyle(.primary)
             }
+            .buttonStyle(.plain)
+            .help("Reset zoom to 100%")
+
+            ToolButton(systemImage: "plus.magnifyingglass", label: "Zoom in", isActive: false) { zoomIn() }
+                .disabled(!canZoomIn)
+                .opacity(canZoomIn ? 1 : 0.4)
+
+            ToolButton(systemImage: "arrow.up.left.and.arrow.down.right", label: "Fit all cards", isActive: false) { fit() }
+
+            barDivider
+
+            // Clear drawing — always present so the bar never changes width
+            ToolButton(
+                systemImage: "eraser.fill",
+                label: hasDrawing ? "Clear drawing" : "No drawing",
+                isActive: false,
+                tint: hasDrawing ? .red : .primary
+            ) { clearDrawing() }
+                .disabled(!hasDrawing)
+                .opacity(hasDrawing ? 1 : 0.3)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
         .background(.regularMaterial, in: Capsule())
         .shadow(color: .black.opacity(0.14), radius: 10, y: 4)
-        .animation(.snappy(duration: 0.18), value: hasDrawing)
+    }
+
+    private var barDivider: some View {
+        Rectangle()
+            .fill(Color.primary.opacity(0.1))
+            .frame(width: 1, height: 20)
+            .padding(.horizontal, 3)
     }
 }
 
@@ -318,8 +357,8 @@ private struct ToolButton: View {
             Image(systemName: systemImage)
                 .font(.system(size: 15, weight: .medium))
                 .foregroundStyle(isActive ? .white : tint)
-                .frame(width: 38, height: 38)
-                .background(isActive ? Color.accentColor : Color.clear, in: RoundedRectangle(cornerRadius: 9))
+                .frame(width: 34, height: 36)
+                .background(isActive ? Color.accentColor : Color.clear, in: RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
         .help(label)
@@ -331,6 +370,7 @@ private struct ToolButton: View {
 @Observable
 final class CanvasDragState {
     var selectionOffset: CGSize = .zero
+    var isDraggingActive: Bool = false
 }
 
 private struct DotGrid: View {
@@ -362,18 +402,20 @@ private struct DotGrid: View {
 
 private struct EmptyCanvasHint: View {
     var body: some View {
-        VStack(spacing: 10) {
-            Image(systemName: "rectangle.3.group.bubble.left")
-                .font(.system(size: 34))
+        VStack(spacing: 12) {
+            Image(systemName: "square.on.square.dashed")
+                .font(.system(size: 36))
                 .foregroundStyle(.tertiary)
-            Text("Empty canvas")
+            Text("Nothing here yet")
                 .font(.headline)
-            Text("Paste from the toolbar below, or drag a clip from the sidebar")
-                .font(.caption)
                 .foregroundStyle(.secondary)
+            Text("Paste from the toolbar · drag clips from the sidebar · or tap + to add a card")
+                .font(.caption)
+                .foregroundStyle(.tertiary)
                 .multilineTextAlignment(.center)
+                .frame(maxWidth: 260)
         }
-        .padding(24)
+        .padding(32)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .allowsHitTesting(false)
     }

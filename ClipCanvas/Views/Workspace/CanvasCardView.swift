@@ -19,12 +19,21 @@ struct CanvasCardView: View {
     @State private var dragOffset: CGSize = .zero
     @State private var resizeOffset: CGSize = .zero
     @State private var isDragging = false
+    @State private var isExpanded = false
 
     private var renderedWidth: CGFloat {
         clampedCardWidth(card.width + resizeOffset.width / canvasScale)
     }
     private var renderedHeight: CGFloat {
         clampedCardHeight(card.height + resizeOffset.height / canvasScale)
+    }
+    private var displayHeight: CGFloat {
+        isExpanded ? min(renderedHeight * 2.5, 520) : renderedHeight
+    }
+
+    // True when this card or any grouped selection is actively being dragged
+    private var isLiftedForDrag: Bool {
+        isDragging || (isSelected && dragState.isDraggingActive)
     }
 
     var body: some View {
@@ -33,7 +42,6 @@ struct CanvasCardView: View {
 
             if isSelected {
                 ResizeHandle()
-                    .padding(5)
                     .gesture(resizeDrag)
             }
 
@@ -43,8 +51,7 @@ struct CanvasCardView: View {
                     .overlay { ProgressView() }
             }
         }
-        .frame(width: renderedWidth, height: renderedHeight)
-        // Sticky-note styling: solid color, continuous radius, natural shadow
+        .frame(width: renderedWidth, height: displayHeight)
         .background(card.color.background, in: RoundedRectangle(cornerRadius: 12, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 12, style: .continuous)
@@ -54,15 +61,18 @@ struct CanvasCardView: View {
                 )
         }
         .shadow(
-            color: .black.opacity(isDragging ? 0.22 : (isSelected ? 0.14 : 0.10)),
-            radius: isDragging ? 20 : (isSelected ? 10 : 6),
-            y: isDragging ? 12 : (isSelected ? 6 : 4)
+            color: .black.opacity(isLiftedForDrag ? 0.22 : (isSelected ? 0.14 : 0.10)),
+            radius: isLiftedForDrag ? 20 : (isSelected ? 10 : 6),
+            y: isLiftedForDrag ? 12 : (isSelected ? 6 : 4)
         )
-        // Lift effect when dragging
-        .scaleEffect(isDragging ? 1.04 : 1.0)
-        .animation(.interactiveSpring(duration: 0.2), value: isDragging)
+        .scaleEffect(isLiftedForDrag ? 1.04 : 1.0)
+        .animation(.interactiveSpring(duration: 0.2), value: isLiftedForDrag)
+        .animation(.spring(duration: 0.28), value: isExpanded)
         .offset(dragOffset != .zero ? dragOffset : (isSelected ? dragState.selectionOffset : .zero))
         .contentShape(Rectangle())
+        .onTapGesture(count: 2) {
+            withAnimation(.spring(duration: 0.28)) { isExpanded.toggle() }
+        }
         .onTapGesture(perform: select)
         .gesture(cardDrag)
         .contextMenu {
@@ -80,22 +90,21 @@ struct CanvasCardView: View {
         }
     }
 
-    // MARK: Note body layout
+    // MARK: Note body
 
     @ViewBuilder
     private var noteBody: some View {
         VStack(alignment: .leading, spacing: 0) {
-            // Content fills the bulk of the note
             Group {
                 if let snippet = card.snippet, snippet.type == .image {
-                    SnippetPreviewContent(snippet: snippet, lineLimit: 9, imageHeight: max(80, renderedHeight - 54))
+                    SnippetPreviewContent(snippet: snippet, lineLimit: 12, imageHeight: max(80, displayHeight - 54))
                 } else {
                     Text(card.snippet?.preview ?? "Empty note")
                         .font(card.snippet?.type == .code
                               ? .system(.callout, design: .monospaced)
                               : .body)
                         .foregroundStyle((card.snippet?.text.isEmpty ?? true) ? .secondary : .primary)
-                        .lineLimit(12)
+                        .lineLimit(isExpanded ? nil : 12)
                         .frame(maxWidth: .infinity, alignment: .topLeading)
                         .textSelection(.enabled)
                 }
@@ -104,7 +113,6 @@ struct CanvasCardView: View {
             .padding(.top, 14)
             .frame(maxHeight: .infinity, alignment: .topLeading)
 
-            // Footer: source icon · relative time
             HStack(spacing: 5) {
                 if let snippet = card.snippet {
                     Image(systemName: snippet.sourceIcon)
@@ -117,6 +125,11 @@ struct CanvasCardView: View {
                     Image(systemName: "wand.and.sparkles")
                         .font(.caption2)
                         .foregroundStyle(.green.opacity(0.7))
+                }
+                if isExpanded {
+                    Image(systemName: "arrow.up.left.and.arrow.down.right")
+                        .font(.caption2)
+                        .foregroundStyle(.tertiary)
                 }
             }
             .foregroundStyle(.primary.opacity(0.38))
@@ -133,6 +146,7 @@ struct CanvasCardView: View {
             .onChanged { value in
                 if !isDragging {
                     withAnimation(.interactiveSpring(duration: 0.15)) { isDragging = true }
+                    if isSelected { dragState.isDraggingActive = true }
                 }
                 dragOffset = value.translation
                 if isSelected { dragState.selectionOffset = value.translation }
@@ -140,6 +154,7 @@ struct CanvasCardView: View {
             .onEnded { value in
                 withAnimation(.interactiveSpring(duration: 0.2)) { isDragging = false }
                 dragState.selectionOffset = .zero
+                dragState.isDraggingActive = false
                 let ids = isSelected ? selectedCardIDs : [card.id]
                 if ids.count > 1 {
                     moveCards(ids, value.translation, canvasScale)
@@ -160,6 +175,7 @@ struct CanvasCardView: View {
                 card.height = clampedCardHeight(card.height + value.translation.height / canvasScale)
                 card.updatedAt = Date()
                 resizeOffset = .zero
+                if isExpanded { isExpanded = false }
             }
     }
 
@@ -167,55 +183,25 @@ struct CanvasCardView: View {
     private func clampedCardHeight(_ h: CGFloat) -> CGFloat { min(max(120, h), 360) }
 }
 
-// MARK: - Zoom / reset control strip
-
-struct CanvasControlStrip: View {
-    let scale: CGFloat
-    let canZoomOut: Bool
-    let canZoomIn: Bool
-    let zoomOut: () -> Void
-    let zoomIn: () -> Void
-    let fit: () -> Void
-    let reset: () -> Void
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Button(action: zoomOut) { Image(systemName: "minus.magnifyingglass") }
-                .disabled(!canZoomOut)
-                .help("Zoom out")
-            Text("\(Int(scale * 100))%")
-                .font(.caption.weight(.semibold))
-                .monospacedDigit()
-                .frame(width: 48)
-            Button(action: zoomIn) { Image(systemName: "plus.magnifyingglass") }
-                .disabled(!canZoomIn)
-                .help("Zoom in")
-            Divider().frame(height: 22)
-            Button(action: fit)   { Image(systemName: "arrow.up.left.and.arrow.down.right") }
-                .help("Fit board")
-            Button(action: reset) { Image(systemName: "arrow.counterclockwise") }
-                .help("Reset view")
-        }
-        .buttonStyle(.plain)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 8))
-        .overlay {
-            RoundedRectangle(cornerRadius: 8).stroke(Color.black.opacity(0.08))
-        }
-    }
-}
-
-// MARK: - Resize handle
+// MARK: - Resize handle (corner grip lines)
 
 private struct ResizeHandle: View {
     var body: some View {
-        Image(systemName: "arrow.down.right.and.arrow.up.left")
-            .font(.caption2.weight(.bold))
-            .foregroundStyle(.white)
-            .frame(width: 24, height: 24)
-            .background(Color.accentColor, in: RoundedRectangle(cornerRadius: 6))
-            .shadow(color: .black.opacity(0.18), radius: 6, y: 3)
+        Canvas { ctx, size in
+            let count = 3
+            let spacing: CGFloat = 5
+            let lineWidth: CGFloat = 1.5
+            for i in 0..<count {
+                let offset = CGFloat(i) * spacing
+                var path = Path()
+                path.move(to: CGPoint(x: size.width - offset - spacing, y: size.height))
+                path.addLine(to: CGPoint(x: size.width, y: size.height - offset - spacing))
+                ctx.stroke(path, with: .color(.secondary.opacity(0.5)), lineWidth: lineWidth)
+            }
+        }
+        .frame(width: 22, height: 22)
+        .padding(6)
+        .contentShape(Rectangle())
     }
 }
 
@@ -254,6 +240,16 @@ struct CardEditSheet: View {
                     .font(card.snippet?.type == .code ? .system(.body, design: .monospaced) : .body)
                     .padding(12)
                     .focused($editorFocused)
+                    .overlay(alignment: .topLeading) {
+                        if text.isEmpty {
+                            Text("Start writing…")
+                                .foregroundStyle(.tertiary)
+                                .font(.body)
+                                .padding(.horizontal, 16)
+                                .padding(.vertical, 20)
+                                .allowsHitTesting(false)
+                        }
+                    }
 
                 Divider()
 
