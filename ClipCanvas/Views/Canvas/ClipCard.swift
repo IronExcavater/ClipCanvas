@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct ClipCard: View {
     let clip: Clip
@@ -102,31 +103,15 @@ struct ClipCard: View {
 
 extension CardColor {
     var background: Color {
-        Color(UIColor(dynamicProvider: { traits in
-            switch self {
-            case .cloud:    return traits.userInterfaceStyle == .dark
-                ? UIColor(red: 0.22, green: 0.22, blue: 0.21, alpha: 1)
-                : UIColor(red: 0.96, green: 0.96, blue: 0.94, alpha: 1)
-            case .banana:   return traits.userInterfaceStyle == .dark
-                ? UIColor(red: 0.42, green: 0.38, blue: 0.03, alpha: 1)
-                : UIColor(red: 1.00, green: 0.95, blue: 0.46, alpha: 1)
-            case .flamingo: return traits.userInterfaceStyle == .dark
-                ? UIColor(red: 0.50, green: 0.17, blue: 0.17, alpha: 1)
-                : UIColor(red: 1.00, green: 0.67, blue: 0.67, alpha: 1)
-            case .sage:     return traits.userInterfaceStyle == .dark
-                ? UIColor(red: 0.10, green: 0.36, blue: 0.26, alpha: 1)
-                : UIColor(red: 0.71, green: 0.92, blue: 0.84, alpha: 1)
-            case .sky:      return traits.userInterfaceStyle == .dark
-                ? UIColor(red: 0.10, green: 0.29, blue: 0.44, alpha: 1)
-                : UIColor(red: 0.68, green: 0.84, blue: 0.95, alpha: 1)
-            case .lavender: return traits.userInterfaceStyle == .dark
-                ? UIColor(red: 0.30, green: 0.18, blue: 0.40, alpha: 1)
-                : UIColor(red: 0.84, green: 0.74, blue: 0.89, alpha: 1)
-            case .peach:    return traits.userInterfaceStyle == .dark
-                ? UIColor(red: 0.45, green: 0.20, blue: 0.10, alpha: 1)
-                : UIColor(red: 1.00, green: 0.85, blue: 0.76, alpha: 1)
-            }
-        }))
+        switch self {
+        case .cloud:    return .adaptive(light: UIColor(red: 0.96, green: 0.96, blue: 0.94, alpha: 1), dark: UIColor(red: 0.22, green: 0.22, blue: 0.21, alpha: 1))
+        case .banana:   return .adaptive(light: UIColor(red: 1.00, green: 0.95, blue: 0.46, alpha: 1), dark: UIColor(red: 0.42, green: 0.38, blue: 0.03, alpha: 1))
+        case .flamingo: return .adaptive(light: UIColor(red: 1.00, green: 0.67, blue: 0.67, alpha: 1), dark: UIColor(red: 0.50, green: 0.17, blue: 0.17, alpha: 1))
+        case .sage:     return .adaptive(light: UIColor(red: 0.71, green: 0.92, blue: 0.84, alpha: 1), dark: UIColor(red: 0.10, green: 0.36, blue: 0.26, alpha: 1))
+        case .sky:      return .adaptive(light: UIColor(red: 0.68, green: 0.84, blue: 0.95, alpha: 1), dark: UIColor(red: 0.10, green: 0.29, blue: 0.44, alpha: 1))
+        case .lavender: return .adaptive(light: UIColor(red: 0.84, green: 0.74, blue: 0.89, alpha: 1), dark: UIColor(red: 0.30, green: 0.18, blue: 0.40, alpha: 1))
+        case .peach:    return .adaptive(light: UIColor(red: 1.00, green: 0.85, blue: 0.76, alpha: 1), dark: UIColor(red: 0.45, green: 0.20, blue: 0.10, alpha: 1))
+        }
     }
 }
 

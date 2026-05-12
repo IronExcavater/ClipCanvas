@@ -1,12 +1,14 @@
 import Foundation
 import SwiftUI
+#if canImport(UIKit)
 import UIKit
+#endif
 
 // MARK: - Comparable
 
 extension Comparable {
-    /// Clamps a value to a closed range. Defined in this module to shadow the
-    /// package-level SDK symbol of the same name introduced in iOS 26.
+    /// Clamps a value to a closed range. Defined here to shadow the package-level
+    /// SDK symbol of the same name added in iOS 26.
     func clamped(to range: ClosedRange<Self>) -> Self {
         Swift.min(Swift.max(self, range.lowerBound), range.upperBound)
     }
@@ -18,9 +20,7 @@ extension CGSize {
     static func + (lhs: CGSize, rhs: CGSize) -> CGSize {
         CGSize(width: lhs.width + rhs.width, height: lhs.height + rhs.height)
     }
-    static func += (lhs: inout CGSize, rhs: CGSize) {
-        lhs = lhs + rhs
-    }
+    static func += (lhs: inout CGSize, rhs: CGSize) { lhs = lhs + rhs }
 }
 
 // MARK: - View
@@ -33,11 +33,13 @@ extension View {
     }
 }
 
-// MARK: - Color
+// MARK: - Color (UIKit platforms)
 
+#if canImport(UIKit)
 extension Color {
-    /// Creates a color that adapts between light and dark mode using UIColor's dynamic provider.
+    /// Creates a color that adapts between light and dark mode.
     static func adaptive(light: UIColor, dark: UIColor) -> Color {
         Color(UIColor(dynamicProvider: { $0.userInterfaceStyle == .dark ? dark : light }))
     }
 }
+#endif

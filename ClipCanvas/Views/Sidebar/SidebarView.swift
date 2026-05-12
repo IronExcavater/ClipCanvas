@@ -14,16 +14,14 @@ struct SidebarView: View {
     private var recentChats: [AIChat] { Array(chats.prefix(3)) }
 
     var body: some View {
-        NavigationStack {
-            List {
-                workspacesSection
-                clipsSection
-                chatsSection
-            }
-            .listStyle(.insetGrouped)
-            .navigationTitle("ClipCanvas")
-            .navigationBarTitleDisplayMode(.inline)
+        List {
+            workspacesSection
+            clipsSection
+            chatsSection
         }
+        .listStyle(.insetGrouped)
+        .navigationTitle("ClipCanvas")
+        .navigationBarTitleDisplayMode(.inline)
         .safeAreaInset(edge: .bottom, spacing: 0) {
             bottomNav
         }
@@ -188,7 +186,7 @@ private struct WorkspaceRow: View {
                         .padding(.horizontal, 7)
                         .padding(.vertical, 3)
                         .background(Color.accentColor.opacity(0.12), in: Capsule())
-                        .foregroundStyle(.accentColor)
+                        .foregroundStyle(Color.accentColor)
                 }
             }
         }
