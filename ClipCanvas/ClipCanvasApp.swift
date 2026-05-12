@@ -5,7 +5,8 @@ import SwiftData
 struct ClipCanvasApp: App {
     let container: ModelContainer = {
         do {
-            return try ModelContainer(for: Clip.self, Workspace.self, CanvasPlacement.self)
+            return try ModelContainer(for: Clip.self, Workspace.self, CanvasPlacement.self,
+                                      AIChat.self, ChatMessage.self, ChatAttachment.self)
         } catch {
             fatalError("SwiftData container failed: \(error)")
         }
