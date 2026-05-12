@@ -1,42 +1,31 @@
 import SwiftUI
-import SwiftData
 
+/// Layout shell. Decides iPhone overlay vs iPad/Mac split view.
+/// Has no data dependencies — workspace resolution lives in CanvasHost.
 struct RootView: View {
     @Environment(\.horizontalSizeClass) private var hSizeClass
-    @Environment(\.modelContext) private var context
-
-    @Query(sort: [SortDescriptor(\Workspace.sortIndex), SortDescriptor(\Workspace.createdAt)])
-    private var workspaces: [Workspace]
 
     @State private var sidebarOpen = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
 
-    private var activeWorkspace: Workspace? {
-        workspaces.first(where: \.isActive) ?? workspaces.first
-    }
-
     var body: some View {
-        Group {
-            if hSizeClass == .compact { iPhoneLayout } else { splitLayout }
-        }
-        .task { AppBootstrap.ensureActiveWorkspace(in: context) }
+        if hSizeClass == .compact { iPhoneLayout } else { splitLayout }
     }
 
     // MARK: - iPhone: canvas-first + overlay sidebar drawer
 
     private var iPhoneLayout: some View {
         ZStack(alignment: .leading) {
-            canvas(onToggle: { sidebarOpen.toggle() })
-                .ignoresSafeArea()
+            CanvasHost(onToggleSidebar: { withAnimation { sidebarOpen.toggle() } })
 
             if sidebarOpen {
                 Color.black.opacity(0.35)
                     .ignoresSafeArea()
-                    .onTapGesture { sidebarOpen = false }
+                    .onTapGesture { withAnimation { sidebarOpen = false } }
                     .transition(.opacity)
 
                 NavigationStack {
-                    SidebarView(onClose: { sidebarOpen = false })
+                    SidebarView(onClose: { withAnimation { sidebarOpen = false } })
                 }
                 .frame(width: min(UIScreen.main.bounds.width * 0.86, 360))
                 .background(.regularMaterial)
@@ -52,22 +41,14 @@ struct RootView: View {
     private var splitLayout: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             NavigationStack {
-                SidebarView(onClose: nil)
+                SidebarView(onClose: { columnVisibility = .detailOnly })
             }
         } detail: {
-            canvas(onToggle: { columnVisibility = columnVisibility == .all ? .detailOnly : .all })
-        }
-    }
-
-    // MARK: - Canvas (shared between both layouts)
-
-    @ViewBuilder
-    private func canvas(onToggle: @escaping () -> Void) -> some View {
-        if let workspace = activeWorkspace {
-            CanvasContainerView(workspace: workspace, onToggleSidebar: onToggle)
-        } else {
-            ContentUnavailableView("No workspace", systemImage: "rectangle.3.group",
-                description: Text("Create a workspace to get started."))
+            CanvasHost(onToggleSidebar: {
+                withAnimation {
+                    columnVisibility = columnVisibility == .all ? .detailOnly : .all
+                }
+            })
         }
     }
 }
