@@ -4,61 +4,31 @@ import UIKit
 struct ClipCard: View {
     let clip: Clip
     let isSelected: Bool
-    let isSelectMode: Bool
     let onTap: () -> Void
-    let onLongPress: () -> Void
-    let onDelete: () -> Void
+    let onResize: (CGSize) -> Void
+    let onResizeEnded: () -> Void
+    let onToggleExpandedSize: () -> Void
 
     var body: some View {
-        ZStack(alignment: .topLeading) {
-            VStack(alignment: .leading, spacing: 0) {
-                content
-                Divider().overlay(Color.primary.opacity(0.06))
-                footer
-            }
-            .background(clip.color.background, in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-            .overlay(selectionRing)
-            .shadow(color: .black.opacity(isSelected ? 0.18 : 0.08),
-                    radius: isSelected ? 12 : 5,
-                    y: isSelected ? 4 : 2)
+        ZStack(alignment: .bottomTrailing) {
+            content
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .padding(14)
 
-            // Selection checkmark — only visible in select mode
-            if isSelectMode {
-                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                    .font(.system(size: 20, weight: .semibold))
-                    .foregroundStyle(isSelected ? Color.accentColor : Color.secondary.opacity(0.7))
-                    .padding(8)
-                    .background(.regularMaterial, in: Circle())
-                    .padding(6)
-                    .transition(.scale.combined(with: .opacity))
-            }
+            resizeHandle
+                .padding(7)
         }
-        .onTapGesture { onTap() }
-        .onLongPressGesture(minimumDuration: 0.35) { onLongPress() }
-        .contextMenu {
-            Button("Copy", systemImage: "doc.on.doc") {
-                ClipboardService.write(clip: clip)
-            }
-            Button("Select", systemImage: "checkmark.circle") {
-                onLongPress()
-            }
-            Menu("Color", systemImage: "paintpalette") {
-                ForEach(CardColor.allCases, id: \.self) { color in
-                    Button {
-                        clip.color = color
-                    } label: {
-                        Label(color.label, systemImage: clip.color == color ? "checkmark.circle.fill" : "circle.fill")
-                    }
-                }
-            }
-            Divider()
-            Button("Delete", systemImage: "trash", role: .destructive) { onDelete() }
-        }
-        .animation(.spring(response: 0.2, dampingFraction: 0.75), value: isSelectMode)
-        .animation(.spring(response: 0.15), value: isSelected)
+        .background(cardBackground, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                .stroke(isSelected ? Color.accentColor : Color.primary.opacity(0.08),
+                        lineWidth: isSelected ? 2.5 : 1)
+        )
+        .shadow(color: .black.opacity(isSelected ? 0.16 : 0.09), radius: isSelected ? 10 : 6, y: isSelected ? 4 : 2)
+        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .onTapGesture(perform: onTap)
+        .animation(.spring(response: 0.18, dampingFraction: 0.8), value: isSelected)
     }
-
-    // MARK: - Subviews
 
     private var content: some View {
         Group {
@@ -66,40 +36,38 @@ struct ClipCard: View {
                 Image(uiImage: uiImage)
                     .resizable()
                     .scaledToFill()
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 120)
                     .clipped()
             } else {
                 Text(clip.preview.isEmpty ? " " : clip.preview)
-                    .font(.system(size: 13))
-                    .lineLimit(6)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, 12)
-                    .padding(.top, 12)
-                    .padding(.bottom, 8)
+                    .font(.system(size: 15))
+                    .lineLimit(nil)
+                    .foregroundStyle(.primary)
             }
         }
     }
 
-    private var footer: some View {
-        HStack(spacing: 5) {
-            Image(systemName: clip.type.icon).font(.system(size: 10))
-            Text(clip.origin.label).font(.system(size: 10))
-            Spacer()
-            Text(clip.createdAt, style: .relative).font(.system(size: 10))
-        }
-        .foregroundStyle(Color.primary.opacity(0.5))
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+    private var resizeHandle: some View {
+        Image(systemName: "arrow.down.right.and.arrow.up.left")
+            .font(.system(size: 13, weight: .semibold))
+            .foregroundStyle(.secondary)
+            .frame(width: 30, height: 30)
+            .background(.regularMaterial, in: Circle())
+            .contentShape(Circle())
+            .onTapGesture(count: 2, perform: onToggleExpandedSize)
+            .highPriorityGesture(
+                DragGesture(minimumDistance: 2)
+                    .onChanged { onResize($0.translation) }
+                    .onEnded { _ in onResizeEnded() }
+            )
     }
 
-    private var selectionRing: some View {
-        RoundedRectangle(cornerRadius: 14, style: .continuous)
-            .stroke(Color.accentColor, lineWidth: isSelected ? 2.5 : 0)
+    private var cardBackground: Color {
+        if let tag = clip.tags.min(by: { $0.sortIndex < $1.sortIndex }) {
+            return tag.color.opacity(0.22)
+        }
+        return clip.color.background
     }
 }
-
-// MARK: - CardColor visual properties
 
 extension CardColor {
     var background: Color {
@@ -113,26 +81,4 @@ extension CardColor {
         case .peach:    return .adaptive(light: UIColor(red: 1.00, green: 0.85, blue: 0.76, alpha: 1), dark: UIColor(red: 0.45, green: 0.20, blue: 0.10, alpha: 1))
         }
     }
-}
-
-// MARK: - Preview
-
-#Preview {
-    VStack(spacing: 16) {
-        ClipCard(
-            clip: Clip(content: "Buy oat milk and check the PR before standup tomorrow morning.", origin: .clipboard),
-            isSelected: false, isSelectMode: false,
-            onTap: {}, onLongPress: {}, onDelete: {}
-        )
-        .frame(width: 220)
-
-        ClipCard(
-            clip: Clip(content: "https://developer.apple.com/documentation/swiftui", origin: .clipboard),
-            isSelected: true, isSelectMode: true,
-            onTap: {}, onLongPress: {}, onDelete: {}
-        )
-        .frame(width: 220)
-    }
-    .padding()
-    .background(Color.gray.opacity(0.1))
 }

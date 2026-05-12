@@ -2,62 +2,63 @@ import SwiftUI
 
 struct CanvasTopBar: View {
     let workspaceName: String
-    let selectedCount: Int
-    let mode: CanvasMode
+    @Binding var isRenaming: Bool
+    @Binding var renameText: String
+    var renameFocused: FocusState<Bool>.Binding
     let onToggleSidebar: () -> Void
-    let onExitSelectMode: () -> Void
-    let onDeleteSelected: () -> Void
-    let onCopySelected: () -> Void
+    let onBeginRename: () -> Void
+    let onCommitRename: () -> Void
+    let onClearAll: () -> Void
 
     var body: some View {
         HStack(spacing: 12) {
-            if mode == .select {
-                Button("Done") { onExitSelectMode() }
-                    .font(.body.weight(.semibold))
-                    .foregroundStyle(.accentColor)
-
-                Spacer()
-
-                Text(selectedCount == 0 ? "Select items" : "\(selectedCount) selected")
-                    .font(.headline)
-
-                Spacer()
-
-                HStack(spacing: 22) {
-                    Button(action: onCopySelected) {
-                        Image(systemName: "doc.on.doc")
-                            .font(.system(size: 17))
-                    }
-                    .disabled(selectedCount == 0)
-
-                    Button(action: onDeleteSelected) {
-                        Image(systemName: "trash")
-                            .font(.system(size: 17))
-                            .foregroundStyle(selectedCount > 0 ? .red : Color.secondary)
-                    }
-                    .disabled(selectedCount == 0)
-                }
-            } else {
-                Button(action: onToggleSidebar) {
-                    Image(systemName: "sidebar.left")
-                        .font(.system(size: 18, weight: .regular))
-                        .foregroundStyle(.primary)
-                }
-
-                Spacer()
-
-                Text(workspaceName)
-                    .font(.headline)
-
-                Spacer()
-
-                // Placeholder to balance the sidebar button
-                Color.clear.frame(width: 28, height: 28)
+            Button(action: onToggleSidebar) {
+                Image(systemName: "sidebar.left")
+                    .font(.system(size: 18))
+                    .foregroundStyle(.primary)
+                    .frame(width: 32, height: 32)
             }
+            .buttonStyle(.plain)
+
+            Spacer()
+
+            title
+
+            Spacer()
+
+            Button(role: .destructive, action: onClearAll) {
+                Image(systemName: "trash")
+                    .font(.system(size: 17))
+                    .foregroundStyle(.primary)
+                    .frame(width: 32, height: 32)
+            }
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, 16)
         .padding(.top, 4)
         .padding(.bottom, 10)
-        .background(.regularMaterial)
+        .background(.regularMaterial, ignoresSafeAreaEdges: .top)
+    }
+
+    @ViewBuilder
+    private var title: some View {
+        if isRenaming {
+            TextField("Workspace name", text: $renameText)
+                .font(.headline)
+                .multilineTextAlignment(.center)
+                .textFieldStyle(.plain)
+                .focused(renameFocused)
+                .submitLabel(.done)
+                .onSubmit(onCommitRename)
+                .onDisappear {
+                    if isRenaming { onCommitRename() }
+                }
+                .frame(maxWidth: 220)
+        } else {
+            Text(workspaceName)
+                .font(.headline)
+                .lineLimit(1)
+                .onTapGesture(count: 2, perform: onBeginRename)
+        }
     }
 }
