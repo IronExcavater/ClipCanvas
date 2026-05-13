@@ -3,7 +3,7 @@ import UIKit
 
 enum AppSymbol {
     static let sidebar = "rectangle.leadinghalf.inset.filled"
-    static let options = "ellipsis"
+    static let options = "ellipsis.circle"
     static let settings = "gearshape"
 }
 
@@ -27,18 +27,29 @@ private struct BlendedIconButtonBackground: ViewModifier {
 
     @ViewBuilder
     func body(content: Content) -> some View {
-        if #available(iOS 26, *) {
-            content
-                .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground).opacity(isPressed ? 0.96 : 0.88), in: Circle())
-                .glassEffect(.regular.interactive(), in: .rect(cornerRadius: size / 2))
-        } else {
-            content
-                .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: Circle())
-                .overlay(
-                    Circle()
-                        .stroke(Color.primary.opacity(isPressed ? 0.16 : 0.08), lineWidth: 1)
-                )
-        }
+        content
+            .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: Circle())
+            .overlay(
+                Circle()
+                    .stroke(Color.primary.opacity(isPressed ? 0.12 : 0.06), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(isPressed ? 0.08 : 0.14), radius: isPressed ? 5 : 10, y: isPressed ? 2 : 5)
+    }
+}
+
+struct AppMenuIconLabel: View {
+    var body: some View {
+        Image(systemName: AppSymbol.options)
+            .font(.system(size: 24, weight: .regular))
+            .foregroundStyle(.primary)
+            .frame(width: 46, height: 46)
+            .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: Circle())
+            .overlay(
+                Circle()
+                    .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+            )
+            .shadow(color: .black.opacity(0.14), radius: 10, y: 5)
+            .contentShape(Circle())
     }
 }
 

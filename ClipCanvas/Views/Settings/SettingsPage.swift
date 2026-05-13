@@ -122,10 +122,11 @@ private struct TagSettingsRow: View {
                 Menu {
                     Button("Delete Tag", systemImage: "trash", role: .destructive, action: onDelete)
                 } label: {
-                    Image(systemName: "ellipsis.circle")
-                        .font(.system(size: 19, weight: .regular))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 36, height: 36)
+                    Image(systemName: AppSymbol.options)
+                        .font(.system(size: 22, weight: .regular))
+                        .foregroundStyle(.primary)
+                        .frame(width: 40, height: 40)
+                        .contentShape(Circle())
                 }
                 .buttonStyle(.plain)
             }

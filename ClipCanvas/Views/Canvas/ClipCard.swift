@@ -51,7 +51,7 @@ struct ClipCard: View {
         ResizeHandle()
             .onTapGesture(count: 2, perform: onToggleExpandedSize)
             .highPriorityGesture(
-                DragGesture(minimumDistance: 2)
+                DragGesture(minimumDistance: 0)
                     .onChanged { onResize($0.translation) }
                     .onEnded { _ in onResizeEnded() }
             )

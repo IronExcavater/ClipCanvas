@@ -116,9 +116,7 @@ struct TrashPage: View {
                             confirmingDeleteAll = true
                         }
                     } label: {
-                        Image(systemName: "ellipsis.circle")
-                            .font(.system(size: 22, weight: .regular))
-                            .frame(width: 44, height: 44)
+                        AppMenuIconLabel()
                     }
                     .buttonStyle(.plain)
                 }

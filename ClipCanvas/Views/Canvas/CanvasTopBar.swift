@@ -39,11 +39,7 @@ struct CanvasTopBar: View {
                     confirmingClear = true
                 }
             } label: {
-                Image(systemName: "ellipsis.circle")
-                    .font(.system(size: 25, weight: .regular))
-                    .foregroundStyle(.primary)
-                    .frame(width: 46, height: 46)
-                    .contentShape(Circle())
+                AppMenuIconLabel()
             }
             .buttonStyle(.plain)
         }
@@ -90,14 +86,14 @@ private struct CanvasTopBarFade: View {
     var body: some View {
         Rectangle()
             .fill(.ultraThinMaterial)
-            .frame(height: 132)
+            .frame(height: 188)
             .mask(
                 LinearGradient(
-                    colors: [.black, .black.opacity(0.86), .black.opacity(0.40), .clear],
+                    colors: [.black, .black.opacity(0.92), .black.opacity(0.62), .black.opacity(0.26), .clear],
                     startPoint: .top,
                     endPoint: .bottom
                 )
             )
-            .offset(y: -54)
+            .offset(y: -82)
     }
 }
