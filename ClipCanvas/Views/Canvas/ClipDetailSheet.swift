@@ -10,19 +10,31 @@ struct ClipDetailSheet: View {
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    ClipInfoPanel(clip: clip)
+                Section("Info") {
+                    ClipInfoRow("Type", value: ClipTag.builtInName(for: clip.type), icon: clip.type.icon)
+                    ClipInfoRow("From", value: clip.origin.label, icon: "tray")
+                    ClipUpdatedRow(date: clip.updatedAt)
+                    ClipInfoRow("Created", value: clip.createdAt.formatted(date: .abbreviated, time: .shortened), icon: "calendar")
                 }
-                .appListItemRowInsets(vertical: 4)
 
-                Section {
+                Section("Content") {
                     contentEditor
                         .appListCard(tint: clip.primaryDisplayColor, opacity: 0.16)
                 }
                 .appListItemRowInsets(vertical: 4)
 
-                Section {
-                    actionRows
+                Section("Actions") {
+                    ClipDetailActionToolbar(
+                        isPinned: clip.isPinned,
+                        canOpenLink: ClipActionService.openableURL(for: clip) != nil,
+                        onCopy: { ClipActionService.copy(clip) },
+                        onOpen: { ClipActionService.openURL(for: clip) },
+                        onPin: { ClipActionService.togglePin(clip) },
+                        onDelete: {
+                            ClipActionService.softDelete(clip)
+                            dismiss()
+                        }
+                    )
                 }
                 .appListItemRowInsets(vertical: 4)
 
@@ -35,21 +47,27 @@ struct ClipDetailSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Cancel") {
+                    Button {
                         dismiss()
+                    } label: {
+                        Image(systemName: "xmark")
                     }
                     .accessibilityLabel("Cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button("Done") {
+                    Button {
                         commitEdit()
                         dismiss()
+                    } label: {
+                        Image(systemName: "checkmark")
                     }
                     .fontWeight(.semibold)
                     .accessibilityLabel("Done")
                 }
             }
             .onAppear { editedContent = clip.content }
+            .scrollDismissesKeyboard(.interactively)
+            .safeAreaPadding(.bottom, 72)
         }
     }
 
@@ -59,37 +77,6 @@ struct ClipDetailSheet: View {
             .scrollContentBackground(.hidden)
             .frame(minHeight: 150)
             .focused($contentFocused)
-    }
-
-    private var actionRows: some View {
-        Group {
-            Button {
-                ClipActionService.copy(clip)
-            } label: {
-                Label("Copy", systemImage: "doc.on.doc")
-            }
-
-            if ClipActionService.openableURL(for: clip) != nil {
-                Button {
-                    ClipActionService.openURL(for: clip)
-                } label: {
-                    Label("Open Link", systemImage: "safari")
-                }
-            }
-
-            Button {
-                ClipActionService.togglePin(clip)
-            } label: {
-                Label(clip.isPinned ? "Unpin" : "Pin", systemImage: clip.isPinned ? "pin.slash" : "pin")
-            }
-
-            Button(role: .destructive) {
-                ClipActionService.softDelete(clip)
-                dismiss()
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
-        }
     }
 
     private func commitEdit() {
@@ -103,29 +90,18 @@ struct ClipDetailSheet: View {
     }
 }
 
-private struct ClipInfoPanel: View {
-    let clip: Clip
+private struct ClipInfoRow: View {
+    let title: String
+    let value: String
+    let icon: String
 
-    var body: some View {
-        VStack(spacing: 10) {
-            infoRow("Type", value: ClipTag.builtInName(for: clip.type), icon: clip.type.icon)
-            Divider()
-            infoRow("From", value: clip.origin.label, icon: "tray")
-            Divider()
-            LabeledContent {
-                RelativeAgeText(date: clip.updatedAt, prefix: "Updated ", suffix: " ago", emptyText: "Updated just now")
-                    .foregroundStyle(.primary)
-            } label: {
-                Label("Last Updated", systemImage: "clock")
-                    .foregroundStyle(.primary.opacity(0.68))
-            }
-            Divider()
-            infoRow("Created", value: clip.createdAt.formatted(date: .abbreviated, time: .shortened), icon: "calendar")
-        }
-        .font(.subheadline)
+    init(_ title: String, value: String, icon: String) {
+        self.title = title
+        self.value = value
+        self.icon = icon
     }
 
-    private func infoRow(_ title: String, value: String, icon: String) -> some View {
+    var body: some View {
         LabeledContent {
             Text(value)
                 .foregroundStyle(.primary)
@@ -133,5 +109,59 @@ private struct ClipInfoPanel: View {
             Label(title, systemImage: icon)
                 .foregroundStyle(.primary.opacity(0.68))
         }
+        .font(.subheadline)
+    }
+}
+
+private struct ClipUpdatedRow: View {
+    let date: Date
+
+    var body: some View {
+        LabeledContent {
+            RelativeAgeText(date: date, prefix: "Updated ", suffix: " ago", emptyText: "Updated just now")
+                .foregroundStyle(.primary)
+        } label: {
+            Label("Last Updated", systemImage: "clock")
+                .foregroundStyle(.primary.opacity(0.68))
+        }
+        .font(.subheadline)
+    }
+}
+
+private struct ClipDetailActionToolbar: View {
+    let isPinned: Bool
+    let canOpenLink: Bool
+    let onCopy: () -> Void
+    let onOpen: () -> Void
+    let onPin: () -> Void
+    let onDelete: () -> Void
+
+    var body: some View {
+        HStack(spacing: 8) {
+            action("Copy", icon: "doc.on.doc", action: onCopy)
+            if canOpenLink {
+                action("Open", icon: "safari", action: onOpen)
+            }
+            action(isPinned ? "Unpin" : "Pin", icon: isPinned ? "pin.slash" : "pin", action: onPin)
+            action("Delete", icon: "trash", destructive: true, action: onDelete)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func action(_ title: String, icon: String, destructive: Bool = false, action: @escaping () -> Void) -> some View {
+        Button(role: destructive ? .destructive : nil, action: action) {
+            VStack(spacing: 5) {
+                Image(systemName: icon)
+                    .font(.system(size: 17, weight: .semibold))
+                Text(title)
+                    .font(.caption2.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .foregroundStyle(destructive ? .red : .primary)
+            .frame(maxWidth: .infinity, minHeight: 58)
+            .background(Color.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        }
+        .buttonStyle(.plain)
     }
 }

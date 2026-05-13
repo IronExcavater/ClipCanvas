@@ -86,7 +86,7 @@ struct TrashPage: View {
                             title: clip.preview,
                             deletedAt: clip.deletedAt,
                             tint: clip.primaryDisplayColor,
-                            tagTitle: clip.primaryDisplayTagName,
+                            tagTitle: clip.tags.min(by: { $0.sortIndex < $1.sortIndex })?.name,
                             dragID: clip.id.uuidString,
                             isSelecting: isSelecting,
                             isSelected: selectedItemIDs.contains(key(for: clip)),
@@ -103,8 +103,7 @@ struct TrashPage: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .contentMargins(.top, 0, for: .scrollContent)
-        .navigationTitle("Recently Deleted")
-        .navigationBarTitleDisplayMode(.inline)
+        .appSearchAwareNavigationTitle("Recently Deleted", isSearching: searchPresented)
         .searchable(text: $search, isPresented: $searchPresented, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search deleted")
         .animation(.easeInOut(duration: 0.18), value: searchPresented)
         .toolbar {
@@ -293,7 +292,7 @@ private struct DeletedItemRow: View {
                 Spacer()
 
                 if let tagTitle {
-                    AppTagPill(title: tagTitle, color: tint, isSelected: false)
+                    AppTagPill(title: tagTitle, color: tint, icon: "tag", isSelected: false)
                 }
             }
             .frame(minHeight: 58)
