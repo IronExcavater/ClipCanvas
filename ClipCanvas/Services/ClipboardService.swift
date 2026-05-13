@@ -16,6 +16,8 @@ enum ClipboardContent {
 }
 
 enum ClipboardService {
+    private static let duplicateReuseWindow: TimeInterval = 8 * 60
+    private static var recentFingerprints: [String: Date] = [:]
 
     static func readContent() -> ClipboardContent? {
         let pb = UIPasteboard.general
@@ -39,6 +41,16 @@ enum ClipboardService {
     static func writeString(_ string: String) {
         UIPasteboard.general.string = string
     }
+
+    static func markImported(_ content: ClipboardContent, at date: Date = Date()) {
+        recentFingerprints[content.historyFingerprint] = date
+        recentFingerprints = recentFingerprints.filter { date.timeIntervalSince($0.value) < duplicateReuseWindow }
+    }
+
+    static func wasRecentlyImported(_ content: ClipboardContent, at date: Date = Date()) -> Bool {
+        guard let last = recentFingerprints[content.historyFingerprint] else { return false }
+        return date.timeIntervalSince(last) < duplicateReuseWindow
+    }
 }
 
 // Factory extension — one canonical way to create a Clip from clipboard content
@@ -46,9 +58,8 @@ extension Clip {
     static func make(from content: ClipboardContent, origin: ClipOrigin) -> Clip {
         switch content {
         case .text(let text):
-            let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-            let body = trimmed.isEmpty ? text : trimmed
-            let sensitivity = SensitivityService.detect(body)
+            let body = text.trimmedClipboardContent
+            let sensitivity = ClipClassificationService.detectSensitivity(body)
             return Clip(content: body, origin: origin, sensitivity: sensitivity)
         case .image(let data, let uti):
             return Clip(content: "", imageData: data, imageUTI: uti, origin: origin)
@@ -62,20 +73,56 @@ extension Clip {
     ) -> (clip: Clip, isNew: Bool) {
         switch content {
         case .text(let text):
-            let fingerprint = text.trimmingCharacters(in: .whitespacesAndNewlines)
+            let fingerprint = text.normalizedClipboardHistoryText
             let existing = try? context.fetch(
                 FetchDescriptor<Clip>(
-                    predicate: #Predicate { $0.content == fingerprint && $0.deletedAt == nil }
+                    predicate: #Predicate { $0.deletedAt == nil }
                 )
             )
-            if let first = existing?.first {
-                first.updatedAt = Date()
+            if let first = existing?.first(where: { $0.type != .image && $0.content.normalizedClipboardHistoryText == fingerprint }) {
+                ClipboardService.markImported(content)
                 return (first, false)
             }
-        case .image:
-            break
+        case .image(let data, _):
+            let existing = try? context.fetch(
+                FetchDescriptor<Clip>(
+                    predicate: #Predicate { $0.deletedAt == nil }
+                )
+            )
+            if let first = existing?.first(where: { $0.type == .image && $0.imageData == data }) {
+                ClipboardService.markImported(content)
+                return (first, false)
+            }
         }
 
+        ClipboardService.markImported(content)
         return (Clip.make(from: content, origin: origin), true)
+    }
+}
+
+private extension ClipboardContent {
+    var historyFingerprint: String {
+        switch self {
+        case .text(let text):
+            return "text:\(text.normalizedClipboardHistoryText.lowercased())"
+        case .image(let data, _):
+            return "image:\(data.count):\(data.hashValue)"
+        }
+    }
+}
+
+private extension String {
+    var trimmedClipboardContent: String {
+        let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? self : trimmed
+    }
+
+    var normalizedClipboardHistoryText: String {
+        trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "\r\n", with: "\n")
+            .replacingOccurrences(of: "\r", with: "\n")
+            .components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+            .joined(separator: " ")
     }
 }

@@ -23,6 +23,10 @@ final class ClipTag {
 }
 
 extension ClipTag {
+    private static func builtInColorKey(for type: ClipType) -> String {
+        "clipTypeColor.\(type.rawValue)"
+    }
+
     static let builtInDefinitions: [(name: String, hex: String, sortIndex: Int)] = [
         ("Text", "#607D8B", 0),
         ("Link", "#4CAF50", 1),
@@ -40,6 +44,9 @@ extension ClipTag {
     }
 
     static func builtInHex(for type: ClipType) -> String {
+        if let stored = UserDefaults.standard.string(forKey: builtInColorKey(for: type)) {
+            return stored
+        }
         switch type {
         case .text: return "#607D8B"
         case .url: return "#4CAF50"
@@ -50,6 +57,10 @@ extension ClipTag {
 
     static func builtInColor(for type: ClipType) -> Color {
         Color(hex: builtInHex(for: type)) ?? .secondary
+    }
+
+    static func setBuiltInColor(_ hex: String, for type: ClipType) {
+        UserDefaults.standard.set(hex, forKey: builtInColorKey(for: type))
     }
 }
 

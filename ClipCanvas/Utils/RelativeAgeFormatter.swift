@@ -25,5 +25,12 @@ enum RelativeAgeFormatter {
         }
         return parts.joined(separator: " ")
     }
-}
 
+    static func refreshInterval(since date: Date, now: Date = Date()) -> TimeInterval {
+        let seconds = max(0, now.timeIntervalSince(date))
+        if seconds < 60 { return 1 }
+        if seconds < 60 * 60 { return 60 }
+        if seconds < 24 * 60 * 60 { return 60 * 60 }
+        return 24 * 60 * 60
+    }
+}

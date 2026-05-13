@@ -110,50 +110,6 @@ final class Clip: SoftDeletable {
     // MARK: - Type detection
 
     static func detect(content: String, imageData: Data?) -> ClipType {
-        if imageData != nil { return .image }
-        if looksLikeURL(content) { return .url }
-        if looksLikeCode(content) { return .code }
-        return .text
-    }
-
-    // Pre-compiled patterns
-    private static let urlPrefixRegex = try! NSRegularExpression(
-        pattern: #"^(?:https?://|www\.)\S"#,
-        options: .caseInsensitive
-    )
-    private static let codeKeywordRegex = try! NSRegularExpression(
-        pattern: #"\b(?:func|class|struct|enum|import|def|async|function|const|interface|extends|implements|public|private|protected|static|return|override|void|#include|#import|SELECT|FROM|WHERE|INSERT|UPDATE|DELETE|CREATE|ALTER)\b"#
-    )
-    private static let codeOperatorRegex = try! NSRegularExpression(
-        pattern: #"(?:->|=>|::|===|!==|\?\?|&&|\|\||\+=|-=|\*=|/=)"#
-    )
-
-    private static func looksLikeURL(_ text: String) -> Bool {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.contains("\n"), (4...2048).contains(trimmed.count) else { return false }
-        let range = NSRange(trimmed.startIndex..., in: trimmed)
-        guard urlPrefixRegex.firstMatch(in: trimmed, range: range) != nil else { return false }
-        let candidate = trimmed.lowercased().hasPrefix("www.") ? "https://\(trimmed)" : trimmed
-        guard let url = URL(string: candidate), let host = url.host else { return false }
-        return host.contains(".")
-    }
-
-    private static func looksLikeCode(_ text: String) -> Bool {
-        let lines = text.components(separatedBy: .newlines)
-        guard lines.count >= 2 else { return false }
-        let range = NSRange(text.startIndex..., in: text)
-        let keywords = codeKeywordRegex.numberOfMatches(in: text, range: range)
-        let operators = codeOperatorRegex.numberOfMatches(in: text, range: range)
-        let braces = text.filter { "{}[]".contains($0) }.count
-        let hasIndent = lines.dropFirst().contains { $0.hasPrefix("    ") || $0.hasPrefix("\t") }
-        let semicolons = text.filter { $0 == ";" }.count
-
-        var score = 0
-        score += min(keywords, 3)
-        score += min(operators, 2)
-        score += braces >= 4 ? 2 : braces >= 2 ? 1 : 0
-        if hasIndent { score += 1 }
-        if semicolons >= 2 { score += 1 }
-        return score >= 3
+        ClipClassificationService.detectType(content: content, imageData: imageData)
     }
 }
