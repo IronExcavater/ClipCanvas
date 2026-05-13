@@ -181,10 +181,10 @@ Workspace actions intentionally excluded:
 - Create: `ClipCanvasTests/CanvasObjectTests.swift`
 - Modify: `ClipCanvas/Models/Workspace.swift`
 
-- [ ] Add tests that a sticky note object stores text, size, position, style, and workspace relationship.
-- [ ] Add tests that a clip-backed object points at a `Clip` without copying clip content.
-- [ ] Add tests that a connector can target object IDs or free points.
-- [ ] Add tests that soft-deleting a clip hides clip-backed objects but does not delete the canvas object record until the workspace object is deleted.
+- [x] Add tests that a sticky note object stores text, size, position, style, and workspace relationship.
+- [x] Add tests that a clip-backed object points at a `Clip` without copying clip content.
+- [x] Add tests that a connector can target object IDs or free points.
+- [x] Add tests that soft-deleting a clip hides clip-backed objects but does not delete the canvas object record until the workspace object is deleted.
 
 ### Task 2: Add Canvas Object Models
 
@@ -192,10 +192,10 @@ Workspace actions intentionally excluded:
 - Create: `ClipCanvas/Models/CanvasObject.swift`
 - Modify: `ClipCanvas/ClipCanvasApp.swift`
 
-- [ ] Add `CanvasObject`, `CanvasObjectKind`, `CanvasObjectStyle`, connector endpoint types, and `CGPointCodable`.
-- [ ] Add `@Relationship(deleteRule: .cascade, inverse: \CanvasObject.workspace)` from `Workspace` to `canvasObjects`.
-- [ ] Add `CanvasObject.self` to the SwiftData `ModelContainer`.
-- [ ] Keep `CanvasPlacement` in the schema during the transition so old workspace data still opens.
+- [x] Add `CanvasObject`, `CanvasObjectKind`, `CanvasObjectStyle`, connector endpoint types, and `CGPointCodable`.
+- [x] Add `@Relationship(deleteRule: .cascade, inverse: \CanvasObject.workspace)` from `Workspace` to `canvasObjects`.
+- [x] Add `CanvasObject.self` to the SwiftData `ModelContainer`.
+- [x] Keep `CanvasPlacement` in the schema during the transition so old workspace data still opens.
 
 ### Task 3: Placement Compatibility
 

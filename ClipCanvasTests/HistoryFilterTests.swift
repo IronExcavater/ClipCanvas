@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import ClipCanvas
 
@@ -27,7 +28,7 @@ import Testing
 
     @Test func builtInTagFilterMatchesClipType() {
         let filter = HistoryFilter()
-        filter.tag = .builtIn(.url)
+        filter.type = .url
         let urlClip = Clip(content: "https://apple.com", origin: .clipboard)
         let textClip = Clip(content: "Hello", origin: .clipboard)
         #expect(filter.matches(urlClip))
@@ -41,7 +42,7 @@ import Testing
         tagged.tags = [tag]
         let untagged = Clip(content: "Untagged note", origin: .typed)
 
-        filter.tag = .user(tag.id)
+        filter.userTagID = tag.id
 
         #expect(filter.matches(tagged))
         #expect(!filter.matches(untagged))
@@ -49,18 +50,22 @@ import Testing
 
     @Test func nilTagMatchesAll() {
         let filter = HistoryFilter()
-        filter.tag = nil
+        filter.type = nil
+        filter.userTagID = nil
         let clip = Clip(content: "https://apple.com", origin: .clipboard)
         #expect(filter.matches(clip))
     }
 
     // MARK: - Selection removed
 
-    @Test func historyFilterOwnsSearchAndTag() {
+    @Test func historyFilterOwnsSearchTypeAndUserTag() {
         let filter = HistoryFilter()
+        let tagID = UUID()
         filter.search = "hello"
-        filter.tag = .builtIn(.text)
+        filter.type = .text
+        filter.userTagID = tagID
         #expect(filter.search == "hello")
-        #expect(filter.tag == .builtIn(.text))
+        #expect(filter.type == .text)
+        #expect(filter.userTagID == tagID)
     }
 }

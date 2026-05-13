@@ -72,6 +72,9 @@ final class Clip: SoftDeletable {
     @Relationship(deleteRule: .cascade, inverse: \CanvasPlacement.clip)
     var placements: [CanvasPlacement] = []
 
+    @Relationship(deleteRule: .nullify, inverse: \CanvasObject.clip)
+    var canvasObjects: [CanvasObject] = []
+
     @Relationship(deleteRule: .nullify)
     var tags: [ClipTag] = []
 

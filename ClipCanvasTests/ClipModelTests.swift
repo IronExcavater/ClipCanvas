@@ -103,7 +103,7 @@ import SwiftData
 
     @Test func findOrMakeReusesExistingTextClip() throws {
         let container = try ModelContainer(
-            for: Clip.self, ClipTag.self, Workspace.self, CanvasPlacement.self,
+            for: Clip.self, ClipTag.self, Workspace.self, CanvasPlacement.self, CanvasObject.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let context = ModelContext(container)
@@ -118,7 +118,7 @@ import SwiftData
 
     @Test func bootstrapSeedsBuiltInTagsOnce() throws {
         let container = try ModelContainer(
-            for: Clip.self, ClipTag.self, Workspace.self, CanvasPlacement.self,
+            for: Clip.self, ClipTag.self, Workspace.self, CanvasPlacement.self, CanvasObject.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let context = ModelContext(container)

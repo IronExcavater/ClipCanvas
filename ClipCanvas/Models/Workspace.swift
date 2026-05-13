@@ -15,6 +15,9 @@ final class Workspace: SoftDeletable {
     @Relationship(deleteRule: .cascade, inverse: \CanvasPlacement.workspace)
     var placements: [CanvasPlacement] = []
 
+    @Relationship(deleteRule: .cascade, inverse: \CanvasObject.workspace)
+    var canvasObjects: [CanvasObject] = []
+
     @Relationship(deleteRule: .cascade, inverse: \AIChat.workspace)
     var chats: [AIChat] = []
 

@@ -1,6 +1,6 @@
 import Foundation
 
-protocol SoftDeletable: AnyObject {
+nonisolated protocol SoftDeletable: AnyObject {
     var deletedAt: Date? { get set }
     func softDelete()
 }
