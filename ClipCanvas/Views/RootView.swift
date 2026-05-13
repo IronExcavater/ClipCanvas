@@ -16,23 +16,28 @@ struct RootView: View {
 
     private var iPhoneLayout: some View {
         GeometryReader { proxy in
+            let drawerWidth = min(proxy.size.width * 0.86, 360)
             ZStack(alignment: .leading) {
                 CanvasHost(onToggleSidebar: { withAnimation { sidebarOpen.toggle() } })
 
-                if sidebarOpen {
-                    Color.black.opacity(0.35)
-                        .ignoresSafeArea()
-                        .onTapGesture { withAnimation { sidebarOpen = false } }
-                        .transition(.opacity)
-
-                    NavigationStack {
-                        SidebarView(onClose: { withAnimation { sidebarOpen = false } })
-                    }
-                    .frame(width: min(proxy.size.width * 0.86, 360))
-                    .background(.regularMaterial)
+                Color.black.opacity(sidebarOpen ? 0.35 : 0)
                     .ignoresSafeArea()
-                    .transition(.move(edge: .leading).combined(with: .opacity))
+                    .allowsHitTesting(sidebarOpen)
+                    .onTapGesture { withAnimation { sidebarOpen = false } }
+
+                NavigationStack {
+                    SidebarView(
+                        onClose: { withAnimation { sidebarOpen = false } },
+                        isOpen: sidebarOpen
+                    )
                 }
+                .frame(width: drawerWidth)
+                .background {
+                    sidebarDrawerBackground
+                }
+                .ignoresSafeArea()
+                .offset(x: sidebarOpen ? 0 : -drawerWidth)
+                .shadow(color: .black.opacity(sidebarOpen ? 0.18 : 0), radius: 18, x: 8)
             }
             .animation(.spring(response: 0.32, dampingFraction: 0.88), value: sidebarOpen)
         }
@@ -51,6 +56,18 @@ struct RootView: View {
                     columnVisibility = columnVisibility == .all ? .detailOnly : .all
                 }
             })
+        }
+    }
+
+    @ViewBuilder
+    private var sidebarDrawerBackground: some View {
+        if #available(iOS 26, *) {
+            Rectangle()
+                .fill(Color.clear)
+                .glassEffect(.regular, in: .rect(cornerRadius: 0))
+        } else {
+            Rectangle()
+                .fill(.regularMaterial)
         }
     }
 }

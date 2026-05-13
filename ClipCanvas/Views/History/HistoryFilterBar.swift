@@ -11,39 +11,58 @@ struct HistoryFilterBar: View {
     }
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 8) {
-                chip(nil, label: "All", color: .secondary, icon: "tray.full")
-                ForEach(ClipType.allCases, id: \.self) { type in
-                    chip(
-                        .builtIn(type),
-                        label: ClipTag.builtInName(for: type),
-                        color: ClipTag.builtInColor(for: type),
-                        icon: type.icon
-                    )
-                }
-                ForEach(userTags) { tag in
-                    chip(.user(tag.id), label: tag.name, color: tag.color, icon: "tag")
-                }
+        fadingFilterRow {
+            typeChip(nil, label: "All", color: .secondary, icon: "tray.full")
+            ForEach(ClipType.allCases, id: \.self) { type in
+                typeChip(type, label: ClipTag.builtInName(for: type), color: ClipTag.builtInColor(for: type), icon: type.icon)
             }
-            .padding(.horizontal, 4)
+            ForEach(userTags) { tag in
+                userTagChip(tag.id, label: tag.name, color: tag.color)
+            }
         }
     }
 
-    private func chip(_ tag: HistoryTagFilter?, label: String, color: Color, icon: String) -> some View {
-        let active = filter.tag == tag
-        return Button {
-            filter.tag = active ? nil : tag
-        } label: {
-            HStack(spacing: 4) {
-                Image(systemName: icon).font(.caption)
-                Text(label).font(.caption.weight(.medium))
-            }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .background((active ? color : color.opacity(0.16)), in: Capsule())
-            .foregroundStyle(active ? .white : .primary)
+    private func fadingFilterRow<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6, content: content)
+                .padding(.horizontal, 24)
         }
-        .buttonStyle(.plain)
+        .mask(
+            HStack(spacing: 0) {
+                LinearGradient(colors: [.clear, .black], startPoint: .leading, endPoint: .trailing)
+                    .frame(width: 12)
+                Rectangle()
+                LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing)
+                    .frame(width: 12)
+            }
+        )
+    }
+
+    private func typeChip(_ type: ClipType?, label: String, color: Color, icon: String) -> some View {
+        let active = filter.type == type && (type != nil || filter.userTagID == nil)
+        return AppTagChip(
+            title: label,
+            color: color,
+            icon: icon,
+            isSelected: active
+        ) {
+            if type == nil {
+                filter.clear()
+            } else {
+                filter.type = active ? nil : type
+            }
+        }
+    }
+
+    private func userTagChip(_ tagID: UUID?, label: String, color: Color) -> some View {
+        let active = filter.userTagID == tagID
+        return AppTagChip(
+            title: label,
+            color: color,
+            icon: "tag",
+            isSelected: active
+        ) {
+            filter.userTagID = active ? nil : tagID
+        }
     }
 }

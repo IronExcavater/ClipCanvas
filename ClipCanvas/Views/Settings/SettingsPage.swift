@@ -2,80 +2,62 @@ import SwiftUI
 import SwiftData
 
 struct SettingsPage: View {
-    @AppStorage("settings.copyClipOnTap") private var copyClipOnTap = true
-    @AppStorage("settings.fitCanvasAfterDrop") private var fitCanvasAfterDrop = false
-    @AppStorage("settings.showResizeHandles") private var showResizeHandles = true
-    @AppStorage("settings.deduplicateHistory") private var deduplicateHistory = true
-    @AppStorage("settings.maskSensitiveContent") private var maskSensitiveContent = true
-    @AppStorage("settings.useTagColors") private var useTagColors = true
-    @AppStorage("settings.enableLiquidGlass") private var enableLiquidGlass = true
-    @AppStorage("settings.includeAIContext") private var includeAIContext = true
+    @Environment(\.modelContext) private var context
 
-    @Query(filter: #Predicate<Clip> { $0.deletedAt == nil }) private var clips: [Clip]
-    @Query(filter: #Predicate<Clip> { $0.deletedAt != nil }) private var deletedClips: [Clip]
-    @Query(filter: #Predicate<Workspace> { $0.deletedAt == nil }) private var workspaces: [Workspace]
+    @AppStorage("settings.copyClipOnTap") private var copyClipOnTap = true
+
     @Query(sort: \ClipTag.sortIndex) private var tags: [ClipTag]
+
+    @State private var newTagName = ""
+    @State private var selectedColor = "#FF9800"
+
+    private let colorPresets = ["#FF9800", "#4CAF50", "#2196F3", "#9C27B0", "#E91E63", "#607D8B"]
+    private var userTags: [ClipTag] { tags.filter { !$0.isBuiltIn } }
 
     var body: some View {
         List {
             Section("Canvas") {
                 Toggle("Copy clip when tapped", isOn: $copyClipOnTap)
-                Toggle("Fit canvas after drop", isOn: $fitCanvasAfterDrop)
-                Toggle("Show resize handles", isOn: $showResizeHandles)
-            }
-
-            Section("History") {
-                Toggle("Deduplicate clipboard history", isOn: $deduplicateHistory)
-                Toggle("Mask sensitive previews", isOn: $maskSensitiveContent)
-                LabeledContent("Saved clips", value: "\(clips.count)")
-            }
-
-            Section("Appearance") {
-                Toggle("Use tag colors for notes", isOn: $useTagColors)
-                Toggle("Liquid glass controls", isOn: $enableLiquidGlass)
-                LabeledContent("Workspaces", value: "\(workspaces.count)")
             }
 
             Section("Tags") {
                 ForEach(ClipType.allCases, id: \.self) { type in
-                    tagPreview(
-                        name: ClipTag.builtInName(for: type),
-                        color: ClipTag.builtInColor(for: type),
-                        detail: "Built in"
+                    BuiltInTagSettingsRow(type: type, presets: colorPresets)
+                }
+                ForEach(userTags) { tag in
+                    TagSettingsRow(
+                        tag: tag,
+                        presets: colorPresets,
+                        onDelete: { context.delete(tag) }
                     )
                 }
-                ForEach(tags.filter { !$0.isBuiltIn }) { tag in
-                    tagPreview(name: tag.name, color: tag.color, detail: "Custom")
+
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 10) {
+                        TextField("New tag", text: $newTagName)
+                            .textFieldStyle(.plain)
+                            .submitLabel(.done)
+                            .onSubmit(createTag)
+
+                        TagColorDot(hex: selectedColor, presets: colorPresets) {
+                            selectedColor = $0
+                        }
+
+                        Button(action: createTag) {
+                            Image(systemName: "plus")
+                                .font(.system(size: 16, weight: .semibold))
+                                .frame(width: 42, height: 42)
+                        }
+                        .buttonStyle(BlendedIconButtonStyle())
+                        .disabled(newTagName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    }
                 }
-                Button {
-                    // Future: open tag editor.
-                } label: {
-                    Label("Manage Tags", systemImage: "tag")
-                }
-                .disabled(true)
             }
 
-            Section("AI") {
-                Toggle("Include selected clips as context", isOn: $includeAIContext)
-                Button {
-                    // Future: provider and model configuration.
-                } label: {
-                    Label("Model and Provider", systemImage: "sparkles")
-                }
-                .disabled(true)
-            }
-
-            Section("Data") {
+            Section("Library") {
                 NavigationLink(destination: TrashPage()) {
                     Label("Recently Deleted", systemImage: "trash")
                 }
-                LabeledContent("Deleted clips", value: "\(deletedClips.count)")
-                Button {
-                    // Future: export a portable archive.
-                } label: {
-                    Label("Export Library", systemImage: "square.and.arrow.up")
-                }
-                .disabled(true)
             }
         }
         .navigationTitle("Settings")
@@ -83,16 +65,74 @@ struct SettingsPage: View {
         .buttonStyle(.plain)
     }
 
-    private func tagPreview(name: String, color: Color, detail: String) -> some View {
+    private func createTag() {
+        let trimmed = newTagName.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        let sortIndex = (tags.map(\.sortIndex).max() ?? 10) + 1
+        context.insert(ClipTag(name: trimmed, colorHex: selectedColor, isBuiltIn: false, sortIndex: sortIndex))
+        newTagName = ""
+    }
+}
+
+private struct BuiltInTagSettingsRow: View {
+    let type: ClipType
+    let presets: [String]
+
+    var body: some View {
         HStack(spacing: 10) {
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(color)
-                .frame(width: 22, height: 22)
-            Text(name)
+            TagColorDot(hex: ClipTag.builtInHex(for: type), presets: presets) {
+                ClipTag.setBuiltInColor($0, for: type)
+            }
+            AppTagPill(
+                title: ClipTag.builtInName(for: type),
+                color: ClipTag.builtInColor(for: type),
+                icon: type.icon,
+                isSelected: false
+            )
             Spacer()
-            Text(detail)
+            Text("Clip type")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }
+        .padding(.vertical, 2)
+    }
+}
+
+private struct TagSettingsRow: View {
+    @Bindable var tag: ClipTag
+
+    let presets: [String]
+    let onDelete: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                TagColorDot(hex: tag.colorHex, presets: presets) {
+                    tag.colorHex = $0
+                }
+
+                TextField("Tag name", text: $tag.name)
+                    .font(.subheadline.weight(.medium))
+                    .textFieldStyle(.plain)
+                    .submitLabel(.done)
+                    .onSubmit(normalizeName)
+
+                Menu {
+                    Button("Delete Tag", systemImage: "trash", role: .destructive, action: onDelete)
+                } label: {
+                    Image(systemName: AppSymbol.options)
+                        .font(.system(size: 15, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 36, height: 36)
+                }
+                .buttonStyle(BlendedIconButtonStyle())
+            }
+        }
+        .padding(.vertical, 3)
+    }
+
+    private func normalizeName() {
+        let trimmed = tag.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        tag.name = trimmed.isEmpty ? "Untitled" : trimmed
     }
 }

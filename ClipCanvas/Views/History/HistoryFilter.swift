@@ -1,29 +1,22 @@
 import Foundation
 import Observation
 
-enum HistoryTagFilter: Equatable {
-    case builtIn(ClipType)
-    case user(UUID)
-}
-
 @Observable
 final class HistoryFilter {
     var search: String = ""
-    var tag: HistoryTagFilter?
+    var type: ClipType?
+    var userTagID: UUID?
 
     func matches(_ clip: Clip) -> Bool {
         let matchesSearch = search.isEmpty
             || clip.content.localizedCaseInsensitiveContains(search)
-        return matchesSearch && matchesTag(clip)
+        let matchesType = type.map { clip.type == $0 } ?? true
+        let matchesUserTag = userTagID.map { id in clip.tags.contains { $0.id == id } } ?? true
+        return matchesSearch && matchesType && matchesUserTag
     }
 
-    private func matchesTag(_ clip: Clip) -> Bool {
-        guard let tag else { return true }
-        switch tag {
-        case .builtIn(let type):
-            return clip.type == type
-        case .user(let id):
-            return clip.tags.contains { $0.id == id }
-        }
+    func clear() {
+        type = nil
+        userTagID = nil
     }
 }

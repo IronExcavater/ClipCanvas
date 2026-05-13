@@ -9,6 +9,9 @@ struct HistoryPage: View {
 
     @State private var filter = HistoryFilter()
     @State private var detailClip: Clip?
+    @State private var tagEditSelection: ClipTagEditSelection?
+    @State private var isSelecting = false
+    @State private var selectedClipIDs = Set<UUID>()
 
     private var filtered: [Clip] {
         clips
@@ -16,46 +19,70 @@ struct HistoryPage: View {
             .sortedForPinnedRecency()
     }
     private var grouped: [(label: String, clips: [Clip])] { filtered.groupedByAge() }
+    private var selectedClips: [Clip] { clips.filter { selectedClipIDs.contains($0.id) } }
 
     var body: some View {
-        @Bindable var filter = filter
+        let searchBinding = Binding(
+            get: { filter.search },
+            set: { newValue in
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    filter.search = newValue
+                }
+            }
+        )
         List {
-            AppSearchField(text: $filter.search, prompt: "Search history")
-                .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 4, trailing: 16))
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
-
             HistoryFilterBar(filter: filter)
-                .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 8, trailing: 16))
-                .listRowBackground(Color.clear)
-                .listRowSeparator(.hidden)
+                .appListItemRowInsets(vertical: 0)
 
             if filtered.isEmpty {
                 emptyState
             } else {
+                selectionControl
+                    .appListItemRowInsets(vertical: 1)
+
                 ForEach(grouped, id: \.label) { group in
-                    Section(group.label) {
-                        ForEach(group.clips) { clip in
-                            HistoryRow(
-                                clip: clip,
-                                onCopy: { ClipboardService.write(clip: clip) },
-                                onTogglePin: { clip.isPinned.toggle() },
-                                onDelete: { clip.softDelete() },
-                                onDetails: { detailClip = clip }
-                            )
-                        }
+                    Text(group.label)
+                        .font(.caption.weight(.semibold))
+                        .foregroundStyle(.secondary)
+                        .textCase(nil)
+                        .appListItemRowInsets(horizontal: 16, vertical: 1)
+
+                    ForEach(group.clips) { clip in
+                        ClipRowView(
+                            clip: clip,
+                            compact: false,
+                            isSelecting: isSelecting,
+                            isSelected: selectedClipIDs.contains(clip.id),
+                            onSelect: { toggleSelection(clip) },
+                            onDetails: { detailClip = clip }
+                        )
+                        .appListItemRowInsets(vertical: 4)
                     }
                 }
             }
         }
+        .listStyle(.plain)
+        .scrollContentBackground(.hidden)
+        .contentMargins(.top, 0, for: .scrollContent)
+        .listSectionSpacing(.compact)
         .navigationTitle("History")
-        .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                EmptyView()
-            }
-        }
+        .navigationBarTitleDisplayMode(.inline)
+        .searchable(text: searchBinding, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search history")
+        .animation(.easeInOut(duration: 0.18), value: filter.search.isEmpty)
         .sheet(item: $detailClip) { clip in
             ClipDetailSheet(clip: clip)
+        }
+        .sheet(item: $tagEditSelection) { selection in
+            NavigationStack {
+                List {
+                    Section("Tags") {
+                        ClipTagEditor(clips: selection.clips)
+                    }
+                }
+                .navigationTitle("Edit Tags")
+                .navigationBarTitleDisplayMode(.inline)
+            }
+            .presentationDetents([.medium, .large])
         }
     }
 
@@ -67,13 +94,67 @@ struct HistoryPage: View {
                 systemImage: "doc.on.clipboard",
                 description: Text("Copy something to get started.")
             )
-            .listRowBackground(Color.clear)
+            .appEmptyStateRow()
         } else {
             ContentUnavailableView.search(text: filter.search)
-                .listRowBackground(Color.clear)
+                .appEmptyStateRow()
         }
     }
 
+    private var selectionControl: some View {
+        AppListSelectionControl(
+            isSelecting: isSelecting,
+            selectedCount: selectedClipIDs.count,
+            selectTitle: "Select",
+            onToggle: { isSelecting ? endSelection() : beginSelection() }
+        ) {
+            HStack(spacing: 2) {
+                Button {
+                    tagEditSelection = ClipTagEditSelection(clips: selectedClips)
+                } label: {
+                    Image(systemName: "tag")
+                        .font(.system(size: 16, weight: .semibold))
+                        .frame(width: 40, height: 40)
+                }
+                .buttonStyle(BlendedIconButtonStyle())
+                .disabled(selectedClipIDs.isEmpty)
+
+                Button(role: .destructive, action: deleteSelected) {
+                    Image(systemName: "trash")
+                        .font(.system(size: 16, weight: .semibold))
+                        .frame(width: 40, height: 40)
+                }
+                .buttonStyle(BlendedIconButtonStyle())
+                .disabled(selectedClipIDs.isEmpty)
+            }
+        }
+    }
+
+}
+
+private extension HistoryPage {
+    func toggleSelection(_ clip: Clip) {
+        if selectedClipIDs.contains(clip.id) {
+            selectedClipIDs.remove(clip.id)
+        } else {
+            selectedClipIDs.insert(clip.id)
+        }
+    }
+
+    func deleteSelected() {
+        selectedClips.forEach { ClipActionService.softDelete($0) }
+        endSelection()
+    }
+
+    func beginSelection() {
+        selectedClipIDs.removeAll()
+        isSelecting = true
+    }
+
+    func endSelection() {
+        selectedClipIDs.removeAll()
+        isSelecting = false
+    }
 }
 
 private extension [Clip] {
@@ -94,4 +175,9 @@ private extension [Clip] {
         }
         return buckets.filter { !$0.clips.isEmpty }
     }
+}
+
+private struct ClipTagEditSelection: Identifiable {
+    let id = UUID()
+    let clips: [Clip]
 }

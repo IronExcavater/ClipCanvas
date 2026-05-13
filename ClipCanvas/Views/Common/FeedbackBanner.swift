@@ -1,17 +1,23 @@
 import SwiftUI
 
-// Transient feedback pill — appears at top of screen for 1.7s then fades out.
-// Usage: overlay(alignment: .top) { FeedbackBanner(message: feedback) }
 struct FeedbackBanner: View {
     let message: String
 
     var body: some View {
-        Text(message)
-            .font(.caption.weight(.medium))
+        Label(message, systemImage: "checkmark")
+            .font(.caption.weight(.semibold))
+            .lineLimit(1)
             .padding(.horizontal, 14)
-            .padding(.vertical, 8)
-            .background(.regularMaterial, in: Capsule())
-            .shadow(radius: 4, y: 2)
-            .transition(.move(edge: .top).combined(with: .opacity))
+            .padding(.vertical, 9)
+            .background {
+                if #available(iOS 26, *) {
+                    Capsule()
+                        .fill(Color.clear)
+                        .glassEffect(.regular, in: .rect(cornerRadius: 22))
+                } else {
+                    Capsule().fill(.regularMaterial)
+                }
+            }
+            .shadow(color: .black.opacity(0.12), radius: 10, y: 4)
     }
 }

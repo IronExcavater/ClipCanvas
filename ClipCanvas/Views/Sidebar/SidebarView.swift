@@ -3,10 +3,11 @@ import SwiftData
 
 struct SidebarView: View {
     let onClose: (() -> Void)?
+    var isOpen = true
 
     @Query(
         filter: #Predicate<Workspace> { $0.deletedAt == nil },
-        sort: \Workspace.updatedAt, order: .reverse
+        sort: \Workspace.sortIndex
     ) private var workspaces: [Workspace]
 
     @Query(
@@ -25,20 +26,36 @@ struct SidebarView: View {
     private var recentChats: [AIChat] { Array(chats.prefix(3)) }
 
     var body: some View {
-        List {
+        VStack(spacing: 0) {
             sidebarHeader
-            workspacesSection
-            clipsSection
-            chatsSection
-        }
-        .listStyle(.insetGrouped)
-        .navigationTitle("Library")
-        .navigationBarTitleDisplayMode(.inline)
-        .safeAreaInset(edge: .bottom, spacing: 0) {
+
+            List {
+                workspacesSection
+                clipsSection
+                chatsSection
+            }
+            .listStyle(.plain)
+            .scrollContentBackground(.hidden)
+            .contentMargins(.top, 0, for: .scrollContent)
+            .contentMargins(.bottom, 8, for: .scrollContent)
+            .listSectionSpacing(.compact)
+            .listSectionSeparator(.hidden)
+            .mask(VerticalEdgeFadeMask(top: 10, bottom: 24))
+
             bottomNav
         }
+        .background {
+            sidebarBackground
+                .ignoresSafeArea()
+        }
+        .toolbar(.hidden, for: .navigationBar)
+        .ignoresSafeArea(.container, edges: .bottom)
+        .ignoresSafeArea(.keyboard, edges: .bottom)
         .sheet(item: $detailClip) { clip in
             ClipDetailSheet(clip: clip)
+        }
+        .onChange(of: isOpen) { _, newValue in
+            if !newValue { finishRenaming() }
         }
     }
 
@@ -47,26 +64,26 @@ struct SidebarView: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text("ClipCanvas")
                     .font(.title3.weight(.bold))
-                    .foregroundStyle(.primary)
+                    .foregroundStyle(Color.accentColor)
                 Text("Workspaces, clips, and chats")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            if let onClose {
-                Button(action: onClose) {
-                    Image(systemName: "sidebar.left")
-                        .font(.system(size: 19, weight: .semibold))
-                        .frame(width: 44, height: 44)
+            if onClose != nil {
+                Button(action: closeSidebar) {
+                    Image(systemName: AppSymbol.sidebar)
+                        .font(.system(size: 18, weight: .semibold))
+                        .frame(width: 46, height: 46)
                 }
                 .buttonStyle(BlendedIconButtonStyle())
                 .accessibilityLabel("Collapse Sidebar")
             }
         }
-        .padding(.vertical, 6)
-        .listRowInsets(EdgeInsets(top: 10, leading: 16, bottom: 6, trailing: 16))
-        .listRowBackground(Color.clear)
-        .listRowSeparator(.hidden)
+        .padding(.top, 4)
+        .padding(.bottom, 10)
+        .padding(.leading, 16)
+        .padding(.trailing, 12)
     }
 
     // MARK: - Sections
@@ -81,8 +98,9 @@ struct SidebarView: View {
                     onActivate: { activateWorkspace(ws) },
                     onRename: { beginWorkspaceRename(ws) },
                     onCommitRename: { commitWorkspaceRename() },
-                    onDelete: { ws.softDelete() }
+                    onDelete: { WorkspaceActionService.softDelete(ws, among: workspaces) }
                 )
+                .appListItemRowInsets(vertical: 4)
             }
         } header: {
             sectionHeader("Workspaces", destination: WorkspacesPage())
@@ -95,21 +113,19 @@ struct SidebarView: View {
                 Text("Copy something to get started")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                    .listRowBackground(Color.clear)
+                    .appListItemRowInsets(horizontal: 16, vertical: 2)
             } else {
                 ForEach(recentClips) { clip in
                     ClipRowView(
                         clip: clip,
                         compact: true,
-                        onCopy: { ClipboardService.write(clip: clip) },
-                        onTogglePin: { clip.isPinned.toggle() },
-                        onDelete: { clip.softDelete() },
                         onDetails: { detailClip = clip }
                     )
+                    .appListItemRowInsets(vertical: 4)
                 }
             }
         } header: {
-            sectionHeader("Recent Clips", destination: HistoryPage())
+            sectionHeader("Recent Clipboard", destination: HistoryPage())
         }
     }
 
@@ -119,7 +135,7 @@ struct SidebarView: View {
                 Text("No chats yet")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
-                    .listRowBackground(Color.clear)
+                    .appListItemRowInsets(horizontal: 16, vertical: 2)
             } else {
                 ForEach(recentChats) { chat in
                     VStack(alignment: .leading, spacing: 2) {
@@ -130,26 +146,30 @@ struct SidebarView: View {
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
-                    .padding(.vertical, 2)
+                    .appListItemContentPadding()
+                    .appListCard(tint: .secondary, opacity: 0.08)
+                    .appListItemRowInsets(vertical: 4)
                 }
             }
         } header: {
-            sectionHeader("AI Chats", destination: Text("All Chats - Phase 2"))
+            sectionHeader("AI Chats", destination: AIChatsPage())
         }
     }
 
     private func sectionHeader<Destination: View>(_ title: String, destination: Destination) -> some View {
-        HStack {
-            Text(title)
-            Spacer()
-            NavigationLink(destination: destination) {
-                Label("View \(title)", systemImage: "arrow.up.forward")
-                    .labelStyle(.titleAndIcon)
+        NavigationLink(destination: destination) {
+            HStack {
+                Text(title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                Spacer()
+                Text("View all")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.accentColor)
             }
-            .buttonStyle(.plain)
         }
+        .buttonStyle(.plain)
+        .textCase(nil)
     }
 
     // MARK: - Bottom nav
@@ -158,28 +178,45 @@ struct SidebarView: View {
         HStack(spacing: 0) {
             NavigationLink(destination: TrashPage()) {
                 Image(systemName: "trash")
-                    .font(.system(size: 20))
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.secondary)
-                    .frame(width: 48, height: 44)
+                    .frame(width: 46, height: 46)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(BlendedIconButtonStyle())
             Spacer()
             NavigationLink(destination: SettingsPage()) {
-                Image(systemName: "slider.horizontal.3")
-                    .font(.system(size: 20))
+                Image(systemName: AppSymbol.settings)
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.secondary)
-                    .frame(width: 48, height: 44)
+                    .frame(width: 46, height: 46)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(BlendedIconButtonStyle())
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 10)
-        .background(.regularMaterial)
-        .overlay(alignment: .top) { Divider() }
+        .ignoresSafeArea(.container, edges: .bottom)
+        .ignoresSafeArea(.keyboard, edges: .bottom)
+    }
+
+    @ViewBuilder
+    private var sidebarBackground: some View {
+        if #available(iOS 26, *) {
+            Rectangle()
+                .fill(Color.clear)
+                .glassEffect(.regular, in: .rect(cornerRadius: 0))
+        } else {
+            Rectangle()
+                .fill(.regularMaterial)
+        }
+    }
+
+    private func closeSidebar() {
+        finishRenaming()
+        onClose?()
     }
 
     private func activateWorkspace(_ workspace: Workspace) {
-        workspaces.forEach { $0.isActive = ($0.id == workspace.id) }
+        WorkspaceActionService.activate(workspace, among: workspaces)
     }
 
     private func beginWorkspaceRename(_ workspace: Workspace) {
@@ -188,13 +225,12 @@ struct SidebarView: View {
     }
 
     private func commitWorkspaceRename() {
-        let trimmed = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty {
-            renamingWorkspace?.name = trimmed
-            renamingWorkspace?.updatedAt = Date()
-        }
+        finishRenaming()
+    }
+
+    private func finishRenaming() {
+        WorkspaceActionService.rename(renamingWorkspace, to: renameText)
         renamingWorkspace = nil
         renameText = ""
     }
-
 }
