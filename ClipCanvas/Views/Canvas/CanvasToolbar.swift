@@ -2,93 +2,168 @@ import SwiftUI
 
 struct CanvasToolbar: View {
     @Binding var mode: CanvasMode
+    let selectedCount: Int
+    let canOpenLink: Bool
     let onPaste: () -> Void
-    let onZoomIn: () -> Void
-    let onZoomOut: () -> Void
-    let onFitContent: () -> Void
+    let onCopy: () -> Void
+    let onOpenLink: () -> Void
+    let onDetails: () -> Void
+    let onDelete: () -> Void
+    let onArrangeSelection: () -> Void
+    let onManageTags: () -> Void
+
+    private var hasSelection: Bool { selectedCount > 0 }
+    private let buttonSize: CGFloat = 52
+    private let iconSize: CGFloat = 19
 
     var body: some View {
         HStack(spacing: 0) {
-            toolButton("doc.on.clipboard", action: onPaste)
+            if hasSelection {
+                toolButton("doc.on.doc", action: onCopy)
+                if canOpenLink {
+                    toolButton("safari", action: onOpenLink)
+                }
+                AppDivider()
+                toolButton("info.circle", action: onDetails)
+                    .disabled(selectedCount != 1)
+                    .opacity(selectedCount == 1 ? 1 : 0.42)
+                toolButton("tag", action: onManageTags)
+                toolButton("square.grid.2x2", action: onArrangeSelection)
+                AppDivider()
+                destructiveButton("trash", action: onDelete)
+            } else {
+                toolButton("doc.on.clipboard", action: onPaste)
 
-            divider
+                AppDivider()
 
-            modeButton("hand.point.up.left", for: .pan)
-            modeButton("pencil.tip", for: .draw)
-
-            Spacer(minLength: 10)
-
-            zoomControl
+                modeButton("hand.point.up.left", for: .pan)
+                modeButton("pencil.tip", for: .draw)
+            }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
         .background {
             toolbarBackground
-                .clipShape(Capsule())
         }
         .shadow(color: .black.opacity(0.18), radius: 20, y: 8)
         .padding(.horizontal, 20)
-        .padding(.bottom, 8)
-        .frame(maxWidth: 460)
+        .padding(.bottom, 24)
+        .frame(maxWidth: hasSelection ? 420 : 300)
         .frame(maxWidth: .infinity)
+        .ignoresSafeArea(.container, edges: .bottom)
+        .ignoresSafeArea(.keyboard, edges: .bottom)
     }
 
     private func modeButton(_ icon: String, for target: CanvasMode) -> some View {
         Button { mode = target } label: {
-            Image(systemName: icon)
-                .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(mode == target ? .white : .primary)
-                .frame(width: 46, height: 46)
-                .background(mode == target ? Color.accentColor : Color.clear, in: Circle())
+            let selected = mode == target
+            ZStack {
+                Circle()
+                    .fill(selected ? Color.accentColor : Color.clear)
+                Image(systemName: icon)
+                    .font(.system(size: iconSize, weight: .semibold))
+                    .foregroundStyle(selected ? .white : .primary)
+            }
+            .frame(width: buttonSize, height: buttonSize)
+            .contentShape(Circle())
+            .shadow(
+                color: selected ? Color.accentColor.opacity(0.28) : .clear,
+                radius: selected ? 9 : 0,
+                y: selected ? 4 : 0
+            )
+            .scaleEffect(selected ? 1.02 : 1)
         }
         .buttonStyle(.plain)
-        .animation(.spring(response: 0.2, dampingFraction: 0.7), value: mode == target)
+        .animation(.spring(response: 0.24, dampingFraction: 0.82), value: mode == target)
     }
 
     private func toolButton(_ icon: String, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            Image(systemName: icon)
-                .font(.system(size: 18, weight: .medium))
-                .foregroundStyle(.primary)
-                .frame(width: 46, height: 46)
+            ZStack {
+                Color.clear
+                Image(systemName: icon)
+                    .font(.system(size: iconSize, weight: .medium))
+                    .foregroundStyle(.primary)
+            }
+            .frame(width: buttonSize, height: buttonSize)
+            .contentShape(Circle())
         }
         .buttonStyle(.plain)
     }
 
-    private var zoomControl: some View {
-        HStack(spacing: 0) {
-            Button(action: onZoomOut) {
-                Image(systemName: "minus")
-                    .frame(width: 38, height: 42)
+    private func destructiveButton(_ icon: String, action: @escaping () -> Void) -> some View {
+        Button(role: .destructive, action: action) {
+            ZStack {
+                Color.clear
+                Image(systemName: icon)
+                    .font(.system(size: iconSize, weight: .medium))
             }
-            Button(action: onFitContent) {
-                Image(systemName: "arrow.up.left.and.arrow.down.right")
-                    .frame(width: 42, height: 42)
-            }
-            Button(action: onZoomIn) {
-                Image(systemName: "plus")
-                    .frame(width: 38, height: 42)
-            }
+            .frame(width: buttonSize, height: buttonSize)
+            .contentShape(Circle())
         }
-        .font(.system(size: 16, weight: .semibold))
-        .foregroundStyle(.primary)
         .buttonStyle(.plain)
-        .background(Color.primary.opacity(0.08), in: Capsule())
-    }
-
-    private var divider: some View {
-        Rectangle()
-            .fill(Color.primary.opacity(0.12))
-            .frame(width: 1, height: 26)
-            .padding(.horizontal, 6)
     }
 
     @ViewBuilder
     private var toolbarBackground: some View {
         if #available(iOS 26, *) {
-            Color.clear.background(.ultraThinMaterial)
+            RoundedRectangle(cornerRadius: 36, style: .continuous)
+                .fill(Color.clear)
+                .glassEffect(.regular, in: .rect(cornerRadius: 36))
         } else {
-            Color.clear.background(.regularMaterial)
+            Capsule()
+                .fill(.regularMaterial)
+        }
+    }
+}
+
+struct CanvasZoomControls: View {
+    let scale: CGFloat
+    let onZoomIn: () -> Void
+    let onZoomOut: () -> Void
+
+    var body: some View {
+        VStack(spacing: 5) {
+            zoomButton("plus", action: onZoomIn)
+            Text("\(Int((scale * 100).rounded()))%")
+                .font(.caption2.weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+                .minimumScaleFactor(0.75)
+                .frame(width: 38, height: 18)
+            zoomButton("minus", action: onZoomOut)
+        }
+        .font(.system(size: 16, weight: .semibold))
+        .foregroundStyle(.primary)
+        .buttonStyle(.plain)
+        .frame(width: 44)
+        .padding(.vertical, 5)
+        .background {
+            zoomBackground
+        }
+        .shadow(color: .black.opacity(0.14), radius: 12, y: 5)
+        .ignoresSafeArea(.container, edges: .bottom)
+        .ignoresSafeArea(.keyboard, edges: .bottom)
+    }
+
+    private func zoomButton(_ icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .frame(width: 40, height: 40)
+                .contentShape(Circle())
+        }
+    }
+
+    @ViewBuilder
+    private var zoomBackground: some View {
+        if #available(iOS 26, *) {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(Color.clear)
+                .glassEffect(.regular, in: .rect(cornerRadius: 22))
+        } else {
+            Capsule()
+                .fill(.regularMaterial)
         }
     }
 }

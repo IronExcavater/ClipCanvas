@@ -8,9 +8,12 @@ struct CanvasContainerView: View {
     @Environment(\.modelContext) private var context
     @State private var mode: CanvasMode = .pan
     @State private var feedback: String?
+    @State private var feedbackToken = UUID()
     @State private var zoomCommand: ZoomCommand?
+    @State private var visibleScale: CGFloat = 1
     @State private var selectedPlacementIDs: Set<UUID> = []
     @State private var detailClip: Clip?
+    @State private var tagEditSelection: ClipTagEditSelection?
     @State private var isRenaming = false
     @State private var renameText = ""
     @AppStorage("settings.copyClipOnTap") private var copyClipOnTap = true
@@ -23,6 +26,7 @@ struct CanvasContainerView: View {
                 mode: mode,
                 zoomCommand: $zoomCommand,
                 selectedPlacementIDs: $selectedPlacementIDs,
+                visibleScale: $visibleScale,
                 onCopyClip: copyToClipboard
             )
             .ignoresSafeArea()
@@ -36,46 +40,67 @@ struct CanvasContainerView: View {
                     onToggleSidebar: onToggleSidebar,
                     onBeginRename: beginRename,
                     onCommitRename: commitRename,
-                    onClearAll: clearAll
+                    onClearAll: clearAll,
+                    onArrangeAll: { zoomCommand = .arrangeAll },
+                    onFitContent: { zoomCommand = .fitContent }
                 )
 
                 Spacer()
 
-                if !selectedPlacementIDs.isEmpty {
-                    CanvasSelectionBar(
-                        selectedCount: selectedPlacementIDs.count,
-                        onCopy: copySelected,
-                        onDetails: showSelectedDetails,
-                        onDelete: deleteSelected,
-                        onClear: { selectedPlacementIDs.removeAll() }
+                HStack {
+                    Spacer()
+                    CanvasZoomControls(
+                        scale: visibleScale,
+                        onZoomIn: { zoomCommand = .zoomIn },
+                        onZoomOut: { zoomCommand = .zoomOut }
                     )
-                    .padding(.bottom, 8)
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .padding(.trailing, 14)
+                    .padding(.bottom, 12)
                 }
 
                 CanvasToolbar(
                     mode: $mode,
+                    selectedCount: selectedPlacementIDs.count,
+                    canOpenLink: selectedOpenableClip != nil,
                     onPaste: paste,
-                    onZoomIn: { zoomCommand = .zoomIn },
-                    onZoomOut: { zoomCommand = .zoomOut },
-                    onFitContent: { zoomCommand = .fitContent }
+                    onCopy: copySelected,
+                    onOpenLink: openSelectedLink,
+                    onDetails: showSelectedDetails,
+                    onDelete: deleteSelected,
+                    onArrangeSelection: { zoomCommand = .arrangeSelection },
+                    onManageTags: showSelectedTags
                 )
             }
+            .ignoresSafeArea(.container, edges: .bottom)
 
-            if let feedback {
-                VStack {
-                    Spacer().frame(height: 70)
-                    FeedbackBanner(message: feedback)
-                    Spacer()
-                }
-                .transition(.move(edge: .top).combined(with: .opacity))
+            VStack {
+                Spacer().frame(height: 70)
+                FeedbackBanner(message: feedback ?? "")
+                    .opacity(feedback == nil ? 0 : 1)
+                    .offset(y: feedback == nil ? -12 : 0)
+                    .scaleEffect(feedback == nil ? 0.96 : 1)
+                Spacer()
             }
+            .allowsHitTesting(false)
         }
-        .animation(.spring(response: 0.25, dampingFraction: 0.82), value: feedback != nil)
+        .animation(.spring(response: 0.24, dampingFraction: 0.86), value: feedback)
         .animation(.spring(response: 0.25, dampingFraction: 0.82), value: selectedPlacementIDs)
         .sheet(item: $detailClip) { clip in
             ClipDetailSheet(clip: clip)
         }
+        .sheet(item: $tagEditSelection) { selection in
+            NavigationStack {
+                List {
+                    Section("Tags") {
+                        ClipTagEditor(clips: selection.clips)
+                    }
+                }
+                .navigationTitle("Edit Tags")
+                .navigationBarTitleDisplayMode(.inline)
+            }
+            .presentationDetents([.medium, .large])
+        }
+        .ignoresSafeArea(.keyboard, edges: .bottom)
     }
 
     // MARK: - Clipboard
@@ -93,7 +118,7 @@ struct CanvasContainerView: View {
 
     private func copyToClipboard(_ clip: Clip) {
         guard copyClipOnTap else { return }
-        ClipboardService.write(clip: clip)
+        ClipActionService.copy(clip)
         showFeedback("Copied")
     }
 
@@ -107,7 +132,9 @@ struct CanvasContainerView: View {
 
     private func commitRename() {
         let trimmed = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty { workspace.name = trimmed }
+        if !trimmed.isEmpty {
+            WorkspaceActionService.rename(workspace, to: trimmed)
+        }
         isRenaming = false
         renameFocused = false
     }
@@ -124,14 +151,24 @@ struct CanvasContainerView: View {
 
     private func copySelected() {
         let clips = selectedClips
-        let texts = clips.map(\.content).filter { !$0.isEmpty }
-        guard !texts.isEmpty else { return }
-        ClipboardService.writeString(texts.joined(separator: "\n\n"))
+        guard !clips.isEmpty else { return }
+        ClipActionService.copy(clips)
         showFeedback(clips.count == 1 ? "Copied 1 clip" : "Copied \(clips.count) clips")
     }
 
     private func showSelectedDetails() {
         detailClip = selectedClips.first
+    }
+
+    private func openSelectedLink() {
+        guard let clip = selectedOpenableClip else { return }
+        ClipActionService.openURL(for: clip)
+    }
+
+    private func showSelectedTags() {
+        let clips = selectedClips
+        guard !clips.isEmpty else { return }
+        tagEditSelection = ClipTagEditSelection(clips: clips)
     }
 
     private func deleteSelected() {
@@ -148,43 +185,32 @@ struct CanvasContainerView: View {
             .compactMap(\.clip)
     }
 
+    private var selectedOpenableClip: Clip? {
+        guard selectedClips.count == 1, let clip = selectedClips.first else { return nil }
+        return ClipActionService.openableURL(for: clip) == nil ? nil : clip
+    }
+
     // MARK: - Feedback
 
     private func showFeedback(_ msg: String) {
-        withAnimation { feedback = msg }
+        let token = UUID()
+        feedbackToken = token
+        withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
+            feedback = msg
+        }
         Task {
             try? await Task.sleep(for: .seconds(1.7))
-            withAnimation { feedback = nil }
+            await MainActor.run {
+                guard feedbackToken == token else { return }
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    feedback = nil
+                }
+            }
         }
     }
 }
 
-private struct CanvasSelectionBar: View {
-    let selectedCount: Int
-    let onCopy: () -> Void
-    let onDetails: () -> Void
-    let onDelete: () -> Void
-    let onClear: () -> Void
-
-    var body: some View {
-        HStack(spacing: 4) {
-            Text("\(selectedCount)")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(.white)
-                .frame(width: 24, height: 24)
-                .background(Color.accentColor, in: Circle())
-
-            Button(action: onCopy) { Image(systemName: "doc.on.doc") }
-            Button(action: onDetails) { Image(systemName: "info.circle") }
-                .disabled(selectedCount != 1)
-            Button(role: .destructive, action: onDelete) { Image(systemName: "trash") }
-            Button(action: onClear) { Image(systemName: "xmark") }
-        }
-        .font(.system(size: 17, weight: .medium))
-        .buttonStyle(.plain)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(.regularMaterial, in: Capsule())
-        .shadow(color: .black.opacity(0.16), radius: 12, y: 5)
-    }
+private struct ClipTagEditSelection: Identifiable {
+    let id = UUID()
+    let clips: [Clip]
 }

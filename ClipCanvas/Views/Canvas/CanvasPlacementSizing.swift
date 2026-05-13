@@ -4,15 +4,16 @@ import Foundation
 enum CanvasPlacementSizing {
     static let defaultSize = CGSize(width: 220, height: 150)
 
-    static func toggledSize(for placement: CanvasPlacement) -> CGSize {
+    static func toggledSize(for placement: CanvasPlacement, availableScreenWidth: CGFloat? = nil) -> CGSize {
         if isExpanded(placement) { return defaultSize }
-        return expandedSize(for: placement.clip)
+        return expandedSize(for: placement.clip, availableScreenWidth: availableScreenWidth)
     }
 
-    static func expandedSize(for clip: Clip?) -> CGSize {
+    static func expandedSize(for clip: Clip?, availableScreenWidth: CGFloat? = nil) -> CGSize {
         guard let clip else { return defaultSize }
         if clip.type == .image {
-            return CGSize(width: 300, height: 260)
+            let width = min(max((availableScreenWidth ?? 360) - 48, 300), 520)
+            return CGSize(width: width, height: min(width * 0.78, 420))
         }
 
         let count = max(clip.content.count, 1)

@@ -6,6 +6,7 @@ struct CanvasView: View {
     let mode: CanvasMode
     @Binding var zoomCommand: ZoomCommand?
     @Binding var selectedPlacementIDs: Set<UUID>
+    @Binding var visibleScale: CGFloat
     let onCopyClip: (Clip) -> Void
 
     @Environment(\.modelContext) private var context
@@ -15,7 +16,9 @@ struct CanvasView: View {
     @State private var canvasScale: CGFloat = 1.0
     @State private var baseScale: CGFloat = 1.0
     @State private var activeDrag: (id: UUID, offset: CGSize)?
-    @State private var activeResize: (id: UUID, start: CGSize)?
+    @State private var activeResize: (id: UUID, start: CGSize, translation: CGSize)?
+    @State private var zOrder: [UUID: Double] = [:]
+    @State private var nextZOrder: Double = 1
 
     private var placements: [CanvasPlacement] {
         workspace.placements.filter { $0.clip?.deletedAt == nil }
@@ -33,11 +36,20 @@ struct CanvasView: View {
 
                 ForEach(placements) { placement in
                     if let clip = placement.clip {
-                        positionedCard(placement: placement, clip: clip)
+                        positionedCard(placement: placement, clip: clip, in: geo)
                     }
                 }
 
-                if placements.isEmpty { EmptyCanvasHint() }
+                if placements.isEmpty {
+                    EmptyCanvasHint()
+                        .frame(width: 260, height: 150)
+                        .scaleEffect(canvasScale)
+                        .position(
+                            x: canvasOffset.width + 220 * canvasScale,
+                            y: canvasOffset.height + 220 * canvasScale
+                        )
+                        .allowsHitTesting(false)
+                }
             }
             .frame(width: geo.size.width, height: geo.size.height)
             .clipped()
@@ -50,6 +62,12 @@ struct CanvasView: View {
                 handleZoom(command, in: geo)
                 zoomCommand = nil
             }
+            .onChange(of: canvasScale) { _, newValue in
+                visibleScale = newValue
+            }
+            .onAppear {
+                visibleScale = canvasScale
+            }
         }
     }
 
@@ -58,7 +76,7 @@ struct CanvasView: View {
     private func dotGrid(in geo: GeometryProxy) -> some View {
         Canvas { ctx, size in
             let spacing = max(28.0 * canvasScale, 12)
-            let radius = min(1.2 * canvasScale, 2)
+            let radius = min(1.35 * canvasScale, 2.2)
             var x = canvasOffset.width.truncatingRemainder(dividingBy: spacing)
             if x < 0 { x += spacing }
             while x < size.width + spacing {
@@ -72,7 +90,7 @@ struct CanvasView: View {
                             width: radius * 2,
                             height: radius * 2
                         )),
-                        with: .color(.secondary.opacity(0.22))
+                        with: .color(.secondary.opacity(0.32))
                     )
                     y += spacing
                 }
@@ -84,33 +102,41 @@ struct CanvasView: View {
 
     // MARK: - Card positioning
 
-    private func positionedCard(placement: CanvasPlacement, clip: Clip) -> some View {
+    private func positionedCard(placement: CanvasPlacement, clip: Clip, in geo: GeometryProxy) -> some View {
         let scale = canvasScale
         let offset = canvasOffset
-        let screenCenterX = placement.x * scale + offset.width + (placement.width * scale) / 2
-        let screenCenterY = placement.y * scale + offset.height + (placement.height * scale) / 2
         let isDragging = activeDrag?.id == placement.id
         let dragOffset = isDragging ? (activeDrag?.offset ?? .zero) : .zero
         let isSelected = selectedPlacementIDs.contains(placement.id)
+        let size = displaySize(for: placement)
+        let screenCenterX = placement.x * scale + offset.width + (size.width * scale) / 2
+        let screenCenterY = placement.y * scale + offset.height + (size.height * scale) / 2
 
         return ClipCard(
             clip: clip,
             isSelected: isSelected,
             onTap: {
-                selectedPlacementIDs.insert(placement.id)
+                bringToFront(placement.id)
+                if selectedPlacementIDs.contains(placement.id) {
+                    selectedPlacementIDs.remove(placement.id)
+                } else {
+                    selectedPlacementIDs.insert(placement.id)
+                }
                 onCopyClip(clip)
             },
-            onResize: { resizePlacement(placement, translation: $0) },
-            onResizeEnded: { activeResize = nil },
-            onToggleExpandedSize: { toggleExpandedSize(for: placement) }
+            onDoubleTap: { toggleExpandedSize(for: placement, in: geo) },
+            onResize: { updateResizePreview(for: placement, translation: $0) },
+            onResizeEnded: { commitResize(for: placement) },
+            onToggleExpandedSize: { toggleExpandedSize(for: placement, in: geo) }
         )
-        .frame(width: placement.width, height: placement.height)
+        .frame(width: size.width, height: size.height)
         .scaleEffect(scale * (isDragging ? 1.05 : 1.0))
-        .frame(width: placement.width * scale, height: placement.height * scale)
+        .frame(width: size.width * scale, height: size.height * scale)
         .offset(x: dragOffset.width, y: dragOffset.height)
         .shadow(color: .black.opacity(isDragging ? 0.22 : 0), radius: isDragging ? 16 : 0, y: isDragging ? 8 : 0)
         .gesture(cardDragGesture(for: placement))
         .position(x: screenCenterX, y: screenCenterY)
+        .zIndex(zIndex(for: placement, isSelected: isSelected, isDragging: isDragging))
         .animation(.spring(response: 0.22, dampingFraction: 0.78), value: isDragging)
     }
 
@@ -124,7 +150,9 @@ struct CanvasView: View {
                     height: baseOffset.height + value.translation.height
                 )
             }
-            .onEnded { _ in baseOffset = canvasOffset }
+            .onEnded { _ in
+                baseOffset = canvasOffset
+            }
     }
 
     private func pinchGesture(in geo: GeometryProxy) -> some Gesture {
@@ -142,9 +170,12 @@ struct CanvasView: View {
     private func cardDragGesture(for placement: CanvasPlacement) -> some Gesture {
         DragGesture(minimumDistance: 4)
             .onChanged { value in
+                guard activeResize?.id != placement.id else { return }
+                bringToFront(placement.id)
                 activeDrag = (placement.id, value.translation)
             }
             .onEnded { value in
+                guard activeResize?.id != placement.id else { return }
                 placement.x += value.translation.width / canvasScale
                 placement.y += value.translation.height / canvasScale
                 activeDrag = nil
@@ -163,6 +194,11 @@ struct CanvasView: View {
                 zoom(to: max(canvasScale / 1.2, 0.2), in: geo)
             case .fitContent:
                 fitContent(in: geo)
+            case .arrangeAll:
+                arrangePlacements(placements, at: viewportCenter(in: geo), fitAfter: true, in: geo)
+            case .arrangeSelection:
+                let selected = placements.filter { selectedPlacementIDs.contains($0.id) }
+                arrangePlacements(selected, at: viewportCenter(in: geo), fitAfter: false, in: geo)
             }
             baseScale = canvasScale
             baseOffset = canvasOffset
@@ -204,24 +240,94 @@ struct CanvasView: View {
         )
     }
 
-    private func resizePlacement(_ placement: CanvasPlacement, translation: CGSize) {
-        if activeResize?.id != placement.id {
-            activeResize = (placement.id, CGSize(width: placement.width, height: placement.height))
-        }
-        guard let start = activeResize?.start else { return }
-        placement.width = max(160, min(420, start.width + translation.width / canvasScale))
-        placement.height = max(96, min(520, start.height + translation.height / canvasScale))
+    private func updateResizePreview(for placement: CanvasPlacement, translation: CGSize) {
+        let start = activeResize?.id == placement.id
+            ? activeResize?.start ?? CGSize(width: placement.width, height: placement.height)
+            : CGSize(width: placement.width, height: placement.height)
+        activeResize = (placement.id, start, translation)
+        bringToFront(placement.id)
+    }
+
+    private func commitResize(for placement: CanvasPlacement) {
+        let size = displaySize(for: placement)
+        placement.width = size.width
+        placement.height = size.height
+        activeResize = nil
+        activeDrag = nil
         workspace.updatedAt = Date()
     }
 
-    private func toggleExpandedSize(for placement: CanvasPlacement) {
-        let size = CanvasPlacementSizing.toggledSize(for: placement)
+    private func displaySize(for placement: CanvasPlacement) -> CGSize {
+        guard activeResize?.id == placement.id,
+              let start = activeResize?.start,
+              let translation = activeResize?.translation else {
+            return CGSize(width: placement.width, height: placement.height)
+        }
+        return CGSize(
+            width: max(160, min(420, start.width + translation.width / canvasScale)),
+            height: max(96, min(520, start.height + translation.height / canvasScale))
+        )
+    }
+
+    private func toggleExpandedSize(for placement: CanvasPlacement, in geo: GeometryProxy) {
+        let width = placement.clip?.type == .image ? geo.size.width / canvasScale : nil
+        let size = CanvasPlacementSizing.toggledSize(for: placement, availableScreenWidth: width)
         withAnimation(.spring(response: 0.25, dampingFraction: 0.82)) {
             placement.width = size.width
             placement.height = size.height
         }
         activeResize = nil
         workspace.updatedAt = Date()
+    }
+
+    private func viewportCenter(in geo: GeometryProxy) -> CGPoint {
+        CGPoint(
+            x: (geo.size.width / 2 - canvasOffset.width) / canvasScale,
+            y: (geo.size.height / 2 - canvasOffset.height) / canvasScale
+        )
+    }
+
+    private func arrangePlacements(_ target: [CanvasPlacement], at center: CGPoint, fitAfter: Bool, in geo: GeometryProxy) {
+        guard !target.isEmpty else { return }
+        let columns = max(1, Int(ceil(sqrt(Double(target.count)))))
+        let rows = Int(ceil(Double(target.count) / Double(columns)))
+        let spacing: Double = 22
+        var columnWidths = Array(repeating: 0.0, count: columns)
+        var rowHeights = Array(repeating: 0.0, count: rows)
+
+        for (index, placement) in target.enumerated() {
+            let col = index % columns
+            let row = index / columns
+            columnWidths[col] = max(columnWidths[col], placement.width)
+            rowHeights[row] = max(rowHeights[row], placement.height)
+        }
+
+        let totalWidth = columnWidths.reduce(0, +) + spacing * Double(max(columns - 1, 0))
+        let totalHeight = rowHeights.reduce(0, +) + spacing * Double(max(rows - 1, 0))
+        let originX = Double(center.x) - totalWidth / 2
+        let originY = Double(center.y) - totalHeight / 2
+
+        for (index, placement) in target.enumerated() {
+            let col = index % columns
+            let row = index / columns
+            placement.x = originX + columnWidths.prefix(col).reduce(0.0, +) + spacing * Double(col)
+            placement.y = originY + rowHeights.prefix(row).reduce(0.0, +) + spacing * Double(row)
+            bringToFront(placement.id)
+        }
+        workspace.updatedAt = Date()
+        if fitAfter { fitContent(in: geo) }
+    }
+
+    private func bringToFront(_ id: UUID) {
+        zOrder[id] = nextZOrder
+        nextZOrder += 1
+    }
+
+    private func zIndex(for placement: CanvasPlacement, isSelected: Bool, isDragging: Bool) -> Double {
+        let base = zOrder[placement.id] ?? 0
+        if isDragging { return base + 20_000 }
+        if isSelected { return base + 10_000 }
+        return base
     }
 
     // MARK: - Actions

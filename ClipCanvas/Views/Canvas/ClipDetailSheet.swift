@@ -11,52 +11,23 @@ struct ClipDetailSheet: View {
         NavigationStack {
             List {
                 Section {
-                    TextEditor(text: $editedContent)
-                        .font(.body)
-                        .scrollContentBackground(.hidden)
-                        .frame(minHeight: 220)
-                        .focused($contentFocused)
-                } header: {
-                    Text("Content")
-                } footer: {
-                    Text("\(editedContent.count) characters")
+                    contentEditor
+                        .appListItemContentPadding(horizontal: 10, vertical: 8)
+                        .appListCard(tint: clip.primaryDisplayColor, opacity: 0.16)
                 }
+                .appListItemRowInsets(vertical: 4)
 
-                Section("Info") {
-                    infoRow("Type", icon: clip.type.icon, value: ClipTag.builtInName(for: clip.type))
-                    infoRow("Origin", icon: "tray", value: clip.origin.label)
-                    infoRow("Status", icon: clip.isPinned ? "pin.fill" : "pin", value: clip.isPinned ? "Pinned" : "Not pinned")
-                    infoRow("Created", icon: "calendar", value: clip.createdAt.formatted(date: .abbreviated, time: .shortened))
-                    infoRow("Updated", icon: "clock", value: RelativeAgeFormatter.shortString(since: clip.updatedAt))
+                Section {
+                    actionStrip
+                    metadataGrid
                 }
+                .appListItemRowInsets(vertical: 4)
+                .buttonStyle(.plain)
 
                 Section("Tags") {
-                    tagRow(name: ClipTag.builtInName(for: clip.type), color: ClipTag.builtInColor(for: clip.type), detail: "Built in")
-                    ForEach(clip.tags.sorted { $0.sortIndex < $1.sortIndex }) { tag in
-                        tagRow(name: tag.name, color: tag.color, detail: "Custom")
-                    }
+                    ClipTagEditor(clips: [clip])
+                        .appListItemRowInsets(vertical: 4)
                 }
-
-                Section("Actions") {
-                    Button {
-                        ClipboardService.write(clip: clip)
-                    } label: {
-                        Label("Copy", systemImage: "doc.on.doc")
-                    }
-                    Button {
-                        clip.isPinned.toggle()
-                        clip.updatedAt = Date()
-                    } label: {
-                        Label(clip.isPinned ? "Unpin from top" : "Keep at top", systemImage: clip.isPinned ? "pin.slash" : "pin")
-                    }
-                    Button(role: .destructive) {
-                        clip.softDelete()
-                        dismiss()
-                    } label: {
-                        Label("Delete", systemImage: "trash")
-                    }
-                }
-                .buttonStyle(.plain)
             }
             .navigationTitle("Clip Details")
             .navigationBarTitleDisplayMode(.inline)
@@ -89,32 +60,78 @@ struct ClipDetailSheet: View {
         }
     }
 
-    private func tagRow(name: String, color: Color, detail: String) -> some View {
+    private var contentEditor: some View {
+        TextEditor(text: $editedContent)
+            .font(.body)
+            .scrollContentBackground(.hidden)
+            .frame(minHeight: 150)
+            .focused($contentFocused)
+    }
+
+    private var actionStrip: some View {
         HStack(spacing: 10) {
-            RoundedRectangle(cornerRadius: 4, style: .continuous)
-                .fill(color)
-                .frame(width: 22, height: 22)
-            Text(name)
+            detailAction("Copy", icon: "doc.on.doc") {
+                ClipActionService.copy(clip)
+            }
+
+            if ClipActionService.openableURL(for: clip) != nil {
+                detailAction("Open", icon: "safari") {
+                    ClipActionService.openURL(for: clip)
+                }
+            }
+
+            detailAction(clip.isPinned ? "Pinned" : "Pin", icon: clip.isPinned ? "pin.fill" : "pin") {
+                ClipActionService.togglePin(clip)
+            }
+
             Spacer()
-            Text(detail)
-                .font(.caption)
-                .foregroundStyle(.secondary)
+
+            Button(role: .destructive) {
+                ClipActionService.softDelete(clip)
+                dismiss()
+            } label: {
+                Label("Delete", systemImage: "trash")
+                    .font(.caption.weight(.semibold))
+                    .labelStyle(.iconOnly)
+                    .frame(width: 40, height: 40)
+            }
+            .buttonStyle(.plain)
         }
     }
 
-    private func infoRow(_ title: String, icon: String, value: String) -> some View {
-        LabeledContent {
-            Text(value.isEmpty ? "Now" : value)
-                .foregroundStyle(.secondary)
-        } label: {
-            Label(title, systemImage: icon)
+    private var metadataGrid: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Label(ClipTag.builtInName(for: clip.type), systemImage: clip.type.icon)
+            Label(clip.origin.label, systemImage: "tray")
+            Label {
+                RelativeAgeText(date: clip.updatedAt, prefix: "Last updated ", emptyText: "Last updated just now")
+            } icon: {
+                Image(systemName: "clock")
+            }
+            Label(clip.createdAt.formatted(date: .abbreviated, time: .shortened), systemImage: "calendar")
         }
+        .font(.caption)
+        .foregroundStyle(.secondary)
+    }
+
+    private func detailAction(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Label(title, systemImage: icon)
+                .font(.caption.weight(.semibold))
+                .labelStyle(.titleAndIcon)
+                .padding(.horizontal, 10)
+                .frame(height: 40)
+                .background(Color.secondary.opacity(0.08), in: Capsule())
+        }
+        .buttonStyle(.plain)
     }
 
     private func commitEdit() {
         let trimmed = editedContent.trimmingCharacters(in: .whitespacesAndNewlines)
         if !trimmed.isEmpty, trimmed != clip.content {
             clip.content = trimmed
+            clip.type = Clip.detect(content: trimmed, imageData: clip.imageData)
+            clip.sensitivity = ClipClassificationService.detectSensitivity(trimmed)
             clip.updatedAt = Date()
         }
     }

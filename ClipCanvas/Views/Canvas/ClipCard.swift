@@ -5,6 +5,7 @@ struct ClipCard: View {
     let clip: Clip
     let isSelected: Bool
     let onTap: () -> Void
+    let onDoubleTap: () -> Void
     let onResize: (CGSize) -> Void
     let onResizeEnded: () -> Void
     let onToggleExpandedSize: () -> Void
@@ -16,7 +17,6 @@ struct ClipCard: View {
                 .padding(14)
 
             resizeHandle
-                .padding(7)
         }
         .background(cardBackground, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
         .overlay(
@@ -26,6 +26,7 @@ struct ClipCard: View {
         )
         .shadow(color: .black.opacity(isSelected ? 0.16 : 0.09), radius: isSelected ? 10 : 6, y: isSelected ? 4 : 2)
         .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .onTapGesture(count: 2, perform: onDoubleTap)
         .onTapGesture(perform: onTap)
         .animation(.spring(response: 0.18, dampingFraction: 0.8), value: isSelected)
     }
@@ -47,12 +48,7 @@ struct ClipCard: View {
     }
 
     private var resizeHandle: some View {
-        Image(systemName: "arrow.down.right.and.arrow.up.left")
-            .font(.system(size: 13, weight: .semibold))
-            .foregroundStyle(.secondary)
-            .frame(width: 30, height: 30)
-            .background(.regularMaterial, in: Circle())
-            .contentShape(Circle())
+        ResizeHandle()
             .onTapGesture(count: 2, perform: onToggleExpandedSize)
             .highPriorityGesture(
                 DragGesture(minimumDistance: 2)
@@ -66,6 +62,26 @@ struct ClipCard: View {
             return tag.color.opacity(0.22)
         }
         return clip.color.background
+    }
+}
+
+private struct ResizeHandle: View {
+    var body: some View {
+        Canvas { ctx, size in
+            let count = 3
+            let spacing: CGFloat = 6
+            let lineWidth: CGFloat = 1.5
+            for i in 0..<count {
+                let offset = CGFloat(i) * spacing
+                var path = Path()
+                path.move(to: CGPoint(x: size.width - offset - spacing, y: size.height))
+                path.addLine(to: CGPoint(x: size.width, y: size.height - offset - spacing))
+                ctx.stroke(path, with: .color(.secondary.opacity(0.55)), lineWidth: lineWidth)
+            }
+        }
+        .frame(width: 28, height: 28)
+        .padding(6)
+        .contentShape(Rectangle())
     }
 }
 

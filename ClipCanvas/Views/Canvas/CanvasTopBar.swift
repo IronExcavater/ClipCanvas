@@ -9,16 +9,20 @@ struct CanvasTopBar: View {
     let onBeginRename: () -> Void
     let onCommitRename: () -> Void
     let onClearAll: () -> Void
+    let onArrangeAll: () -> Void
+    let onFitContent: () -> Void
+
+    @State private var confirmingClear = false
 
     var body: some View {
         HStack(spacing: 12) {
             Button(action: onToggleSidebar) {
-                Image(systemName: "sidebar.left")
-                    .font(.system(size: 18))
+                Image(systemName: AppSymbol.sidebar)
+                    .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.primary)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 46, height: 46)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(BlendedIconButtonStyle())
 
             Spacer()
 
@@ -26,25 +30,38 @@ struct CanvasTopBar: View {
 
             Spacer()
 
-            Button(role: .destructive, action: onClearAll) {
-                Image(systemName: "trash")
-                    .font(.system(size: 17))
-                    .foregroundStyle(.primary)
-                    .frame(width: 32, height: 32)
+            Menu {
+                Button("Rename", systemImage: "pencil", action: onBeginRename)
+                Button("Fit View to Content", systemImage: "arrow.up.left.and.arrow.down.right", action: onFitContent)
+                Button("Arrange All in Grid", systemImage: "square.grid.2x2", action: onArrangeAll)
+                Divider()
+                Button("Clear All", systemImage: "trash", role: .destructive) {
+                    confirmingClear = true
+                }
+            } label: {
+                BlendedIconCircle {
+                    Image(systemName: AppSymbol.options)
+                        .font(.system(size: 20, weight: .bold))
+                }
             }
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 16)
         .padding(.top, 4)
         .padding(.bottom, 10)
-        .background(.regularMaterial, ignoresSafeAreaEdges: .top)
+        .alert("Clear all clips from this workspace?", isPresented: $confirmingClear) {
+            Button("Cancel", role: .cancel) {}
+            Button("Clear All", role: .destructive, action: onClearAll)
+        } message: {
+            Text("This removes every clip placement from the current canvas.")
+        }
     }
 
     @ViewBuilder
     private var title: some View {
         if isRenaming {
             TextField("Workspace name", text: $renameText)
-                .font(.headline)
+                .font(.title3.weight(.semibold))
                 .multilineTextAlignment(.center)
                 .textFieldStyle(.plain)
                 .focused(renameFocused)
@@ -56,7 +73,7 @@ struct CanvasTopBar: View {
                 .frame(maxWidth: 220)
         } else {
             Text(workspaceName)
-                .font(.headline)
+                .font(.title3.weight(.semibold))
                 .lineLimit(1)
                 .onTapGesture(count: 2, perform: onBeginRename)
         }

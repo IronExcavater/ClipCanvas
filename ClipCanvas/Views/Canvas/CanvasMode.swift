@@ -7,4 +7,6 @@ enum ZoomCommand: Equatable {
     case zoomIn
     case zoomOut
     case fitContent
+    case arrangeAll
+    case arrangeSelection
 }
