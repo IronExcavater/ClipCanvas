@@ -203,10 +203,10 @@ Workspace actions intentionally excluded:
 - Create: `ClipCanvas/Services/CanvasObjectMigrationService.swift`
 - Test: `ClipCanvasTests/CanvasObjectMigrationTests.swift`
 
-- [ ] Convert each live `CanvasPlacement` into one `CanvasObject(kind: .clipNote)` preserving clip, x, y, width, and height.
-- [ ] Skip already-migrated placements by storing a deterministic migration marker on `CanvasObject` or by deleting the converted placements after successful migration.
-- [ ] Run migration once from `AppBootstrap.ensureActiveWorkspace(in:)`.
-- [ ] Test that migration is idempotent.
+- [x] Convert each live `CanvasPlacement` into one `CanvasObject(kind: .clipNote)` preserving clip, x, y, width, and height.
+- [x] Skip already-migrated placements by storing a deterministic migration marker on `CanvasObject` or by deleting the converted placements after successful migration.
+- [x] Run migration once from `AppBootstrap.ensureActiveWorkspace(in:)`.
+- [x] Test that migration is idempotent.
 
 ### Task 4: Render Canvas Objects
 

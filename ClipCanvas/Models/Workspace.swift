@@ -79,3 +79,17 @@ final class CanvasPlacement {
         self.y = y
     }
 }
+
+extension CanvasPlacement {
+    var frame: CGRect {
+        get {
+            CGRect(x: x, y: y, width: width, height: height)
+        }
+        set {
+            x = Double(newValue.origin.x)
+            y = Double(newValue.origin.y)
+            width = Double(newValue.width)
+            height = Double(newValue.height)
+        }
+    }
+}

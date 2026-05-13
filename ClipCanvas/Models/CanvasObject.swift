@@ -93,6 +93,7 @@ final class CanvasObject {
     var drawingData: Data?
     var connectorData: Data?
     var groupID: UUID?
+    var sourcePlacementID: UUID?
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
     var deletedAt: Date?
