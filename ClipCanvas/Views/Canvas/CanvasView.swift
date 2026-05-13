@@ -19,6 +19,9 @@ struct CanvasView: View {
     @State private var activeResize: (id: UUID, start: CGSize, translation: CGSize)?
     @State private var zOrder: [UUID: Double] = [:]
     @State private var nextZOrder: Double = 1
+    @State private var panStartOrigin: CGPoint?
+    @State private var pinchStartScale: CGFloat?
+    @State private var pinchAnchorCenter: CGPoint?
 
     private var placements: [CanvasPlacement] {
         workspace.placements.filter { $0.clip?.deletedAt == nil }
@@ -27,7 +30,11 @@ struct CanvasView: View {
     var body: some View {
         GeometryReader { geo in
             ZStack(alignment: .topLeading) {
-                dotGrid(in: geo)
+                CanvasDotGrid(
+                    viewportOrigin: viewportOrigin,
+                    canvasScale: canvasScale,
+                    opacity: gridOpacity(viewportSize: geo.size)
+                )
                     .contentShape(Rectangle())
                     .onTapGesture {
                         selectedPlacementIDs.removeAll()
@@ -69,36 +76,6 @@ struct CanvasView: View {
                 visibleScale = canvasScale
             }
         }
-    }
-
-    // MARK: - Dot grid
-
-    private func dotGrid(in geo: GeometryProxy) -> some View {
-        Canvas { ctx, size in
-            let spacing = max(28.0 * canvasScale, 12)
-            let radius = min(1.35 * canvasScale, 2.2)
-            let opacity = gridOpacity(viewportSize: size)
-            var x = (-viewportOrigin.x * canvasScale).truncatingRemainder(dividingBy: spacing)
-            if x < 0 { x += spacing }
-            while x < size.width + spacing {
-                var y = (-viewportOrigin.y * canvasScale).truncatingRemainder(dividingBy: spacing)
-                if y < 0 { y += spacing }
-                while y < size.height + spacing {
-                    ctx.fill(
-                        Path(ellipseIn: CGRect(
-                            x: x - radius,
-                            y: y - radius,
-                            width: radius * 2,
-                            height: radius * 2
-                        )),
-                        with: .color(.secondary.opacity(opacity))
-                    )
-                    y += spacing
-                }
-                x += spacing
-            }
-        }
-        .background(Color(uiColor: .systemBackground))
     }
 
     // MARK: - Card positioning
@@ -143,45 +120,60 @@ struct CanvasView: View {
     private func canvasPanGesture(in geo: GeometryProxy) -> some Gesture {
         DragGesture(minimumDistance: 4)
             .onChanged { value in
+                let start = panStartOrigin ?? viewportOrigin
+                if panStartOrigin == nil {
+                    panStartOrigin = start
+                    baseViewportOrigin = start
+                }
                 let proposed = CGPoint(
-                    x: baseViewportOrigin.x - value.translation.width / canvasScale,
-                    y: baseViewportOrigin.y - value.translation.height / canvasScale
+                    x: start.x - value.translation.width / canvasScale,
+                    y: start.y - value.translation.height / canvasScale
                 )
                 viewportOrigin = boundedOrigin(proposed, viewportSize: geo.size, rubberBand: true)
             }
             .onEnded { value in
+                let start = panStartOrigin ?? baseViewportOrigin
                 let throwVector = CGSize(
                     width: (value.predictedEndTranslation.width - value.translation.width) * 0.18,
                     height: (value.predictedEndTranslation.height - value.translation.height) * 0.18
                 )
                 let proposed = CGPoint(
-                    x: baseViewportOrigin.x - (value.translation.width + throwVector.width) / canvasScale,
-                    y: baseViewportOrigin.y - (value.translation.height + throwVector.height) / canvasScale
+                    x: start.x - (value.translation.width + throwVector.width) / canvasScale,
+                    y: start.y - (value.translation.height + throwVector.height) / canvasScale
                 )
                 let target = boundedOrigin(proposed, viewportSize: geo.size, rubberBand: false)
                 withAnimation(.smooth(duration: 0.22)) {
                     viewportOrigin = target
                 }
                 baseViewportOrigin = target
+                panStartOrigin = nil
             }
     }
 
     private func pinchGesture(in geo: GeometryProxy) -> some Gesture {
         MagnificationGesture()
             .onChanged { value in
-                let next = min(max(baseScale * value, 0.2), 4.0)
-                zoom(to: next, in: geo)
+                let startScale = pinchStartScale ?? canvasScale
+                let anchorCenter = pinchAnchorCenter ?? viewportCenter(in: geo)
+                if pinchStartScale == nil {
+                    pinchStartScale = startScale
+                    pinchAnchorCenter = anchorCenter
+                }
+                let next = min(max(startScale * value, 0.2), 4.0)
+                zoom(to: next, around: anchorCenter, in: geo)
             }
             .onEnded { _ in
                 baseScale = canvasScale
                 let target = boundedOrigin(viewportOrigin, viewportSize: geo.size, rubberBand: false)
                 viewportOrigin = target
                 baseViewportOrigin = target
+                pinchStartScale = nil
+                pinchAnchorCenter = nil
             }
     }
 
     private func cardDragGesture(for placement: CanvasPlacement) -> some Gesture {
-        DragGesture(minimumDistance: 4)
+        DragGesture(minimumDistance: 4, coordinateSpace: .global)
             .onChanged { value in
                 guard activeResize?.id != placement.id else { return }
                 bringToFront(placement.id)
@@ -219,7 +211,10 @@ struct CanvasView: View {
     }
 
     private func zoom(to next: CGFloat, in geo: GeometryProxy) {
-        let center = viewportCenter(in: geo)
+        zoom(to: next, around: viewportCenter(in: geo), in: geo)
+    }
+
+    private func zoom(to next: CGFloat, around center: CGPoint, in geo: GeometryProxy) {
         canvasScale = next
         viewportOrigin = origin(forCenter: center, viewportSize: geo.size)
     }
@@ -272,10 +267,10 @@ struct CanvasView: View {
               let translation = activeResize?.translation else {
             return CGSize(width: placement.width, height: placement.height)
         }
-        return CGSize(
-            width: max(160, min(420, start.width + translation.width / canvasScale)),
-            height: max(96, min(520, start.height + translation.height / canvasScale))
-        )
+        return CanvasPlacementSizing.snappedSize(CGSize(
+            width: start.width + translation.width / canvasScale,
+            height: start.height + translation.height / canvasScale
+        ), for: placement.clip)
     }
 
     private func toggleExpandedSize(for placement: CanvasPlacement, in geo: GeometryProxy) {
@@ -339,8 +334,8 @@ struct CanvasView: View {
         let bounds = canvasRadiusBounds(viewportSize: viewportSize)
         let center = viewportCenter(for: viewportOrigin, viewportSize: viewportSize)
         let distance = hypot(center.x - bounds.center.x, center.y - bounds.center.y)
-        let progress = min(max((distance / bounds.radius - 0.68) / 0.32, 0), 1)
-        return 0.32 - progress * 0.20
+        let progress = min(max((distance / bounds.radius - 0.54) / 0.46, 0), 1)
+        return 0.42 - progress * 0.36
     }
 
     private func arrangePlacements(_ target: [CanvasPlacement], at center: CGPoint, fitAfter: Bool, in geo: GeometryProxy) {
@@ -430,6 +425,56 @@ private struct CanvasRadiusBounds {
             x: center.x + dx / distance * boundedDistance,
             y: center.y + dy / distance * boundedDistance
         )
+    }
+}
+
+private struct CanvasDotGrid: View, Animatable {
+    var viewportOrigin: CGPoint
+    var canvasScale: CGFloat
+    var opacity: Double
+
+    var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, AnimatablePair<CGFloat, Double>> {
+        get {
+            AnimatablePair(
+                AnimatablePair(viewportOrigin.x, viewportOrigin.y),
+                AnimatablePair(canvasScale, opacity)
+            )
+        }
+        set {
+            viewportOrigin = CGPoint(x: newValue.first.first, y: newValue.first.second)
+            canvasScale = newValue.second.first
+            opacity = newValue.second.second
+        }
+    }
+
+    var body: some View {
+        Canvas { ctx, size in
+            let spacing = max(28.0 * canvasScale, 12)
+            let radius = min(1.35 * canvasScale, 2.2)
+            var x = (-viewportOrigin.x * canvasScale).truncatingRemainder(dividingBy: spacing)
+            if x < 0 { x += spacing }
+
+            while x < size.width + spacing {
+                var y = (-viewportOrigin.y * canvasScale).truncatingRemainder(dividingBy: spacing)
+                if y < 0 { y += spacing }
+
+                while y < size.height + spacing {
+                    ctx.fill(
+                        Path(ellipseIn: CGRect(
+                            x: x - radius,
+                            y: y - radius,
+                            width: radius * 2,
+                            height: radius * 2
+                        )),
+                        with: .color(.secondary.opacity(opacity))
+                    )
+                    y += spacing
+                }
+                x += spacing
+            }
+        }
+        .background(Color(uiColor: .systemBackground))
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 }
 

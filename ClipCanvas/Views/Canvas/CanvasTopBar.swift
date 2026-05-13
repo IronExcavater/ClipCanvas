@@ -50,6 +50,7 @@ struct CanvasTopBar: View {
             CanvasTopBarFade()
                 .allowsHitTesting(false)
                 .ignoresSafeArea(.container, edges: .top)
+                .offset(y: -96)
         }
         .alert("Clear all clips from this workspace?", isPresented: $confirmingClear) {
             Button("Cancel", role: .cancel) {}
@@ -84,16 +85,32 @@ struct CanvasTopBar: View {
 
 private struct CanvasTopBarFade: View {
     var body: some View {
-        Rectangle()
-            .fill(.ultraThinMaterial)
-            .frame(height: 188)
-            .mask(
-                LinearGradient(
-                    colors: [.black, .black.opacity(0.92), .black.opacity(0.62), .black.opacity(0.26), .clear],
-                    startPoint: .top,
-                    endPoint: .bottom
+        VStack(spacing: 0) {
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .frame(height: 126)
+            Rectangle()
+                .fill(.ultraThinMaterial)
+                .frame(height: 154)
+                .mask(
+                    LinearGradient(
+                        colors: [.black, .black.opacity(0.78), .black.opacity(0.34), .clear],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
                 )
+        }
+        .overlay(
+            LinearGradient(
+                colors: [
+                    Color(uiColor: .systemBackground).opacity(0.34),
+                    Color(uiColor: .systemBackground).opacity(0.18),
+                    .clear
+                ],
+                startPoint: .top,
+                endPoint: .bottom
             )
-            .offset(y: -82)
+        )
+        .frame(height: 280)
     }
 }

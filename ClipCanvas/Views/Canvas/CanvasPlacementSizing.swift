@@ -3,6 +3,11 @@ import Foundation
 
 enum CanvasPlacementSizing {
     static let defaultSize = CGSize(width: 220, height: 150)
+    static let minimumSize = CGSize(width: 160, height: 96)
+    static let maximumSize = CGSize(width: 440, height: 540)
+    static let estimatedCharacterWidth: CGFloat = 8.5
+    static let estimatedLineHeight: CGFloat = 20
+    static let contentChrome = CGSize(width: 28, height: 28)
 
     static func toggledSize(for placement: CanvasPlacement, availableScreenWidth: CGFloat? = nil) -> CGSize {
         if isExpanded(placement) { return defaultSize }
@@ -19,9 +24,24 @@ enum CanvasPlacementSizing {
         let count = max(clip.content.count, 1)
         let lines = clip.content.components(separatedBy: .newlines).count
         let estimatedWrappedLines = max(lines, Int((Double(count) / 32.0).rounded(.up)))
-        let height = min(max(CGFloat(estimatedWrappedLines) * 20 + 34, defaultSize.height), 420)
+        let height = min(max(CGFloat(estimatedWrappedLines) * estimatedLineHeight + 34, defaultSize.height), 420)
         let width: CGFloat = count > 220 ? 300 : 260
+        return snappedSize(CGSize(width: width, height: height), for: clip)
+    }
+
+    static func snappedSize(_ proposed: CGSize, for clip: Clip?) -> CGSize {
+        let widthStep = clip?.type == .image ? 12 : estimatedCharacterWidth
+        let heightStep = clip?.type == .image ? 12 : estimatedLineHeight
+        let width = snap(proposed.width, chrome: contentChrome.width, step: widthStep)
+            .clamped(to: minimumSize.width...maximumSize.width)
+        let height = snap(proposed.height, chrome: contentChrome.height, step: heightStep)
+            .clamped(to: minimumSize.height...maximumSize.height)
         return CGSize(width: width, height: height)
+    }
+
+    private static func snap(_ value: CGFloat, chrome: CGFloat, step: CGFloat) -> CGFloat {
+        let contentValue = max(value - chrome, 0)
+        return (contentValue / step).rounded() * step + chrome
     }
 
     private static func isExpanded(_ placement: CanvasPlacement) -> Bool {
