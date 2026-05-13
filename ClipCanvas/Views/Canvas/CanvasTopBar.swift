@@ -49,6 +49,10 @@ struct CanvasTopBar: View {
         .padding(.horizontal, 16)
         .padding(.top, 4)
         .padding(.bottom, 10)
+        .background(alignment: .bottom) {
+            CanvasTopBarFade()
+                .allowsHitTesting(false)
+        }
         .alert("Clear all clips from this workspace?", isPresented: $confirmingClear) {
             Button("Cancel", role: .cancel) {}
             Button("Clear All", role: .destructive, action: onClearAll)
@@ -77,5 +81,21 @@ struct CanvasTopBar: View {
                 .lineLimit(1)
                 .onTapGesture(count: 2, perform: onBeginRename)
         }
+    }
+}
+
+private struct CanvasTopBarFade: View {
+    var body: some View {
+        Rectangle()
+            .fill(.ultraThinMaterial)
+            .frame(height: 88)
+            .mask(
+                LinearGradient(
+                    colors: [.black, .black.opacity(0.75), .clear],
+                    startPoint: .top,
+                    endPoint: .bottom
+                )
+            )
+            .offset(y: 36)
     }
 }

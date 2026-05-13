@@ -10,7 +10,7 @@ struct CanvasView: View {
     let onCopyClip: (Clip) -> Void
 
     @Environment(\.modelContext) private var context
-    @Query(filter: #Predicate<Clip> { $0.deletedAt == nil }) private var clips: [Clip]
+    @Query private var allClips: [Clip]
     @State private var canvasOffset: CGSize = .zero
     @State private var baseOffset: CGSize = .zero
     @State private var canvasScale: CGFloat = 1.0
@@ -32,7 +32,7 @@ struct CanvasView: View {
                     .onTapGesture {
                         selectedPlacementIDs.removeAll()
                     }
-                    .gesture(mode == .pan ? canvasPanGesture : nil)
+                    .gesture(mode == .pan ? canvasPanGesture(in: geo) : nil)
 
                 ForEach(placements) { placement in
                     if let clip = placement.clip {
@@ -142,16 +142,29 @@ struct CanvasView: View {
 
     // MARK: - Gestures
 
-    private var canvasPanGesture: some Gesture {
+    private func canvasPanGesture(in geo: GeometryProxy) -> some Gesture {
         DragGesture(minimumDistance: 4)
             .onChanged { value in
-                canvasOffset = CGSize(
+                let proposed = CGSize(
                     width: baseOffset.width + value.translation.width,
                     height: baseOffset.height + value.translation.height
                 )
+                canvasOffset = boundedOffset(proposed, viewportSize: geo.size, rubberBand: true)
             }
-            .onEnded { _ in
-                baseOffset = canvasOffset
+            .onEnded { value in
+                let projected = CGSize(
+                    width: value.translation.width + (value.predictedEndTranslation.width - value.translation.width) * 0.48,
+                    height: value.translation.height + (value.predictedEndTranslation.height - value.translation.height) * 0.48
+                )
+                let proposed = CGSize(
+                    width: baseOffset.width + projected.width,
+                    height: baseOffset.height + projected.height
+                )
+                let target = boundedOffset(proposed, viewportSize: geo.size, rubberBand: false)
+                withAnimation(.interactiveSpring(response: 0.42, dampingFraction: 0.84, blendDuration: 0.08)) {
+                    canvasOffset = target
+                }
+                baseOffset = target
             }
     }
 
@@ -163,7 +176,11 @@ struct CanvasView: View {
             }
             .onEnded { _ in
                 baseScale = canvasScale
-                baseOffset = canvasOffset
+                let target = boundedOffset(canvasOffset, viewportSize: geo.size, rubberBand: false)
+                withAnimation(.interactiveSpring(response: 0.28, dampingFraction: 0.86)) {
+                    canvasOffset = target
+                }
+                baseOffset = target
             }
     }
 
@@ -281,10 +298,46 @@ struct CanvasView: View {
     }
 
     private func viewportCenter(in geo: GeometryProxy) -> CGPoint {
+        viewportCenter(for: canvasOffset, viewportSize: geo.size)
+    }
+
+    private func viewportCenter(for offset: CGSize, viewportSize: CGSize) -> CGPoint {
         CGPoint(
-            x: (geo.size.width / 2 - canvasOffset.width) / canvasScale,
-            y: (geo.size.height / 2 - canvasOffset.height) / canvasScale
+            x: (viewportSize.width / 2 - offset.width) / canvasScale,
+            y: (viewportSize.height / 2 - offset.height) / canvasScale
         )
+    }
+
+    private func offset(for center: CGPoint, viewportSize: CGSize) -> CGSize {
+        CGSize(
+            width: viewportSize.width / 2 - center.x * canvasScale,
+            height: viewportSize.height / 2 - center.y * canvasScale
+        )
+    }
+
+    private func boundedOffset(_ proposed: CGSize, viewportSize: CGSize, rubberBand: Bool) -> CGSize {
+        let bounds = canvasRadiusBounds(viewportSize: viewportSize)
+        let proposedCenter = viewportCenter(for: proposed, viewportSize: viewportSize)
+        let boundedCenter = bounds.bounded(proposedCenter, rubberBand: rubberBand)
+        return offset(for: boundedCenter, viewportSize: viewportSize)
+    }
+
+    private func canvasRadiusBounds(viewportSize: CGSize) -> CanvasRadiusBounds {
+        let fallback = CGRect(x: 120, y: 140, width: 280, height: 180)
+        let contentRect = placements.reduce(CGRect.null) { partial, placement in
+            partial.union(CGRect(
+                x: CGFloat(placement.x),
+                y: CGFloat(placement.y),
+                width: CGFloat(placement.width),
+                height: CGFloat(placement.height)
+            ))
+        }
+        let usable = contentRect.isNull ? fallback : contentRect
+        let center = CGPoint(x: usable.midX, y: usable.midY)
+        let contentRadius = hypot(usable.width, usable.height) / 2
+        let viewportRadius = hypot(viewportSize.width / canvasScale, viewportSize.height / canvasScale) / 2
+        let expansion = max(520, viewportRadius * 0.75 + CGFloat(placements.count) * 28 + contentRadius * 0.22)
+        return CanvasRadiusBounds(center: center, radius: max(680, contentRadius + expansion))
     }
 
     private func arrangePlacements(_ target: [CanvasPlacement], at center: CGPoint, fitAfter: Bool, in geo: GeometryProxy) {
@@ -342,16 +395,38 @@ struct CanvasView: View {
         var didPlace = false
         for id in ids {
             guard let uuid = UUID(uuidString: id),
-                  let clip = clips.first(where: { $0.id == uuid }) else { continue }
+                  let clip = allClips.first(where: { $0.id == uuid }) else { continue }
             let canvasPoint = CGPoint(
                 x: (location.x - canvasOffset.width) / canvasScale,
                 y: (location.y - canvasOffset.height) / canvasScale
             )
+            if clip.deletedAt != nil {
+                clip.restore()
+            }
             let placement = workspace.place(clip: clip, at: canvasPoint)
             selectedPlacementIDs = [placement.id]
             didPlace = true
         }
         return didPlace
+    }
+}
+
+private struct CanvasRadiusBounds {
+    let center: CGPoint
+    let radius: CGFloat
+
+    func bounded(_ point: CGPoint, rubberBand: Bool) -> CGPoint {
+        let dx = point.x - center.x
+        let dy = point.y - center.y
+        let distance = hypot(dx, dy)
+        guard distance > radius, distance > 0 else { return point }
+
+        let overflow = distance - radius
+        let boundedDistance = rubberBand ? radius + overflow * 0.24 : radius
+        return CGPoint(
+            x: center.x + dx / distance * boundedDistance,
+            y: center.y + dy / distance * boundedDistance
+        )
     }
 }
 
