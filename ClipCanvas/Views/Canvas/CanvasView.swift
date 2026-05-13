@@ -463,8 +463,9 @@ private struct CanvasDotGrid: View, Animatable {
 
     private func dotOpacity(at point: CGPoint) -> Double {
         let distanceFromOrigin = hypot(point.x, point.y)
-        let progress = ((distanceFromOrigin - 640) / 980).clamped(to: 0...1)
-        return 0.44 - progress * 0.38
+        let progress = ((distanceFromOrigin - 280) / 820).clamped(to: 0...1)
+        let eased = progress * progress * (3 - 2 * progress)
+        return 0.46 - eased * 0.42
     }
 }
 

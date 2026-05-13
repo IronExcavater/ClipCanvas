@@ -27,6 +27,11 @@ struct CanvasTopBar: View {
             Spacer()
 
             title
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background(.ultraThinMaterial, in: Capsule())
+                .overlay(Capsule().stroke(Color.primary.opacity(0.07), lineWidth: 1))
+                .shadow(color: .black.opacity(0.10), radius: 12, y: 4)
 
             Spacer()
 

@@ -18,7 +18,10 @@ struct ClipCard: View {
 
             resizeHandle
         }
-        .background(cardBackground, in: RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .background {
+            cardSurface
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        }
         .overlay(
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .stroke(isSelected ? Color.accentColor : Color.primary.opacity(0.08),
@@ -57,9 +60,16 @@ struct ClipCard: View {
             )
     }
 
-    private var cardBackground: Color {
+    private var cardSurface: some View {
+        ZStack {
+            Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground)
+            primaryColor.opacity(0.24)
+        }
+    }
+
+    private var primaryColor: Color {
         if let tag = clip.tags.min(by: { $0.sortIndex < $1.sortIndex }) {
-            return tag.color.opacity(0.22)
+            return tag.color
         }
         return clip.color.background
     }
