@@ -100,7 +100,7 @@ struct SidebarView: View {
                     onCommitRename: { commitWorkspaceRename() },
                     onDelete: { WorkspaceActionService.softDelete(ws, among: workspaces) }
                 )
-                .appListItemRowInsets(vertical: 4)
+                .appListItemRowInsets(vertical: 3)
             }
         } header: {
             sectionHeader("Workspaces", destination: WorkspacesPage())
@@ -121,7 +121,7 @@ struct SidebarView: View {
                         compact: true,
                         onDetails: { detailClip = clip }
                     )
-                    .appListItemRowInsets(vertical: 4)
+                    .appListItemRowInsets(vertical: 3)
                 }
             }
         } header: {
@@ -148,7 +148,7 @@ struct SidebarView: View {
                     }
                     .appListItemContentPadding()
                     .appListCard(tint: .secondary, opacity: 0.08)
-                    .appListItemRowInsets(vertical: 4)
+                    .appListItemRowInsets(vertical: 3)
                 }
             }
         } header: {

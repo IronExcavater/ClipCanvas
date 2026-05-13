@@ -14,18 +14,17 @@ struct ClipTagEditor: View {
     private var userTags: [ClipTag] { tags.filter { !$0.isBuiltIn } }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 12) {
             if clips.count > 1 {
                 Text("\(clips.count) clips")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.secondary)
             }
 
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 88), spacing: 8)], alignment: .leading, spacing: 8) {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 148), spacing: 8)], alignment: .leading, spacing: 8) {
                 ForEach(ClipType.allCases, id: \.self) { type in
                     EditableBuiltInTagChip(
                         type: type,
-                        presets: presets,
                         isSelected: clips.allSatisfy { $0.type == type }
                     )
                 }
@@ -59,7 +58,7 @@ struct ClipTagEditor: View {
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 8)
-            .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(Color.secondary.opacity(0.10), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
     }
 
@@ -93,7 +92,6 @@ struct ClipTagEditor: View {
 
 private struct EditableBuiltInTagChip: View {
     let type: ClipType
-    let presets: [String]
     let isSelected: Bool
 
     var body: some View {
@@ -101,9 +99,10 @@ private struct EditableBuiltInTagChip: View {
             title: ClipTag.builtInName(for: type),
             icon: type.icon,
             hex: ClipTag.builtInHex(for: type),
-            presets: presets,
             isSelected: isSelected,
-            onSelectColor: { ClipTag.setBuiltInColor($0, for: type) },
+            isBuiltIn: true,
+            presets: [],
+            onSelectColor: nil,
             onRename: nil,
             onTap: nil
         )
@@ -122,8 +121,9 @@ private struct EditableUserTagChip: View {
             title: tag.name,
             icon: "tag",
             hex: tag.colorHex,
-            presets: presets,
             isSelected: isSelected,
+            isBuiltIn: false,
+            presets: presets,
             onSelectColor: { tag.colorHex = $0 },
             onRename: { tag.name = $0 },
             onTap: onToggle
@@ -135,9 +135,10 @@ private struct EditableTagChip: View {
     let title: String
     let icon: String
     let hex: String
-    let presets: [String]
     let isSelected: Bool
-    let onSelectColor: (String) -> Void
+    let isBuiltIn: Bool
+    let presets: [String]
+    let onSelectColor: ((String) -> Void)?
     let onRename: ((String) -> Void)?
     let onTap: (() -> Void)?
 
@@ -145,24 +146,33 @@ private struct EditableTagChip: View {
     @State private var draftTitle = ""
 
     var body: some View {
-        HStack(spacing: 7) {
-            TagColorDot(hex: hex, presets: presets, onSelect: onSelectColor)
+        HStack(spacing: 8) {
+            if let onSelectColor {
+                TagColorDot(hex: hex, presets: presets, onSelect: onSelectColor)
+            } else {
+                Circle()
+                    .fill(Color(hex: hex) ?? .accentColor)
+                    .frame(width: 22, height: 22)
+                    .overlay(
+                        Image(systemName: icon)
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.white.opacity(0.9))
+                    )
+            }
 
             if isEditing, onRename != nil {
                 TextField("Tag", text: $draftTitle)
                     .font(.subheadline.weight(.semibold))
                     .textFieldStyle(.plain)
-                    .frame(minWidth: 64)
+                    .frame(minWidth: 84)
                     .onSubmit(commitEdit)
             } else {
                 Button(action: { onTap?() }) {
-                    HStack(spacing: 5) {
-                        Image(systemName: icon)
-                            .font(.caption.weight(.semibold))
-                        Text(title)
-                            .font(.subheadline.weight(.semibold))
-                            .lineLimit(1)
-                    }
+                    Text(title)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(2)
+                        .multilineTextAlignment(.leading)
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     .foregroundStyle(.primary)
                 }
                 .buttonStyle(.plain)
@@ -178,15 +188,18 @@ private struct EditableTagChip: View {
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .frame(minHeight: 40)
-        .background(Color(hex: hex)?.opacity(isSelected ? 0.30 : 0.16) ?? Color.secondary.opacity(0.14), in: Capsule())
-        .contentShape(Capsule())
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+        .background(Color(hex: hex)?.opacity(isSelected ? 0.32 : 0.18) ?? Color.secondary.opacity(0.14), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         .onLongPressGesture {
             if onRename != nil { beginEdit() }
         }
         .contextMenu {
+            if isBuiltIn {
+                Text("Built-in Type")
+            }
             if onRename != nil {
                 Button("Rename Tag", systemImage: "pencil", action: beginEdit)
             }

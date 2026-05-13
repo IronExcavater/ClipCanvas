@@ -38,14 +38,14 @@ struct HistoryPage: View {
                 emptyState
             } else {
                 selectionControl
-                    .appListItemRowInsets(vertical: 1)
+                    .appListItemRowInsets(vertical: 0)
 
                 ForEach(grouped, id: \.label) { group in
                     Text(group.label)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.secondary)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary.opacity(0.82))
                         .textCase(nil)
-                        .appListItemRowInsets(horizontal: 16, vertical: 1)
+                        .appListItemRowInsets(horizontal: 14, vertical: 0)
 
                     ForEach(group.clips) { clip in
                         ClipRowView(
@@ -56,7 +56,7 @@ struct HistoryPage: View {
                             onSelect: { toggleSelection(clip) },
                             onDetails: { detailClip = clip }
                         )
-                        .appListItemRowInsets(vertical: 4)
+                        .appListItemRowInsets(vertical: 3)
                     }
                 }
             }
@@ -74,12 +74,13 @@ struct HistoryPage: View {
         }
         .sheet(item: $tagEditSelection) { selection in
             NavigationStack {
-                List {
-                    Section("Tags") {
-                        ClipTagEditor(clips: selection.clips)
-                    }
+                ScrollView {
+                    ClipTagEditor(clips: selection.clips)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                        .padding(.bottom, 24)
                 }
-                .navigationTitle("Edit Tags")
+                .navigationTitle("Tags")
                 .navigationBarTitleDisplayMode(.inline)
             }
             .presentationDetents([.medium, .large])
@@ -116,7 +117,7 @@ struct HistoryPage: View {
                         .font(.system(size: 16, weight: .semibold))
                         .frame(width: 40, height: 40)
                 }
-                .buttonStyle(BlendedIconButtonStyle())
+                .appSelectionIconButtonStyle()
                 .disabled(selectedClipIDs.isEmpty)
 
                 Button(role: .destructive, action: deleteSelected) {
@@ -124,7 +125,7 @@ struct HistoryPage: View {
                         .font(.system(size: 16, weight: .semibold))
                         .frame(width: 40, height: 40)
                 }
-                .buttonStyle(BlendedIconButtonStyle())
+                .appSelectionIconButtonStyle()
                 .disabled(selectedClipIDs.isEmpty)
             }
         }

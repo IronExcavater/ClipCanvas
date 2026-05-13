@@ -47,7 +47,7 @@ struct WorkspacesPage: View {
                 }
             } else {
                 selectionControl
-                    .appListItemRowInsets(vertical: 2)
+                    .appListItemRowInsets(vertical: 0)
             }
 
             ForEach(filteredWorkspaces) { ws in
@@ -62,7 +62,7 @@ struct WorkspacesPage: View {
                     onCommitRename: { commitRename(ws) },
                     onDelete: { WorkspaceActionService.softDelete(ws, among: workspaces) }
                 )
-                    .appListItemRowInsets(vertical: 4)
+                    .appListItemRowInsets(vertical: 3)
                     .swipeActions(edge: .leading) {
                         Button { beginRename(ws) } label: {
                             Label("Rename", systemImage: "pencil")
@@ -110,7 +110,7 @@ struct WorkspacesPage: View {
                     .font(.system(size: 16, weight: .semibold))
                     .frame(width: 40, height: 40)
             }
-            .buttonStyle(BlendedIconButtonStyle())
+            .appSelectionIconButtonStyle()
             .disabled(selectedWorkspaceIDs.isEmpty)
         }
     }

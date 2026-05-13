@@ -42,11 +42,11 @@ private struct BlendedIconButtonBackground: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 26, *) {
             content
-                .background(Color(uiColor: .secondarySystemBackground).opacity(isPressed ? 0.78 : 0.64), in: Circle())
+                .background(Color(uiColor: .systemBackground).opacity(isPressed ? 0.92 : 0.78), in: Circle())
                 .glassEffect(.regular.interactive(), in: .rect(cornerRadius: size / 2))
         } else {
             content
-                .background(.regularMaterial, in: Circle())
+                .background(Color(uiColor: .systemBackground), in: Circle())
                 .overlay(
                     Circle()
                         .stroke(Color.primary.opacity(isPressed ? 0.16 : 0.08), lineWidth: 1)
@@ -190,8 +190,9 @@ struct AppListSelectionControl<Actions: View>: View {
                     .labelStyle(.titleAndIcon)
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(isSelecting ? Color.accentColor : .primary)
+                    .padding(.horizontal, 2)
             }
-            .buttonStyle(.plain)
+            .appSelectionButtonStyle()
 
             if isSelecting {
                 Text("\(selectedCount) selected")
@@ -207,8 +208,8 @@ struct AppListSelectionControl<Actions: View>: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
         }
-        .appListItemContentPadding(horizontal: 10, vertical: 7)
-        .appListCard(tint: .secondary, opacity: 0.07)
+        .padding(.horizontal, 2)
+        .frame(minHeight: 44)
         .animation(.easeInOut(duration: 0.18), value: isSelecting)
         .animation(.easeInOut(duration: 0.18), value: selectedCount)
     }
@@ -221,13 +222,15 @@ private struct AppListItemBackground: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(tint.opacity(opacity))
+                .fill(tint.opacity(max(opacity, 0.12)))
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(uiColor: .systemBackground).opacity(0.28))
         }
     }
 }
 
 extension View {
-    func appListItemContentPadding(horizontal: CGFloat = 10, vertical: CGFloat = 9) -> some View {
+    func appListItemContentPadding(horizontal: CGFloat = 9, vertical: CGFloat = 8) -> some View {
         self.padding(.horizontal, horizontal)
             .padding(.vertical, vertical)
     }
@@ -301,7 +304,7 @@ extension View {
         }
     }
 
-    func appListItemRowInsets(horizontal: CGFloat = 8, vertical: CGFloat = 4) -> some View {
+    func appListItemRowInsets(horizontal: CGFloat = 8, vertical: CGFloat = 3) -> some View {
         self
             .listRowInsets(EdgeInsets(top: vertical, leading: horizontal, bottom: vertical, trailing: horizontal))
             .listRowSeparator(.hidden)
@@ -313,5 +316,31 @@ extension View {
             .listRowInsets(EdgeInsets(top: 20, leading: 18, bottom: 20, trailing: 18))
             .listRowSeparator(.hidden)
             .listRowBackground(Color.clear)
+    }
+
+    @ViewBuilder
+    func appSelectionButtonStyle() -> some View {
+        if #available(iOS 26, *) {
+            self
+                .buttonStyle(.glass)
+                .buttonBorderShape(.capsule)
+        } else {
+            self
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.capsule)
+        }
+    }
+
+    @ViewBuilder
+    func appSelectionIconButtonStyle() -> some View {
+        if #available(iOS 26, *) {
+            self
+                .buttonStyle(.glass)
+                .buttonBorderShape(.circle)
+        } else {
+            self
+                .buttonStyle(.bordered)
+                .buttonBorderShape(.circle)
+        }
     }
 }

@@ -22,7 +22,7 @@ struct SettingsPage: View {
 
             Section("Tags") {
                 ForEach(ClipType.allCases, id: \.self) { type in
-                    BuiltInTagSettingsRow(type: type, presets: colorPresets)
+                    BuiltInTagSettingsRow(type: type)
                 }
                 ForEach(userTags) { tag in
                     TagSettingsRow(
@@ -76,13 +76,12 @@ struct SettingsPage: View {
 
 private struct BuiltInTagSettingsRow: View {
     let type: ClipType
-    let presets: [String]
 
     var body: some View {
         HStack(spacing: 10) {
-            TagColorDot(hex: ClipTag.builtInHex(for: type), presets: presets) {
-                ClipTag.setBuiltInColor($0, for: type)
-            }
+            Circle()
+                .fill(ClipTag.builtInColor(for: type))
+                .frame(width: 22, height: 22)
             AppTagPill(
                 title: ClipTag.builtInName(for: type),
                 color: ClipTag.builtInColor(for: type),

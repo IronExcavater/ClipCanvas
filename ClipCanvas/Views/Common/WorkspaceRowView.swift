@@ -14,9 +14,10 @@ struct WorkspaceRowView: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        AppListItemButton(tint: .secondary, opacity: workspace.isActive ? 0.14 : 0.08, action: onActivate) {
+        AppListItemButton(tint: .secondary, opacity: workspace.isActive ? 0.16 : 0.12, action: onActivate) {
             rowContent
-                .appListItemContentPadding()
+                .frame(minHeight: 58)
+                .appListItemContentPadding(horizontal: 10, vertical: 8)
         }
         .contentShape(Rectangle())
         .listRowSeparator(.hidden)

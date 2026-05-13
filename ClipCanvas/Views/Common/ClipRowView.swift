@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 struct ClipRowView: View {
     let clip: Clip
@@ -8,8 +9,13 @@ struct ClipRowView: View {
     var onSelect: (() -> Void)?
     var onDetails: (() -> Void)?
 
+    @Query(
+        filter: #Predicate<Workspace> { $0.deletedAt == nil },
+        sort: \Workspace.sortIndex
+    ) private var workspaces: [Workspace]
+
     var body: some View {
-        AppListItemButton(tint: primaryTagColor, opacity: 0.14, action: primaryAction) {
+        AppListItemButton(tint: primaryTagColor, opacity: 0.20, action: primaryAction) {
             HStack(alignment: .center, spacing: 8) {
                 if isSelecting {
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
@@ -24,7 +30,8 @@ struct ClipRowView: View {
                         .accessibilityLabel("Pinned")
                     }
             }
-            .appListItemContentPadding()
+            .frame(minHeight: compact ? 54 : 64)
+            .appListItemContentPadding(horizontal: 10, vertical: 8)
         }
         .contentShape(Rectangle())
         .listRowSeparator(.hidden)
@@ -32,7 +39,7 @@ struct ClipRowView: View {
         .draggable(clip.id.uuidString)
         .swipeActions(edge: .leading) {
             Button(action: { ClipActionService.togglePin(clip) }) {
-                Label(clip.isPinned ? "Unpin from top" : "Keep at top",
+                Label(clip.isPinned ? "Unpin" : "Pin",
                       systemImage: clip.isPinned ? "pin.slash" : "pin")
             }
             .tint(.orange)
@@ -51,7 +58,11 @@ struct ClipRowView: View {
                     ClipActionService.openURL(for: clip)
                 }
             }
-            Button(clip.isPinned ? "Unpin from top" : "Keep at top",
+            Button("Add to Canvas", systemImage: "square.and.arrow.down") {
+                addToCanvas()
+            }
+            .disabled(activeWorkspace == nil)
+            Button(clip.isPinned ? "Unpin" : "Pin",
                    systemImage: clip.isPinned ? "pin.slash" : "pin") {
                 ClipActionService.togglePin(clip)
             }
@@ -75,6 +86,14 @@ struct ClipRowView: View {
 
     private var primaryTagColor: Color {
         clip.primaryDisplayColor
+    }
+
+    private var activeWorkspace: Workspace? {
+        workspaces.first(where: \.isActive) ?? workspaces.first
+    }
+
+    private func addToCanvas() {
+        activeWorkspace?.place(clip: clip)
     }
 
     private var textContent: some View {

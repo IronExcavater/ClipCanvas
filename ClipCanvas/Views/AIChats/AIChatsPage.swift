@@ -36,7 +36,7 @@ struct AIChatsPage: View {
                     .appEmptyStateRow()
             } else {
                 selectionControl
-                    .appListItemRowInsets(vertical: 1)
+                    .appListItemRowInsets(vertical: 0)
 
                 ForEach(filteredChats) { chat in
                     AIChatRow(
@@ -46,7 +46,7 @@ struct AIChatsPage: View {
                         onTap: { toggle(chat) },
                         onDelete: { context.delete(chat) }
                     )
-                    .appListItemRowInsets(vertical: 4)
+                    .appListItemRowInsets(vertical: 3)
                 }
             }
         }
@@ -84,7 +84,7 @@ struct AIChatsPage: View {
                     .font(.system(size: 16, weight: .semibold))
                     .frame(width: 40, height: 40)
             }
-            .buttonStyle(BlendedIconButtonStyle())
+            .appSelectionIconButtonStyle()
             .disabled(selection.isEmpty)
         }
     }

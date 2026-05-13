@@ -90,12 +90,13 @@ struct CanvasContainerView: View {
         }
         .sheet(item: $tagEditSelection) { selection in
             NavigationStack {
-                List {
-                    Section("Tags") {
-                        ClipTagEditor(clips: selection.clips)
-                    }
+                ScrollView {
+                    ClipTagEditor(clips: selection.clips)
+                        .padding(.horizontal, 16)
+                        .padding(.top, 12)
+                        .padding(.bottom, 24)
                 }
-                .navigationTitle("Edit Tags")
+                .navigationTitle("Tags")
                 .navigationBarTitleDisplayMode(.inline)
             }
             .presentationDetents([.medium, .large])

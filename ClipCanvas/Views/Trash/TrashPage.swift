@@ -12,6 +12,11 @@ struct TrashPage: View {
         sort: \Workspace.deletedAt, order: .reverse
     ) private var deletedWorkspaces: [Workspace]
 
+    @Query(
+        filter: #Predicate<Workspace> { $0.deletedAt == nil },
+        sort: \Workspace.sortIndex
+    ) private var liveWorkspaces: [Workspace]
+
     @Environment(\.modelContext) private var context
     @State private var search = ""
     @State private var isSelecting = false
@@ -34,12 +39,13 @@ struct TrashPage: View {
     }
     private var selectedClips: [Clip] { deletedClips.filter { selectedItemIDs.contains(key(for: $0)) } }
     private var selectedWorkspaces: [Workspace] { deletedWorkspaces.filter { selectedItemIDs.contains(key(for: $0)) } }
+    private var activeWorkspace: Workspace? { liveWorkspaces.first(where: \.isActive) ?? liveWorkspaces.first }
 
     var body: some View {
         List {
             if hasDeletedItems {
                 trashControls
-                    .appListItemRowInsets(vertical: 1)
+                    .appListItemRowInsets(vertical: 0)
             }
 
             if deletedWorkspaces.isEmpty && deletedClips.isEmpty {
@@ -67,7 +73,7 @@ struct TrashPage: View {
                             onRestore: { ws.restore() },
                             onDeleteForever: { context.delete(ws) }
                         )
-                        .appListItemRowInsets(vertical: 4)
+                        .appListItemRowInsets(vertical: 3)
                     }
                 }
             }
@@ -80,13 +86,15 @@ struct TrashPage: View {
                             deletedAt: clip.deletedAt,
                             tint: clip.primaryDisplayColor,
                             tagTitle: clip.primaryDisplayTagName,
+                            dragID: clip.id.uuidString,
                             isSelecting: isSelecting,
                             isSelected: selectedItemIDs.contains(key(for: clip)),
                             onTap: { toggleSelection(clip) },
                             onRestore: { clip.restore() },
-                            onDeleteForever: { context.delete(clip) }
+                            onDeleteForever: { context.delete(clip) },
+                            onAddToCanvas: { addDeletedClipToCanvas(clip) }
                         )
-                        .appListItemRowInsets(vertical: 4)
+                        .appListItemRowInsets(vertical: 3)
                     }
                 }
             }
@@ -97,6 +105,9 @@ struct TrashPage: View {
         .navigationTitle("Recently Deleted")
         .navigationBarTitleDisplayMode(.inline)
         .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search deleted")
+        .task {
+            TrashRetentionService.purgeExpired(in: context)
+        }
         .alert("Delete all recently deleted items forever?", isPresented: $confirmingDeleteAll) {
             Button("Cancel", role: .cancel) {}
             Button("Delete All", role: .destructive, action: emptyTrash)
@@ -120,7 +131,7 @@ struct TrashPage: View {
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(isSelecting ? Color.accentColor : .primary)
             }
-            .buttonStyle(.plain)
+            .appSelectionButtonStyle()
 
             if isSelecting {
                 Text("\(selectedItemIDs.count) selected")
@@ -136,7 +147,7 @@ struct TrashPage: View {
                         .font(.system(size: 16, weight: .semibold))
                         .frame(width: 40, height: 40)
                 }
-                .buttonStyle(BlendedIconButtonStyle())
+                .appSelectionIconButtonStyle()
                 .disabled(selectedItemIDs.isEmpty)
 
                 Button(role: .destructive) {
@@ -146,12 +157,12 @@ struct TrashPage: View {
                         .font(.system(size: 16, weight: .semibold))
                         .frame(width: 40, height: 40)
                 }
-                .buttonStyle(BlendedIconButtonStyle())
+                .appSelectionIconButtonStyle()
                 .disabled(selectedItemIDs.isEmpty)
             } else {
                 Menu {
                     Button("Restore All", systemImage: "arrow.counterclockwise", action: restoreAll)
-                    Button("Delete All Forever", systemImage: "trash", role: .destructive) {
+                    Button("Delete All", systemImage: "trash", role: .destructive) {
                         confirmingDeleteAll = true
                     }
                 } label: {
@@ -159,11 +170,10 @@ struct TrashPage: View {
                         .font(.system(size: 16, weight: .semibold))
                         .frame(width: 40, height: 40)
                 }
-                .buttonStyle(BlendedIconButtonStyle())
+                .appSelectionIconButtonStyle()
             }
         }
-        .appListItemContentPadding(horizontal: 10, vertical: 7)
-        .appListCard(tint: .secondary, opacity: 0.07)
+        .frame(minHeight: 44)
         .animation(.easeInOut(duration: 0.18), value: isSelecting)
         .animation(.easeInOut(duration: 0.18), value: selectedItemIDs.count)
     }
@@ -197,6 +207,12 @@ struct TrashPage: View {
         endSelection()
     }
 
+    private func addDeletedClipToCanvas(_ clip: Clip) {
+        guard let activeWorkspace else { return }
+        clip.restore()
+        activeWorkspace.place(clip: clip)
+    }
+
     private func toggleSelection(_ clip: Clip) {
         toggle(key(for: clip))
     }
@@ -228,13 +244,23 @@ private struct DeletedItemRow: View {
     let deletedAt: Date?
     let tint: Color
     var tagTitle: String? = nil
+    var dragID: String? = nil
     var isSelecting = false
     var isSelected = false
     let onTap: () -> Void
     let onRestore: () -> Void
     let onDeleteForever: () -> Void
+    var onAddToCanvas: (() -> Void)? = nil
 
     var body: some View {
+        if let dragID {
+            baseRow.draggable(dragID)
+        } else {
+            baseRow
+        }
+    }
+
+    private var baseRow: some View {
         Button {
             if isSelecting { onTap() }
         } label: {
@@ -244,32 +270,33 @@ private struct DeletedItemRow: View {
                         .foregroundStyle(isSelected ? Color.accentColor : .secondary)
                 }
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text(title)
-                    .font(.subheadline.weight(.medium))
-                    .lineLimit(1)
-                    .foregroundStyle(.primary)
-                if let deletedAt {
-                    RelativeAgeText(date: deletedAt, prefix: "Deleted ", emptyText: "Deleted just now")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                } else {
-                    Text("Deleted recently")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(title)
+                        .font(.subheadline.weight(.medium))
+                        .lineLimit(1)
+                        .foregroundStyle(.primary)
+                    if let deletedAt {
+                        RelativeAgeText(date: deletedAt, prefix: "Deleted ", emptyText: "Deleted just now")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("Deleted recently")
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
+                }
+
+                Spacer()
+
+                if let tagTitle {
+                    AppTagPill(title: tagTitle, color: tint, icon: "tag", isSelected: false)
                 }
             }
-
-            Spacer()
-
-            if let tagTitle {
-                AppTagPill(title: tagTitle, color: tint, icon: "tag", isSelected: false)
-                }
-            }
-            .appListItemContentPadding()
+            .frame(minHeight: 58)
+            .appListItemContentPadding(horizontal: 10, vertical: 8)
         }
         .buttonStyle(.plain)
-        .appListCard(tint: tint, opacity: 0.10)
+        .appListCard(tint: tint, opacity: 0.16)
         .swipeActions(edge: .leading) {
             Button(action: onRestore) {
                 Label("Restore", systemImage: "arrow.counterclockwise")
@@ -278,13 +305,16 @@ private struct DeletedItemRow: View {
         }
         .swipeActions(edge: .trailing) {
             Button(role: .destructive, action: onDeleteForever) {
-                Label("Delete Forever", systemImage: "trash")
+                Label("Delete", systemImage: "trash")
             }
         }
         .contextMenu {
+            if let onAddToCanvas {
+                Button("Add to Canvas", systemImage: "square.and.arrow.down", action: onAddToCanvas)
+            }
             Button("Restore", systemImage: "arrow.counterclockwise", action: onRestore)
             Divider()
-            Button("Delete Forever", systemImage: "trash", role: .destructive, action: onDeleteForever)
+            Button("Delete", systemImage: "trash", role: .destructive, action: onDeleteForever)
         }
     }
 }
