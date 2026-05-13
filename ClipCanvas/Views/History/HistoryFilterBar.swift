@@ -43,6 +43,7 @@ struct HistoryFilterBar: View {
         return AppTagChip(
             title: label,
             color: color,
+            icon: type?.icon,
             isSelected: active
         ) {
             if type == nil {
@@ -58,6 +59,7 @@ struct HistoryFilterBar: View {
         return AppTagChip(
             title: label,
             color: color,
+            icon: "tag",
             isSelected: active
         ) {
             filter.userTagID = active ? nil : tagID

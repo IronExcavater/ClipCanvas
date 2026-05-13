@@ -65,12 +65,13 @@ struct AppDivider: View {
 struct AppTagChip: View {
     let title: String
     let color: Color
+    var icon: String?
     var isSelected: Bool
     var action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            AppTagPill(title: title, color: color, isSelected: isSelected)
+            AppTagPill(title: title, color: color, icon: icon, isSelected: isSelected)
         }
         .buttonStyle(.plain)
     }
@@ -79,13 +80,21 @@ struct AppTagChip: View {
 struct AppTagPill: View {
     let title: String
     let color: Color
+    var icon: String?
     var isSelected: Bool
 
     var body: some View {
         HStack(spacing: 6) {
-            Circle()
-                .fill(color)
-                .frame(width: 8, height: 8)
+            ZStack {
+                Circle()
+                    .fill(color)
+                if let icon {
+                    Image(systemName: icon)
+                        .font(.system(size: 8, weight: .bold))
+                        .foregroundStyle(.white)
+                }
+            }
+            .frame(width: 17, height: 17)
             Text(title)
                 .font(.caption.weight(.semibold))
                 .lineLimit(1)
@@ -165,9 +174,8 @@ struct AppListSelectionControl<Actions: View>: View {
             }
 
             Button(action: onToggle) {
-                Text(isSelecting ? "Done" : selectTitle)
+                Label(isSelecting ? "Done" : selectTitle, systemImage: isSelecting ? "checkmark" : "checklist")
                     .font(.subheadline.weight(.semibold))
-                    .padding(.horizontal, 2)
             }
             .appSelectionButtonStyle()
         }
@@ -278,27 +286,42 @@ extension View {
 
     @ViewBuilder
     func appSelectionButtonStyle() -> some View {
-        if #available(iOS 26, *) {
-            self
-                .buttonStyle(.glass)
-                .buttonBorderShape(.capsule)
-        } else {
-            self
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.capsule)
-        }
+        self
+            .buttonStyle(.plain)
+            .foregroundStyle(.primary)
+            .padding(.horizontal, 13)
+            .frame(height: 38)
+            .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: Capsule())
+            .overlay(Capsule().stroke(Color.primary.opacity(0.07), lineWidth: 1))
+            .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
     }
 
     @ViewBuilder
     func appSelectionIconButtonStyle() -> some View {
-        if #available(iOS 26, *) {
-            self
-                .buttonStyle(.glass)
-                .buttonBorderShape(.circle)
-        } else {
-            self
-                .buttonStyle(.bordered)
-                .buttonBorderShape(.circle)
-        }
+        self
+            .buttonStyle(.plain)
+            .foregroundStyle(.primary)
+            .frame(width: 38, height: 38)
+            .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: Circle())
+            .overlay(Circle().stroke(Color.primary.opacity(0.07), lineWidth: 1))
+            .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
+    }
+}
+
+extension View {
+    func appSearchAwareNavigationTitle(_ title: String, isSearching: Bool) -> some View {
+        self
+            .navigationTitle("")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .principal) {
+                    Text(title)
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .opacity(isSearching ? 0 : 1)
+                        .scaleEffect(isSearching ? 0.96 : 1)
+                        .animation(.easeInOut(duration: 0.22), value: isSearching)
+                }
+            }
     }
 }

@@ -66,8 +66,7 @@ struct HistoryPage: View {
         .scrollContentBackground(.hidden)
         .contentMargins(.top, 0, for: .scrollContent)
         .listSectionSpacing(.compact)
-        .navigationTitle("History")
-        .navigationBarTitleDisplayMode(.inline)
+        .appSearchAwareNavigationTitle("History", isSearching: searchPresented)
         .searchable(text: searchBinding, isPresented: $searchPresented, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search history")
         .animation(.easeInOut(duration: 0.18), value: filter.search.isEmpty)
         .animation(.easeInOut(duration: 0.18), value: searchPresented)
@@ -80,8 +79,9 @@ struct HistoryPage: View {
                     ClipTagEditor(clips: selection.clips)
                         .padding(.horizontal, 16)
                         .padding(.top, 12)
-                        .padding(.bottom, 24)
+                        .padding(.bottom, 120)
                 }
+                .scrollDismissesKeyboard(.interactively)
                 .navigationTitle("Tags")
                 .navigationBarTitleDisplayMode(.inline)
             }

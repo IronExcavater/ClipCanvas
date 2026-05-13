@@ -171,6 +171,7 @@ private struct ClipTypeTagToken: View {
             canRename: false,
             canDelete: false,
             showsDeleteButton: false,
+            showsIconInColorCircle: true,
             onToggle: {},
             onBeginRename: {},
             onEndRename: {},
@@ -214,6 +215,7 @@ private struct UserTagToken: View {
             canRename: true,
             canDelete: true,
             showsDeleteButton: showsDeleteButton,
+            showsIconInColorCircle: true,
             onToggle: onToggle,
             onBeginRename: onBeginRename,
             onEndRename: onEndRename,
@@ -235,6 +237,7 @@ private struct EditableTagToken: View {
     let canRename: Bool
     let canDelete: Bool
     let showsDeleteButton: Bool
+    let showsIconInColorCircle: Bool
     let onToggle: () -> Void
     let onBeginRename: () -> Void
     let onEndRename: () -> Void
@@ -252,6 +255,7 @@ private struct EditableTagToken: View {
         HStack(spacing: 9) {
             TagColorPickerButton(
                 hex: colorHex,
+                icon: showsIconInColorCircle ? icon : nil,
                 presets: presets,
                 isPresented: $showingColorPicker,
                 onSelect: onChangeColor
@@ -267,13 +271,7 @@ private struct EditableTagToken: View {
             }
 
             if showsDeleteButton {
-                Button(action: onDelete) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 18, weight: .semibold))
-                        .foregroundStyle(.primary.opacity(0.56))
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Delete tag")
+                TagDeleteButton(action: onDelete)
             }
         }
         .frame(maxWidth: .infinity, minHeight: 46, alignment: .leading)
@@ -350,9 +348,10 @@ private struct NewTagComposer: View {
     }
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 9) {
             TagColorPickerButton(
                 hex: selectedColor,
+                icon: "tag",
                 presets: presets,
                 isPresented: $showingColorPicker
             ) { selectedColor = $0 }
@@ -368,21 +367,27 @@ private struct NewTagComposer: View {
 
             Button(action: onCreate) {
                 Image(systemName: "plus")
-                    .font(.system(size: 16, weight: .semibold))
-                    .frame(width: 40, height: 40)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 30, height: 30)
+                    .background(canCreate ? Color.accentColor : Color.primary.opacity(0.18), in: Circle())
             }
-            .buttonStyle(BlendedIconButtonStyle())
+            .buttonStyle(.plain)
             .disabled(!canCreate)
         }
         .padding(.leading, 12)
-        .padding(.trailing, 4)
-        .padding(.vertical, 4)
+        .padding(.trailing, 6)
+        .padding(.vertical, 6)
         .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: Capsule())
+        .overlay(Capsule().stroke(Color.primary.opacity(0.07), lineWidth: 1))
+        .shadow(color: .black.opacity(0.12), radius: 12, y: 5)
+        .padding(.bottom, 12)
     }
 }
 
 private struct TagColorPickerButton: View {
     let hex: String
+    let icon: String?
     let presets: [String]
     @Binding var isPresented: Bool
     let onSelect: (String) -> Void
@@ -394,6 +399,13 @@ private struct TagColorPickerButton: View {
             Circle()
                 .fill(Color(hex: hex) ?? .accentColor)
                 .frame(width: 24, height: 24)
+                .overlay {
+                    if let icon {
+                        Image(systemName: icon)
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                }
                 .overlay(Circle().strokeBorder(.white.opacity(0.76), lineWidth: 1))
         }
         .buttonStyle(.plain)
@@ -406,6 +418,24 @@ private struct TagColorPickerButton: View {
             .presentationCompactAdaptation(.popover)
         }
         .accessibilityLabel("Change color")
+    }
+}
+
+private struct TagDeleteButton: View {
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Image(systemName: "xmark")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(.primary.opacity(0.62))
+                .frame(width: 24, height: 24)
+                .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: Circle())
+                .overlay(Circle().stroke(Color.primary.opacity(0.08), lineWidth: 1))
+                .shadow(color: .black.opacity(0.08), radius: 5, y: 2)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Delete tag")
     }
 }
 

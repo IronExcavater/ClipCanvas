@@ -94,8 +94,9 @@ struct CanvasContainerView: View {
                     ClipTagEditor(clips: selection.clips)
                         .padding(.horizontal, 16)
                         .padding(.top, 12)
-                        .padding(.bottom, 24)
+                        .padding(.bottom, 120)
                 }
+                .scrollDismissesKeyboard(.interactively)
                 .navigationTitle("Tags")
                 .navigationBarTitleDisplayMode(.inline)
             }
