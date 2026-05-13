@@ -12,6 +12,7 @@ struct CanvasTopBar: View {
     let onArrangeAll: () -> Void
     let onFitContent: () -> Void
 
+    @State private var showingWorkspaceActions = false
     @State private var confirmingClear = false
 
     var body: some View {
@@ -34,18 +35,21 @@ struct CanvasTopBar: View {
 
             Spacer()
 
-            Menu {
-                Button("Rename Workspace", systemImage: "pencil", action: onBeginRename)
-                Button("Fit to Cards", systemImage: "arrow.up.left.and.arrow.down.right", action: onFitContent)
-                Button("Arrange Grid", systemImage: "square.grid.2x2", action: onArrangeAll)
-                Divider()
-                Button("Clear Workspace", systemImage: "trash", role: .destructive) {
-                    confirmingClear = true
-                }
+            Button {
+                showingWorkspaceActions = true
             } label: {
                 AppMenuIconLabel()
             }
             .buttonStyle(.plain)
+            .confirmationDialog("Workspace", isPresented: $showingWorkspaceActions, titleVisibility: .visible) {
+                Button("Rename", systemImage: "pencil", action: onBeginRename)
+                Button("Fit to Cards", systemImage: "arrow.up.left.and.arrow.down.right", action: onFitContent)
+                Button("Arrange Grid", systemImage: "square.grid.2x2", action: onArrangeAll)
+                Button("Clear Cards", systemImage: "trash", role: .destructive) {
+                    confirmingClear = true
+                }
+                Button("Cancel", role: .cancel) {}
+            }
         }
         .padding(.horizontal, 16)
         .padding(.top, 4)
@@ -56,11 +60,11 @@ struct CanvasTopBar: View {
                 .ignoresSafeArea(.container, edges: .top)
                 .offset(y: -118)
         }
-        .alert("Clear all clips from this workspace?", isPresented: $confirmingClear) {
+        .alert("Clear all cards from this workspace?", isPresented: $confirmingClear) {
             Button("Cancel", role: .cancel) {}
             Button("Clear All", role: .destructive, action: onClearAll)
         } message: {
-            Text("This removes every clip placement from the current canvas.")
+            Text("This removes every card from the current canvas.")
         }
     }
 

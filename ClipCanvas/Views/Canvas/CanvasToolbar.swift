@@ -3,18 +3,17 @@ import SwiftUI
 struct CanvasToolbar: View {
     @Binding var mode: CanvasMode
     let selectedCount: Int
-    let canOpenLink: Bool
     let onPaste: () -> Void
     let onCopy: () -> Void
-    let onOpenLink: () -> Void
     let onDetails: () -> Void
+    let onEditContent: () -> Void
     let onDelete: () -> Void
     let onArrangeSelection: () -> Void
     let onManageTags: () -> Void
 
     private var hasSelection: Bool { selectedCount > 0 }
     private var configuration: CanvasToolbarConfiguration {
-        CanvasToolbarConfiguration.make(selectedCount: selectedCount, canOpenLink: canOpenLink)
+        CanvasToolbarConfiguration.make(selectedCount: selectedCount, mode: mode)
     }
     private let buttonSize: CGFloat = 52
     private let iconSize: CGFloat = 19
@@ -46,10 +45,12 @@ struct CanvasToolbar: View {
             toolButton("doc.on.clipboard", action: onPaste)
         case .copy:
             toolButton("doc.on.doc", action: onCopy)
-        case .openLink:
-            toolButton("safari", action: onOpenLink)
         case .details:
             toolButton("info.circle", action: onDetails)
+                .disabled(selectedCount != 1)
+                .opacity(selectedCount == 1 ? 1 : 0.42)
+        case .editContent:
+            toolButton("square.and.pencil", action: onEditContent)
                 .disabled(selectedCount != 1)
                 .opacity(selectedCount == 1 ? 1 : 0.42)
         case .manageTags:

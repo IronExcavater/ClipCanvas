@@ -6,6 +6,7 @@ struct CanvasView: View {
     let mode: CanvasMode
     @Binding var zoomCommand: ZoomCommand?
     @Binding var selectedObjectIDs: Set<UUID>
+    @Binding var editingObjectID: UUID?
     @Binding var visibleScale: CGFloat
     @Binding var visibleViewportCenter: CGPoint
 
@@ -118,7 +119,10 @@ struct CanvasView: View {
             isSelected: isSelected,
             showsContent: canvasScale >= 0.34 || isSelected || isDragging,
             onTap: { toggleSelection(for: object) },
-            onDoubleTap: { toggleExpandedSize(for: object, in: geo) },
+            onDoubleTap: { handleDoubleTap(for: object, in: geo) },
+            isEditing: editingObjectID == object.id,
+            editingText: clip.content,
+            onCommitEditing: { commitClipText($0, clip: clip, object: object) },
             onResize: { updateResizePreview(for: object, translation: $0) },
             onResizeEnded: { commitResize(for: object, in: geo) },
             onToggleExpandedSize: { toggleExpandedSize(for: object, in: geo) }
@@ -145,7 +149,10 @@ struct CanvasView: View {
             isSelected: isSelected,
             showsContent: canvasScale >= 0.34 || isSelected || isDragging,
             onTap: { toggleSelection(for: object) },
-            onDoubleTap: { toggleExpandedSize(for: object, in: geo) },
+            onDoubleTap: { handleDoubleTap(for: object, in: geo) },
+            isEditing: editingObjectID == object.id,
+            editingText: object.text,
+            onCommitEditing: { commitObjectText($0, object: object) },
             onResize: { updateResizePreview(for: object, translation: $0) },
             onResizeEnded: { commitResize(for: object, in: geo) },
             onToggleExpandedSize: { toggleExpandedSize(for: object, in: geo) }
@@ -204,12 +211,11 @@ struct CanvasView: View {
                     pinchStartScale = startScale
                     pinchAnchorCenter = anchorCenter
                 }
-                let next = min(max(startScale * value, 0.2), 4.0)
+                let next = CanvasScaleSteps.clamp(startScale * value)
                 zoom(to: next, around: anchorCenter, in: geo)
             }
             .onEnded { _ in
-                let target = boundedOrigin(viewportOrigin, viewportSize: geo.size, rubberBand: false)
-                viewportOrigin = target
+                zoom(to: CanvasScaleSteps.nearest(canvasScale), in: geo)
                 pinchStartScale = nil
                 pinchAnchorCenter = nil
             }
@@ -238,9 +244,9 @@ struct CanvasView: View {
         withAnimation(.spring(response: 0.28, dampingFraction: 0.85)) {
             switch command {
             case .zoomIn:
-                zoom(to: min(canvasScale * 1.2, 4.0), in: geo)
+                zoom(to: CanvasScaleSteps.nextZoomIn(from: canvasScale), in: geo)
             case .zoomOut:
-                zoom(to: max(canvasScale / 1.2, 0.2), in: geo)
+                zoom(to: CanvasScaleSteps.nextZoomOut(from: canvasScale), in: geo)
             case .fitContent:
                 fitContent(in: geo)
             case .arrangeAll:
@@ -276,7 +282,7 @@ struct CanvasView: View {
         let contentHeight = max(maxY - minY, 1)
         let availableWidth = max(geo.size.width - 80, 1)
         let availableHeight = max(geo.size.height - 180, 1)
-        let next = min(max(min(availableWidth / contentWidth, availableHeight / contentHeight), 0.2), 2.5)
+        let next = CanvasScaleSteps.fitting(min(availableWidth / contentWidth, availableHeight / contentHeight))
         canvasScale = next
         let proposedOrigin = CGPoint(
             x: CGFloat(minX + contentWidth / 2) - geo.size.width / (2 * next),
@@ -324,6 +330,47 @@ struct CanvasView: View {
             clampObject(object, in: geo)
         }
         activeResize = nil
+        object.markUpdated()
+    }
+
+    private func handleDoubleTap(for object: CanvasObject, in geo: GeometryProxy) {
+        if mode == .edit, canEditText(object) {
+            beginEditing(object)
+        } else {
+            toggleExpandedSize(for: object, in: geo)
+        }
+    }
+
+    private func beginEditing(_ object: CanvasObject) {
+        guard canEditText(object) else { return }
+        selectedObjectIDs = [object.id]
+        editingObjectID = object.id
+        bringToFront(object.id)
+    }
+
+    private func canEditText(_ object: CanvasObject) -> Bool {
+        switch object.kind {
+        case .stickyNote:
+            return true
+        case .clipNote:
+            return object.clip?.type != .image
+        default:
+            return false
+        }
+    }
+
+    private func commitObjectText(_ text: String, object: CanvasObject) {
+        guard object.text != text else { return }
+        object.text = text
+        object.markUpdated()
+    }
+
+    private func commitClipText(_ text: String, clip: Clip, object: CanvasObject) {
+        guard clip.content != text else { return }
+        clip.content = text
+        clip.type = Clip.detect(content: text, imageData: clip.imageData)
+        clip.sensitivity = ClipClassificationService.detectSensitivity(text)
+        clip.updatedAt = Date()
         object.markUpdated()
     }
 

@@ -66,14 +66,16 @@ struct WorkspacesPage: View {
                     .appListItemRowInsets(vertical: 3)
                     .swipeActions(edge: .leading) {
                         Button { beginRename(ws) } label: {
-                            Label("Rename", systemImage: "pencil")
+                            Image(systemName: "pencil")
                         }
                         .tint(.blue)
+                        .accessibilityLabel("Rename")
                     }
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) { WorkspaceActionService.softDelete(ws, among: workspaces) } label: {
-                            Label("Delete", systemImage: "trash")
+                            Image(systemName: "trash")
                         }
+                        .accessibilityLabel("Delete")
                     }
             }
         }
@@ -88,10 +90,9 @@ struct WorkspacesPage: View {
             ToolbarItem(placement: .primaryAction) {
                 if !isSelecting {
                     Button(action: createWorkspace) {
-                        Image(systemName: "plus")
-                            .font(.system(size: 18, weight: .semibold))
+                        AppCircleIconButtonLabel(systemImage: "plus")
                     }
-                    .buttonStyle(BlendedIconButtonStyle())
+                    .buttonStyle(.plain)
                     .accessibilityLabel("New Workspace")
                     .opacity(searchPresented ? 0 : 1)
                     .disabled(searchPresented)

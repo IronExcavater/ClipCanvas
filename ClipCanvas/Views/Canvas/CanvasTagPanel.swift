@@ -20,7 +20,12 @@ struct CanvasTagPanel: View {
                     .accessibilityLabel("Close tags")
                 }
 
-                ClipTagEditor(clips: clips)
+                ScrollView {
+                    ClipTagEditor(clips: clips, layout: .twoColumns)
+                        .padding(.bottom, 10)
+                }
+                .frame(maxHeight: 320)
+                .scrollDismissesKeyboard(.interactively)
             }
             .padding(14)
             .background {
@@ -35,7 +40,7 @@ struct CanvasTagPanel: View {
             }
             .shadow(color: .black.opacity(0.16), radius: 22, y: 10)
             .padding(.horizontal, 14)
-            .padding(.bottom, 102)
+            .padding(.bottom, 96)
         }
         .ignoresSafeArea(.container, edges: .bottom)
     }

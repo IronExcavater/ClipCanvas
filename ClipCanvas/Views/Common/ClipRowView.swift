@@ -39,15 +39,16 @@ struct ClipRowView: View {
         .draggable(clip.id.uuidString)
         .swipeActions(edge: .leading) {
             Button(action: { ClipActionService.togglePin(clip) }) {
-                Label(clip.isPinned ? "Unpin" : "Pin",
-                      systemImage: clip.isPinned ? "pin.slash" : "pin")
+                Image(systemName: clip.isPinned ? "pin.slash" : "pin")
             }
             .tint(.orange)
+            .accessibilityLabel(clip.isPinned ? "Unpin" : "Pin")
         }
         .swipeActions(edge: .trailing) {
             Button(role: .destructive, action: { ClipActionService.softDelete(clip) }) {
-                Label("Delete", systemImage: "trash")
+                Image(systemName: "trash")
             }
+            .accessibilityLabel("Delete")
         }
         .contextMenu {
             Button("Copy", systemImage: "doc.on.doc") {

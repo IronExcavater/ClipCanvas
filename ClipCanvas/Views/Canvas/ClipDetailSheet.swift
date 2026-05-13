@@ -47,16 +47,16 @@ struct ClipDetailSheet: View {
                 .padding(.top, 14)
                 .padding(.bottom, 120)
             }
-            .navigationTitle("Clip Details")
+            .navigationTitle("Note Details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button {
                         dismiss()
                     } label: {
-                        Image(systemName: "xmark")
+                        AppCircleIconButtonLabel(systemImage: "xmark", size: 36, symbolSize: 14)
                     }
-                    .buttonStyle(BlendedIconButtonStyle(size: 36))
+                    .buttonStyle(.plain)
                     .accessibilityLabel("Cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -64,9 +64,9 @@ struct ClipDetailSheet: View {
                         commitEdit()
                         dismiss()
                     } label: {
-                        Image(systemName: "checkmark")
+                        AppCircleIconButtonLabel(systemImage: "checkmark", size: 36, symbolSize: 14)
                     }
-                    .buttonStyle(BlendedIconButtonStyle(size: 36))
+                    .buttonStyle(.plain)
                     .fontWeight(.semibold)
                     .accessibilityLabel("Done")
                 }

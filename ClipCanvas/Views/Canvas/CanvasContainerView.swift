@@ -6,13 +6,14 @@ struct CanvasContainerView: View {
     let onToggleSidebar: () -> Void
 
     @Environment(\.modelContext) private var context
-    @State private var mode: CanvasMode = .normal
+    @State private var mode: CanvasMode = .pan
     @State private var feedback: String?
     @State private var feedbackToken = UUID()
     @State private var zoomCommand: ZoomCommand?
     @State private var visibleScale: CGFloat = 1
     @State private var visibleViewportCenter: CGPoint = .zero
     @State private var selectedObjectIDs: Set<UUID> = []
+    @State private var editingObjectID: UUID?
     @State private var detailClip: Clip?
     @State private var tagEditSelection: ClipTagEditSelection?
     @State private var isRenaming = false
@@ -26,6 +27,7 @@ struct CanvasContainerView: View {
                 mode: mode,
                 zoomCommand: $zoomCommand,
                 selectedObjectIDs: $selectedObjectIDs,
+                editingObjectID: $editingObjectID,
                 visibleScale: $visibleScale,
                 visibleViewportCenter: $visibleViewportCenter
             )
@@ -61,11 +63,10 @@ struct CanvasContainerView: View {
                 CanvasToolbar(
                     mode: $mode,
                     selectedCount: selectedObjectIDs.count,
-                    canOpenLink: selectedOpenableClip != nil,
                     onPaste: paste,
                     onCopy: copySelected,
-                    onOpenLink: openSelectedLink,
                     onDetails: showSelectedDetails,
+                    onEditContent: editSelectedContent,
                     onDelete: deleteSelected,
                     onArrangeSelection: { zoomCommand = .arrangeSelection },
                     onManageTags: showSelectedTags
@@ -94,6 +95,9 @@ struct CanvasContainerView: View {
         }
         .animation(.spring(response: 0.24, dampingFraction: 0.86), value: feedback)
         .animation(.spring(response: 0.25, dampingFraction: 0.82), value: selectedObjectIDs)
+        .onChange(of: mode) { _, newMode in
+            if newMode != .edit { editingObjectID = nil }
+        }
         .sheet(item: $detailClip) { clip in
             ClipDetailSheet(clip: clip)
         }
@@ -158,15 +162,15 @@ struct CanvasContainerView: View {
         detailClip = selectedClips.first
     }
 
-    private func openSelectedLink() {
-        guard let clip = selectedOpenableClip else { return }
-        ClipActionService.openURL(for: clip)
-    }
-
     private func showSelectedTags() {
         let clips = selectedClips
         guard !clips.isEmpty else { return }
         tagEditSelection = ClipTagEditSelection(clips: clips)
+    }
+
+    private func editSelectedContent() {
+        guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first else { return }
+        editingObjectID = id
     }
 
     private func deleteSelected() {
@@ -183,11 +187,6 @@ struct CanvasContainerView: View {
         workspace.canvasObjects
             .filter { selectedObjectIDs.contains($0.id) }
             .compactMap(\.clip)
-    }
-
-    private var selectedOpenableClip: Clip? {
-        guard selectedClips.count == 1, let clip = selectedClips.first else { return nil }
-        return ClipActionService.openableURL(for: clip) == nil ? nil : clip
     }
 
     // MARK: - Feedback

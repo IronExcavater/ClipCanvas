@@ -5,9 +5,9 @@ enum CanvasPlacementSizing {
     static let defaultSize = CGSize(width: 220, height: 150)
     static let minimumSize = CGSize(width: 160, height: 96)
     static let maximumSize = CGSize(width: 440, height: 540)
-    static let estimatedCharacterWidth: CGFloat = 8.5
+    static let estimatedCharacterWidth: CGFloat = 8
     static let estimatedLineHeight: CGFloat = 20
-    static let contentChrome = CGSize(width: 28, height: 28)
+    static let contentChrome = CGSize(width: 28, height: 30)
 
     static func toggledSize(for placement: CanvasPlacement, availableScreenWidth: CGFloat? = nil) -> CGSize {
         if isExpanded(placement) { return defaultSize }
@@ -39,12 +39,15 @@ enum CanvasPlacementSizing {
     }
 
     static func snappedSize(_ proposed: CGSize, for clip: Clip?) -> CGSize {
-        let widthStep = clip?.type == .image ? 16 : estimatedCharacterWidth
-        let heightStep = clip?.type == .image ? 16 : estimatedLineHeight
-        let width = snap(proposed.width, chrome: contentChrome.width, step: widthStep)
-            .clamped(to: minimumSize.width...maximumSize.width)
-        let height = snap(proposed.height, chrome: contentChrome.height, step: heightStep)
-            .clamped(to: minimumSize.height...maximumSize.height)
+        if clip?.type == .image {
+            return CGSize(
+                width: snap(proposed.width, chrome: 0, step: 16).clamped(to: minimumSize.width...maximumSize.width),
+                height: snap(proposed.height, chrome: 0, step: 16).clamped(to: minimumSize.height...maximumSize.height)
+            )
+        }
+
+        let width = snappedTextWidth(proposed.width)
+        let height = snappedTextHeight(proposed.height)
         return CGSize(width: width, height: height)
     }
 
@@ -58,6 +61,20 @@ enum CanvasPlacementSizing {
     private static func snap(_ value: CGFloat, chrome: CGFloat, step: CGFloat) -> CGFloat {
         let contentValue = max(value - chrome, 0)
         return (contentValue / step).rounded() * step + chrome
+    }
+
+    private static func snappedTextWidth(_ value: CGFloat) -> CGFloat {
+        let contentWidth = value - contentChrome.width
+        let columns = (contentWidth / estimatedCharacterWidth).rounded()
+            .clamped(to: CGFloat(16)...CGFloat(52))
+        return columns * estimatedCharacterWidth + contentChrome.width
+    }
+
+    private static func snappedTextHeight(_ value: CGFloat) -> CGFloat {
+        let contentHeight = value - contentChrome.height
+        let rows = (contentHeight / estimatedLineHeight).rounded()
+            .clamped(to: CGFloat(4)...CGFloat(26))
+        return rows * estimatedLineHeight + contentChrome.height
     }
 
     private static func isExpanded(_ placement: CanvasPlacement) -> Bool {

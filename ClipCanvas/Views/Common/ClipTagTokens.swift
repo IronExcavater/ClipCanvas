@@ -258,19 +258,19 @@ struct NewTagComposer: View {
                 Image(systemName: "plus")
                     .font(.system(size: 13, weight: .bold))
                     .foregroundStyle(.white)
-                    .frame(width: 32, height: 32)
+                    .frame(width: 28, height: 28)
                     .background(canCreate ? Color.accentColor : Color.primary.opacity(0.18), in: Circle())
             }
             .buttonStyle(.plain)
             .disabled(!canCreate)
         }
-        .frame(minHeight: 48)
+        .frame(minHeight: 42)
         .padding(.leading, 9)
-        .padding(.trailing, 7)
-        .padding(.vertical, 7)
+        .padding(.trailing, 6)
+        .padding(.vertical, 5)
         .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: Capsule())
         .shadow(color: .black.opacity(0.12), radius: 12, y: 5)
-        .padding(.bottom, 12)
+        .padding(.bottom, 8)
     }
 }
 

@@ -6,6 +6,9 @@ struct CanvasObjectView: View {
     var showsContent = true
     let onTap: () -> Void
     let onDoubleTap: () -> Void
+    var isEditing = false
+    var editingText = ""
+    let onCommitEditing: (String) -> Void
     let onResize: (CGSize) -> Void
     let onResizeEnded: () -> Void
     let onToggleExpandedSize: () -> Void
@@ -25,15 +28,25 @@ struct CanvasObjectView: View {
                 )
         }
         .background {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .fill(fillColor)
+            if usesStickySurface {
+                StickyNoteShape()
+                    .fill(fillColor)
+            } else {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(fillColor)
+            }
         }
         .overlay {
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
-                .stroke(isSelected ? Color.accentColor : strokeColor, lineWidth: isSelected ? 2.5 : 1)
+            if usesStickySurface {
+                StickyNoteShape()
+                    .stroke(isSelected ? Color.accentColor : strokeColor, lineWidth: isSelected ? 2.5 : 1)
+            } else {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(isSelected ? Color.accentColor : strokeColor, lineWidth: isSelected ? 2.5 : 1)
+            }
         }
         .shadow(color: .black.opacity(isSelected ? 0.16 : 0.08), radius: isSelected ? 10 : 5, y: isSelected ? 4 : 2)
-        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .contentShape(Rectangle())
         .onTapGesture(count: 2, perform: onDoubleTap)
         .onTapGesture(perform: onTap)
         .animation(.spring(response: 0.18, dampingFraction: 0.8), value: isSelected)
@@ -43,6 +56,8 @@ struct CanvasObjectView: View {
     private var content: some View {
         if !showsContent {
             Color.clear
+        } else if isEditing, usesEditableText {
+            InlineNoteEditor(text: editingText, onCommit: onCommitEditing)
         } else {
             switch object.kind {
             case .image:
@@ -114,6 +129,14 @@ struct CanvasObjectView: View {
             return color
         }
         return .primary
+    }
+
+    private var usesStickySurface: Bool {
+        object.kind == .stickyNote || object.kind == .clipNote
+    }
+
+    private var usesEditableText: Bool {
+        object.kind == .stickyNote
     }
 }
 

@@ -9,7 +9,7 @@ enum ClipTagEditorLayout {
 struct ClipTagEditor: View {
     let clips: [Clip]
     var showsClipTypes = false
-    var layout: ClipTagEditorLayout = .flow
+    var layout: ClipTagEditorLayout = .twoColumns
 
     @Environment(\.modelContext) private var context
     @Query(sort: \ClipTag.sortIndex) private var tags: [ClipTag]

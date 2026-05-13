@@ -49,6 +49,22 @@ struct AppMenuIconLabel: View {
     }
 }
 
+struct AppCircleIconButtonLabel: View {
+    let systemImage: String
+    var size: CGFloat = 46
+    var symbolSize: CGFloat = 18
+
+    var body: some View {
+        Image(systemName: systemImage)
+            .font(.system(size: symbolSize, weight: .semibold))
+            .foregroundStyle(.primary)
+            .frame(width: size, height: size)
+            .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: Circle())
+            .shadow(color: .black.opacity(0.14), radius: 10, y: 5)
+            .contentShape(Circle())
+    }
+}
+
 struct AppDivider: View {
     var body: some View {
         Rectangle()

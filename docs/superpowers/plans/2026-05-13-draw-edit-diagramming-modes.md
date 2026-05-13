@@ -101,7 +101,7 @@ Arrange:
 - Modify: `ClipCanvas/Views/Canvas/CanvasToolbar.swift`
 - Test: `ClipCanvasTests/CanvasModeTests.swift`
 
-- [x] Replace `.pan` with `.normal`.
+- [x] Keep `.pan` as the internal canvas movement mode.
 - [x] Keep `.draw` and add `.edit`.
 - [x] Add mode-specific toolbar configuration tests for available actions.
 - [x] Preserve existing pan gesture in normal mode.

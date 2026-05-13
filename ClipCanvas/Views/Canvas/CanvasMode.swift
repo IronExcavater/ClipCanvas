@@ -1,18 +1,18 @@
 nonisolated enum CanvasMode: Equatable, CaseIterable {
-    case normal // default: drag pans canvas, tap object selects it
+    case pan    // default: drag pans canvas, tap object selects it
     case edit   // text and sticky-note editing become primary
     case draw   // PencilKit layer (Phase 2 - mode exists but no drawing yet)
 
     var systemImage: String {
         switch self {
-        case .normal: "hand.point.up.left"
+        case .pan: "hand.point.up.left"
         case .edit: "text.cursor"
         case .draw: "pencil.tip"
         }
     }
 
     var allowsCanvasPan: Bool {
-        self == .normal
+        self == .pan
     }
 }
 
@@ -27,8 +27,8 @@ enum ZoomCommand: Equatable {
 nonisolated enum CanvasToolbarItem: Equatable {
     case paste
     case copy
-    case openLink
     case details
+    case editContent
     case manageTags
     case arrangeSelection
     case delete
@@ -39,27 +39,36 @@ nonisolated enum CanvasToolbarItem: Equatable {
 nonisolated struct CanvasToolbarConfiguration: Equatable {
     var items: [CanvasToolbarItem]
 
-    static func make(selectedCount: Int, canOpenLink: Bool) -> CanvasToolbarConfiguration {
+    static func make(selectedCount: Int, mode: CanvasMode) -> CanvasToolbarConfiguration {
         if selectedCount > 0 {
-            var selectionItems: [CanvasToolbarItem] = [.copy]
-            if canOpenLink {
-                selectionItems.append(.openLink)
+            switch mode {
+            case .pan:
+                return CanvasToolbarConfiguration(items: [
+                    .copy,
+                    .divider,
+                    .details,
+                    .arrangeSelection
+                ])
+            case .edit:
+                return CanvasToolbarConfiguration(items: [
+                    .editContent,
+                    .divider,
+                    .manageTags,
+                    .delete
+                ])
+            case .draw:
+                return CanvasToolbarConfiguration(items: [
+                    .details,
+                    .divider,
+                    .delete
+                ])
             }
-            selectionItems.append(contentsOf: [
-                .divider,
-                .details,
-                .manageTags,
-                .arrangeSelection,
-                .divider,
-                .delete
-            ])
-            return CanvasToolbarConfiguration(items: selectionItems)
         }
 
         return CanvasToolbarConfiguration(items: [
             .paste,
             .divider,
-            .mode(.normal),
+            .mode(.pan),
             .mode(.edit),
             .mode(.draw)
         ])

@@ -3,44 +3,43 @@ import Testing
 
 @Suite struct CanvasModeTests {
     @Test func canvasModesMatchWorkspacePlanOrder() {
-        #expect(CanvasMode.allCases == [.normal, .edit, .draw])
-        #expect(CanvasMode.normal.allowsCanvasPan)
+        #expect(CanvasMode.allCases == [.pan, .edit, .draw])
+        #expect(CanvasMode.pan.allowsCanvasPan)
         #expect(!CanvasMode.edit.allowsCanvasPan)
         #expect(!CanvasMode.draw.allowsCanvasPan)
     }
 
     @Test func emptyToolbarShowsPasteAndAllModes() {
-        let configuration = CanvasToolbarConfiguration.make(selectedCount: 0, canOpenLink: false)
+        let configuration = CanvasToolbarConfiguration.make(selectedCount: 0, mode: .pan)
 
         #expect(configuration.items == [
             .paste,
             .divider,
-            .mode(.normal),
+            .mode(.pan),
             .mode(.edit),
             .mode(.draw)
         ])
     }
 
-    @Test func selectionToolbarShowsContextActions() {
-        let configuration = CanvasToolbarConfiguration.make(selectedCount: 1, canOpenLink: true)
+    @Test func panSelectionToolbarShowsCopyInfoAndArrange() {
+        let configuration = CanvasToolbarConfiguration.make(selectedCount: 1, mode: .pan)
 
         #expect(configuration.items == [
             .copy,
-            .openLink,
             .divider,
             .details,
-            .manageTags,
-            .arrangeSelection,
-            .divider,
-            .delete
+            .arrangeSelection
         ])
     }
 
-    @Test func selectionToolbarOmitsLinkActionWhenUnavailable() {
-        let configuration = CanvasToolbarConfiguration.make(selectedCount: 3, canOpenLink: false)
+    @Test func editSelectionToolbarShowsEditTagsAndDelete() {
+        let configuration = CanvasToolbarConfiguration.make(selectedCount: 1, mode: .edit)
 
-        #expect(!configuration.items.contains(.openLink))
-        #expect(configuration.items.contains(.copy))
-        #expect(configuration.items.contains(.delete))
+        #expect(configuration.items == [
+            .editContent,
+            .divider,
+            .manageTags,
+            .delete
+        ])
     }
 }

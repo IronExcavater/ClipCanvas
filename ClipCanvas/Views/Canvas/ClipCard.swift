@@ -7,6 +7,9 @@ struct ClipCard: View {
     var showsContent = true
     let onTap: () -> Void
     let onDoubleTap: () -> Void
+    var isEditing = false
+    var editingText = ""
+    let onCommitEditing: (String) -> Void
     let onResize: (CGSize) -> Void
     let onResizeEnded: () -> Void
     let onToggleExpandedSize: () -> Void
@@ -21,15 +24,15 @@ struct ClipCard: View {
         }
         .background {
             cardSurface
-                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .clipShape(StickyNoteShape())
         }
         .overlay(
-            RoundedRectangle(cornerRadius: 10, style: .continuous)
+            StickyNoteShape()
                 .stroke(isSelected ? Color.accentColor : Color.primary.opacity(0.08),
                         lineWidth: isSelected ? 2.5 : 1)
         )
         .shadow(color: .black.opacity(isSelected ? 0.16 : 0.09), radius: isSelected ? 10 : 6, y: isSelected ? 4 : 2)
-        .contentShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+        .contentShape(StickyNoteShape())
         .onTapGesture(count: 2, perform: onDoubleTap)
         .onTapGesture(perform: onTap)
         .animation(.spring(response: 0.18, dampingFraction: 0.8), value: isSelected)
@@ -39,6 +42,8 @@ struct ClipCard: View {
         Group {
             if !showsContent {
                 Color.clear
+            } else if isEditing, clip.type != .image {
+                InlineNoteEditor(text: editingText, onCommit: onCommitEditing)
             } else if clip.type == .image, let data = clip.imageData, let uiImage = UIImage(data: data) {
                 Image(uiImage: uiImage)
                     .resizable()
@@ -75,6 +80,64 @@ struct ClipCard: View {
             return tag.color
         }
         return clip.color.background
+    }
+}
+
+struct StickyNoteShape: InsettableShape {
+    var cutSize: CGFloat = 22
+    var insetAmount: CGFloat = 0
+
+    func path(in rect: CGRect) -> Path {
+        let rect = rect.insetBy(dx: insetAmount, dy: insetAmount)
+        let cut = min(cutSize, rect.width * 0.24, rect.height * 0.24)
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX - cut, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + cut))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.closeSubpath()
+        return path
+    }
+
+    func inset(by amount: CGFloat) -> StickyNoteShape {
+        var shape = self
+        shape.insetAmount += amount
+        return shape
+    }
+}
+
+struct InlineNoteEditor: View {
+    let text: String
+    let onCommit: (String) -> Void
+
+    @State private var draft = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        TextField("Note", text: $draft, axis: .vertical)
+            .font(.system(size: 15))
+            .foregroundStyle(.primary)
+            .lineLimit(3...14)
+            .textFieldStyle(.plain)
+            .submitLabel(.done)
+            .focused($focused)
+            .onSubmit(commit)
+            .onAppear {
+                draft = text
+                focused = true
+            }
+            .onDisappear(perform: commit)
+            .onChange(of: text) { _, newValue in
+                if !focused { draft = newValue }
+            }
+            .onChange(of: focused) { _, isFocused in
+                if !isFocused { commit() }
+            }
+    }
+
+    private func commit() {
+        onCommit(draft)
     }
 }
 
