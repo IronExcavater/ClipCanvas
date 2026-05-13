@@ -16,8 +16,7 @@ struct WorkspaceRowView: View {
     var body: some View {
         AppListItemButton(tint: .secondary, opacity: workspace.isActive ? 0.16 : 0.12, action: onActivate) {
             rowContent
-                .frame(minHeight: 52)
-                .appListItemContentPadding(horizontal: 8, vertical: 7)
+                .frame(minHeight: 48)
         }
         .contentShape(Rectangle())
         .listRowSeparator(.hidden)
@@ -58,16 +57,17 @@ struct WorkspaceRowView: View {
                     RelativeAgeText(date: workspace.updatedAt, prefix: "Updated ", suffix: " ago")
                 }
                 .font(.caption2)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(.primary.opacity(0.66))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
             Spacer(minLength: 8)
 
             if workspace.isActive {
-                Image(systemName: "checkmark")
-                    .font(.system(size: 13, weight: .bold))
-                    .foregroundStyle(Color.accentColor)
+                Circle()
+                    .fill(Color.accentColor)
+                    .frame(width: 9, height: 9)
+                    .accessibilityLabel("Active")
             }
         }
     }

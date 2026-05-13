@@ -282,11 +282,11 @@ private struct DeletedItemRow: View {
                     if let deletedAt {
                         RelativeAgeText(date: deletedAt, prefix: "Deleted ", emptyText: "Deleted just now")
                             .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.primary.opacity(0.66))
                     } else {
                         Text("Deleted recently")
                             .font(.caption2)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(.primary.opacity(0.66))
                     }
                 }
 
@@ -297,7 +297,6 @@ private struct DeletedItemRow: View {
                 }
             }
             .frame(minHeight: 58)
-            .appListItemContentPadding(horizontal: 10, vertical: 8)
         }
         .buttonStyle(.plain)
         .appListCard(tint: tint, opacity: 0.16)

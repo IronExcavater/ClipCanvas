@@ -146,7 +146,6 @@ struct SidebarView: View {
                             .foregroundStyle(.secondary)
                             .lineLimit(1)
                     }
-                    .appListItemContentPadding()
                     .appListCard(tint: .secondary, opacity: 0.08)
                     .appListItemRowInsets(vertical: 3)
                 }
@@ -158,18 +157,23 @@ struct SidebarView: View {
 
     private func sectionHeader<Destination: View>(_ title: String, destination: Destination) -> some View {
         NavigationLink(destination: destination) {
-            HStack {
+            HStack(spacing: 8) {
                 Text(title)
-                    .font(.subheadline.weight(.semibold))
+                    .font(.headline.weight(.semibold))
                     .foregroundStyle(.primary)
                 Spacer()
-                Text("View all")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(Color.accentColor)
+                HStack(spacing: 4) {
+                    Text("View all")
+                    Image(systemName: "chevron.right")
+                        .font(.caption.weight(.bold))
+                }
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.accentColor)
             }
         }
         .buttonStyle(.plain)
         .textCase(nil)
+        .padding(.vertical, 4)
     }
 
     // MARK: - Bottom nav

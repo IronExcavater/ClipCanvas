@@ -3,7 +3,7 @@ import UIKit
 
 enum AppSymbol {
     static let sidebar = "rectangle.leadinghalf.inset.filled"
-    static let options = "ellipsis.circle"
+    static let options = "ellipsis"
     static let settings = "gearshape"
 }
 
@@ -40,7 +40,7 @@ private struct BlendedIconButtonBackground: ViewModifier {
 struct AppMenuIconLabel: View {
     var body: some View {
         Image(systemName: AppSymbol.options)
-            .font(.system(size: 24, weight: .regular))
+            .font(.system(size: 22, weight: .semibold))
             .foregroundStyle(.primary)
             .frame(width: 46, height: 46)
             .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: Circle())
@@ -120,7 +120,7 @@ struct AppTagPill: View {
     var isSelected: Bool
 
     var body: some View {
-        HStack(spacing: 5) {
+        HStack(spacing: 6) {
             if let icon {
                 Image(systemName: icon)
                     .font(.caption)
@@ -129,14 +129,14 @@ struct AppTagPill: View {
                 .font(.caption.weight(.semibold))
                 .lineLimit(1)
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 11)
         .padding(.vertical, 7)
         .foregroundStyle(.primary)
         .background(background, in: Capsule())
     }
 
     private var background: Color {
-        isSelected ? color.opacity(0.28) : color.opacity(0.13)
+        isSelected ? color.opacity(0.32) : color.opacity(0.16)
     }
 }
 
@@ -149,6 +149,8 @@ struct AppListItemButton<Content: View>: View {
     var body: some View {
         Button(action: action) {
             content
+                .padding(.horizontal, 10)
+                .padding(.vertical, 8)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background {
                     AppListItemBackground(tint: tint, opacity: opacity)
@@ -166,6 +168,8 @@ struct AppListItemContainer<Content: View>: View {
 
     var body: some View {
         content
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 AppListItemBackground(tint: tint, opacity: opacity)
@@ -218,9 +222,11 @@ private struct AppListItemBackground: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(tint.opacity(max(opacity, 0.12)))
+                .fill(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground).opacity(0.88))
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(uiColor: .systemBackground).opacity(0.28))
+                .fill(tint.opacity(max(opacity, 0.14)))
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color(uiColor: .systemBackground).opacity(0.18))
         }
     }
 }

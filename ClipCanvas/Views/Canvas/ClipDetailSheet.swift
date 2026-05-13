@@ -12,7 +12,6 @@ struct ClipDetailSheet: View {
             List {
                 Section {
                     contentEditor
-                        .appListItemContentPadding(horizontal: 10, vertical: 8)
                         .appListCard(tint: clip.primaryDisplayColor, opacity: 0.16)
                 }
                 .appListItemRowInsets(vertical: 4)

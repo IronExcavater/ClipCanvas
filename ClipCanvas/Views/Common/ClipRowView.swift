@@ -30,8 +30,7 @@ struct ClipRowView: View {
                         .accessibilityLabel("Pinned")
                     }
             }
-            .frame(minHeight: compact ? 46 : 58)
-            .appListItemContentPadding(horizontal: 8, vertical: compact ? 6 : 7)
+            .frame(minHeight: compact ? 42 : 54)
         }
         .contentShape(Rectangle())
         .listRowSeparator(.hidden)
@@ -109,7 +108,7 @@ struct ClipRowView: View {
                 RelativeAgeText(date: clip.updatedAt, prefix: "Updated ", suffix: " ago")
                     .font(.caption2)
             }
-            .foregroundStyle(.secondary)
+            .foregroundStyle(.primary.opacity(0.66))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }

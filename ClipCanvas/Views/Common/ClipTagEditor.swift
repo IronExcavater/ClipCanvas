@@ -9,57 +9,63 @@ struct ClipTagEditor: View {
 
     @State private var newTagName = ""
     @State private var selectedColor = "#FF9800"
+    @State private var editingTagID: UUID?
 
     private let presets = ["#FF9800", "#4CAF50", "#2196F3", "#9C27B0", "#E91E63", "#607D8B"]
     private var userTags: [ClipTag] { tags.filter { !$0.isBuiltIn } }
+    private var appliesToClips: Bool { !clips.isEmpty }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 14) {
             if clips.count > 1 {
-                Text("\(clips.count) clips")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                Text("\(clips.count) clips selected")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
             }
 
-            LazyVGrid(columns: [GridItem(.adaptive(minimum: 148), spacing: 8)], alignment: .leading, spacing: 8) {
-                ForEach(ClipType.allCases, id: \.self) { type in
-                    EditableBuiltInTagChip(
-                        type: type,
-                        isSelected: clips.allSatisfy { $0.type == type }
-                    )
-                }
-
-                ForEach(userTags) { tag in
-                    EditableUserTagChip(
-                        tag: tag,
-                        presets: presets,
-                        isSelected: clips.allSatisfy { clipHasTag($0, tag) },
-                        onToggle: { toggle(tag) }
-                    )
-                }
-            }
-
-            HStack(spacing: 8) {
-                TextField("New tag", text: $newTagName)
+            if userTags.isEmpty {
+                Text("Create a tag to organize clips.")
                     .font(.subheadline)
-                    .textFieldStyle(.plain)
-                    .submitLabel(.done)
-                    .onSubmit(createTag)
-
-                TagColorDot(hex: selectedColor, presets: presets) { selectedColor = $0 }
-
-                Button(action: createTag) {
-                    Image(systemName: "plus")
-                        .font(.system(size: 15, weight: .semibold))
-                        .frame(width: 34, height: 34)
+                    .foregroundStyle(.primary.opacity(0.72))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, 4)
+            } else {
+                LazyVGrid(
+                    columns: [GridItem(.adaptive(minimum: appliesToClips ? 148 : 172), spacing: 10)],
+                    alignment: .leading,
+                    spacing: 10
+                ) {
+                    ForEach(userTags) { tag in
+                        EditableUserTagToken(
+                            tag: tag,
+                            presets: presets,
+                            state: selectionState(for: tag),
+                            isApplyingToClips: appliesToClips,
+                            isEditing: editingTagID == tag.id,
+                            onTap: { appliesToClips ? toggle(tag) : beginEditing(tag) },
+                            onBeginEditing: { beginEditing(tag) },
+                            onEndEditing: { finishEditing(tag) },
+                            onDelete: { context.delete(tag) }
+                        )
+                    }
                 }
-                .buttonStyle(BlendedIconButtonStyle())
-                .disabled(newTagName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
-            .background(Color.secondary.opacity(0.10), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+
+            NewTagComposer(
+                name: $newTagName,
+                selectedColor: $selectedColor,
+                presets: presets,
+                onCreate: createTag
+            )
         }
+    }
+
+    private func selectionState(for tag: ClipTag) -> TagSelectionState {
+        guard appliesToClips else { return .inactive }
+        let taggedCount = clips.filter { clipHasTag($0, tag) }.count
+        if taggedCount == clips.count { return .selected }
+        if taggedCount > 0 { return .mixed }
+        return .inactive
     }
 
     private func clipHasTag(_ clip: Clip, _ tag: ClipTag) -> Bool {
@@ -88,165 +94,171 @@ struct ClipTagEditor: View {
         }
         newTagName = ""
     }
-}
 
-private struct EditableBuiltInTagChip: View {
-    let type: ClipType
-    let isSelected: Bool
+    private func beginEditing(_ tag: ClipTag) {
+        editingTagID = tag.id
+    }
 
-    var body: some View {
-        EditableTagChip(
-            title: ClipTag.builtInName(for: type),
-            icon: type.icon,
-            hex: ClipTag.builtInHex(for: type),
-            isSelected: isSelected,
-            isBuiltIn: true,
-            presets: [],
-            onSelectColor: nil,
-            onRename: nil,
-            onTap: nil
-        )
+    private func finishEditing(_ tag: ClipTag) {
+        let trimmed = tag.name.trimmingCharacters(in: .whitespacesAndNewlines)
+        tag.name = trimmed.isEmpty ? "Untitled" : trimmed
+        editingTagID = nil
     }
 }
 
-private struct EditableUserTagChip: View {
+private enum TagSelectionState: Equatable {
+    case inactive
+    case mixed
+    case selected
+
+    var isActive: Bool {
+        switch self {
+        case .inactive: return false
+        case .mixed, .selected: return true
+        }
+    }
+
+    var iconName: String {
+        switch self {
+        case .inactive: return ""
+        case .mixed: return "minus"
+        case .selected: return "checkmark"
+        }
+    }
+}
+
+private struct EditableUserTagToken: View {
     @Bindable var tag: ClipTag
 
     let presets: [String]
-    let isSelected: Bool
-    let onToggle: () -> Void
+    let state: TagSelectionState
+    let isApplyingToClips: Bool
+    let isEditing: Bool
+    let onTap: () -> Void
+    let onBeginEditing: () -> Void
+    let onEndEditing: () -> Void
+    let onDelete: () -> Void
 
     var body: some View {
-        EditableTagChip(
-            title: tag.name,
-            icon: "tag",
-            hex: tag.colorHex,
-            isSelected: isSelected,
-            isBuiltIn: false,
-            presets: presets,
-            onSelectColor: { tag.colorHex = $0 },
-            onRename: { tag.name = $0 },
-            onTap: onToggle
-        )
-    }
-}
-
-private struct EditableTagChip: View {
-    let title: String
-    let icon: String
-    let hex: String
-    let isSelected: Bool
-    let isBuiltIn: Bool
-    let presets: [String]
-    let onSelectColor: ((String) -> Void)?
-    let onRename: ((String) -> Void)?
-    let onTap: (() -> Void)?
-
-    @State private var isEditing = false
-    @State private var draftTitle = ""
-
-    var body: some View {
-        HStack(spacing: 8) {
-            if let onSelectColor {
-                TagColorDot(hex: hex, presets: presets, onSelect: onSelectColor)
-            } else {
-                Circle()
-                    .fill(Color(hex: hex) ?? .accentColor)
-                    .frame(width: 22, height: 22)
-                    .overlay(
-                        Image(systemName: icon)
-                            .font(.system(size: 9, weight: .bold))
-                            .foregroundStyle(.white.opacity(0.9))
-                    )
-            }
-
-            if isEditing, onRename != nil {
-                TextField("Tag", text: $draftTitle)
-                    .font(.subheadline.weight(.semibold))
-                    .textFieldStyle(.plain)
-                    .frame(minWidth: 84)
-                    .onSubmit(commitEdit)
-            } else {
-                Button(action: { onTap?() }) {
-                    Text(title)
-                        .font(.subheadline.weight(.semibold))
-                        .lineLimit(2)
-                        .multilineTextAlignment(.leading)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    .foregroundStyle(.primary)
-                }
-                .buttonStyle(.plain)
-                .disabled(onTap == nil)
-            }
+        VStack(alignment: .leading, spacing: 8) {
+            tokenControl
 
             if isEditing {
-                Button(action: commitEdit) {
-                    Image(systemName: "checkmark")
-                        .font(.caption.weight(.bold))
-                        .frame(width: 24, height: 24)
+                HStack(spacing: 10) {
+                    ColorPresetGrid(presets: presets, selectedColor: tag.colorHex) { tag.colorHex = $0 }
+                    Spacer(minLength: 8)
+                    Button(action: onEndEditing) {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 15, weight: .bold))
+                            .frame(width: 36, height: 36)
+                    }
+                    .buttonStyle(BlendedIconButtonStyle())
+                }
+                .padding(.horizontal, 4)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+            }
+        }
+        .animation(.easeInOut(duration: 0.18), value: isEditing)
+        .animation(.easeInOut(duration: 0.18), value: state.isActive)
+    }
+
+    @ViewBuilder
+    private var tokenControl: some View {
+        Group {
+            if isEditing {
+                tokenLabel
+            } else {
+                Button(action: onTap) {
+                    tokenLabel
                 }
                 .buttonStyle(.plain)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 9)
-        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-        .background(Color(hex: hex)?.opacity(isSelected ? 0.32 : 0.18) ?? Color.secondary.opacity(0.14), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
-        .onLongPressGesture {
-            if onRename != nil { beginEdit() }
-        }
+        .onLongPressGesture(perform: onBeginEditing)
         .contextMenu {
-            if isBuiltIn {
-                Text("Built-in Type")
+            if isApplyingToClips {
+                Button(state == .selected ? "Remove from Clip" : "Add to Clip", systemImage: "tag", action: onTap)
             }
-            if onRename != nil {
-                Button("Rename Tag", systemImage: "pencil", action: beginEdit)
-            }
-            if onTap != nil {
-                Button(isSelected ? "Remove from Clip" : "Add to Clip", systemImage: "tag", action: { onTap?() })
-            }
+            Button("Rename", systemImage: "pencil", action: onBeginEditing)
+            Button("Delete", systemImage: "trash", role: .destructive, action: onDelete)
         }
     }
 
-    private func beginEdit() {
-        draftTitle = title
-        isEditing = true
-    }
+    private var tokenLabel: some View {
+        HStack(spacing: 9) {
+            Circle()
+                .fill(tag.color)
+                .frame(width: 18, height: 18)
+                .overlay(Circle().strokeBorder(.white.opacity(0.72), lineWidth: 1))
 
-    private func commitEdit() {
-        if let onRename {
-            let trimmed = draftTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-            if !trimmed.isEmpty { onRename(trimmed) }
+            if isEditing {
+                TextField("Tag", text: $tag.name)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .textFieldStyle(.plain)
+                    .submitLabel(.done)
+                    .onSubmit(onEndEditing)
+            } else {
+                Text(tag.name)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+
+            if state.isActive {
+                Image(systemName: state.iconName)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(.white)
+                    .frame(width: 22, height: 22)
+                    .background(tag.color, in: Circle())
+            }
         }
-        isEditing = false
+        .frame(maxWidth: .infinity, minHeight: 46, alignment: .leading)
+        .padding(.horizontal, 13)
+        .background(tag.color.opacity(state.isActive ? 0.30 : 0.17), in: Capsule())
+        .contentShape(Capsule())
     }
 }
 
-struct TagColorDot: View {
-    let hex: String
-    let presets: [String]
-    let onSelect: (String) -> Void
+private struct NewTagComposer: View {
+    @Binding var name: String
+    @Binding var selectedColor: String
 
-    @State private var showingPicker = false
+    let presets: [String]
+    let onCreate: () -> Void
+
+    private var canCreate: Bool {
+        !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+    }
 
     var body: some View {
-        Button {
-            showingPicker = true
-        } label: {
-            Circle()
-                .fill(Color(hex: hex) ?? .accentColor)
-                .frame(width: 22, height: 22)
-                .overlay(Circle().strokeBorder(Color.primary.opacity(0.12), lineWidth: 1))
-        }
-        .buttonStyle(.plain)
-        .popover(isPresented: $showingPicker, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
-            ColorPresetGrid(presets: presets, selectedColor: hex) { selected in
-                onSelect(selected)
-                showingPicker = false
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 10) {
+                TextField("New tag", text: $name)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .textFieldStyle(.plain)
+                    .submitLabel(.done)
+                    .onSubmit {
+                        if canCreate { onCreate() }
+                    }
+
+                Button(action: onCreate) {
+                    Image(systemName: "plus")
+                        .font(.system(size: 16, weight: .semibold))
+                        .frame(width: 42, height: 42)
+                }
+                .buttonStyle(BlendedIconButtonStyle())
+                .disabled(!canCreate)
             }
-            .padding(12)
-            .presentationCompactAdaptation(.popover)
+            .padding(.leading, 14)
+            .padding(.trailing, 4)
+            .padding(.vertical, 4)
+            .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: Capsule())
+
+            ColorPresetGrid(presets: presets, selectedColor: selectedColor) { selectedColor = $0 }
+                .padding(.horizontal, 2)
         }
     }
 }
@@ -257,7 +269,7 @@ struct ColorPresetGrid: View {
     let onSelect: (String) -> Void
 
     var body: some View {
-        HStack(spacing: 10) {
+        HStack(spacing: 9) {
             ForEach(presets, id: \.self) { hex in
                 Button {
                     onSelect(hex)
@@ -265,13 +277,10 @@ struct ColorPresetGrid: View {
                     Circle()
                         .fill(Color(hex: hex) ?? .accentColor)
                         .frame(width: 30, height: 30)
-                        .overlay {
-                            if selectedColor == hex {
-                                Image(systemName: "checkmark")
-                                    .font(.caption.weight(.bold))
-                                    .foregroundStyle(.white)
-                            }
-                        }
+                        .overlay(
+                            Circle()
+                                .strokeBorder(selectedColor == hex ? Color.primary.opacity(0.72) : Color.primary.opacity(0.10), lineWidth: selectedColor == hex ? 2 : 1)
+                        )
                 }
                 .buttonStyle(.plain)
             }

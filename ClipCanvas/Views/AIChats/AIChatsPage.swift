@@ -136,9 +136,8 @@ private struct AIChatRow: View {
 
                 RelativeAgeText(date: chat.updatedAt, prefix: "Updated ", suffix: " ago")
                     .font(.caption2)
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary.opacity(0.66))
             }
-            .appListItemContentPadding()
         }
         .appListCard(tint: .secondary, opacity: 0.08)
         .contextMenu {

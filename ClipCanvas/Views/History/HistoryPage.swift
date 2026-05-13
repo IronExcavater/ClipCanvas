@@ -43,10 +43,10 @@ struct HistoryPage: View {
 
                 ForEach(grouped, id: \.label) { group in
                     Text(group.label)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary.opacity(0.82))
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(.primary)
                         .textCase(nil)
-                        .appListItemRowInsets(horizontal: 14, vertical: 0)
+                        .appListItemRowInsets(horizontal: 14, vertical: 1)
 
                     ForEach(group.clips) { clip in
                         ClipRowView(
