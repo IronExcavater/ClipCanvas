@@ -188,9 +188,9 @@ Create an `AIChatDetailView` for the existing `AIChatsPage`.
 - Modify: `ClipCanvas/ClipCanvasApp.swift`
 - Test: `ClipCanvasTests/AIChatModelTests.swift`
 
-- [ ] Add `AIChatMode`, `ChatMessageStatus`, and `AIToolEvent`.
-- [ ] Add SwiftData schema registration for `AIToolEvent`.
-- [ ] Test sorted messages, mode default, attachment states, and tool event status changes.
+- [x] Add `AIChatMode`, `ChatMessageStatus`, and `AIToolEvent`.
+- [x] Add SwiftData schema registration for `AIToolEvent`.
+- [x] Test sorted messages, mode default, attachment states, and tool event status changes.
 
 ### Task 2: Add AI Context Packer
 
