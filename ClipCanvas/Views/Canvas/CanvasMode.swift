@@ -1,5 +1,5 @@
 enum CanvasMode: Equatable {
-    case pan    // default: drag pans canvas, tap card copies to clipboard
+    case pan    // default: drag pans canvas, tap object selects it
     case draw   // PencilKit layer (Phase 2 — mode exists but no drawing yet)
 }
 

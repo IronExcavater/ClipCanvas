@@ -1,15 +1,10 @@
 import SwiftUI
 
 struct SettingsPage: View {
-    @AppStorage("settings.copyClipOnTap") private var copyClipOnTap = true
     @AppStorage("settings.trashRetentionDays") private var trashRetentionDays = TrashRetentionService.defaultRetentionDays
 
     var body: some View {
         List {
-            Section("Clipboard") {
-                Toggle("Copy clips when tapped", isOn: $copyClipOnTap)
-            }
-
             Section("Tags") {
                 ClipTagEditor(clips: [], showsClipTypes: true, layout: .twoColumns)
                     .padding(.vertical, 4)

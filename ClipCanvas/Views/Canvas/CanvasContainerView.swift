@@ -12,12 +12,11 @@ struct CanvasContainerView: View {
     @State private var zoomCommand: ZoomCommand?
     @State private var visibleScale: CGFloat = 1
     @State private var visibleViewportCenter: CGPoint = .zero
-    @State private var selectedPlacementIDs: Set<UUID> = []
+    @State private var selectedObjectIDs: Set<UUID> = []
     @State private var detailClip: Clip?
     @State private var tagEditSelection: ClipTagEditSelection?
     @State private var isRenaming = false
     @State private var renameText = ""
-    @AppStorage("settings.copyClipOnTap") private var copyClipOnTap = true
     @FocusState private var renameFocused: Bool
 
     var body: some View {
@@ -26,10 +25,9 @@ struct CanvasContainerView: View {
                 workspace: workspace,
                 mode: mode,
                 zoomCommand: $zoomCommand,
-                selectedPlacementIDs: $selectedPlacementIDs,
+                selectedObjectIDs: $selectedObjectIDs,
                 visibleScale: $visibleScale,
-                visibleViewportCenter: $visibleViewportCenter,
-                onCopyClip: copyToClipboard
+                visibleViewportCenter: $visibleViewportCenter
             )
             .ignoresSafeArea()
 
@@ -62,7 +60,7 @@ struct CanvasContainerView: View {
 
                 CanvasToolbar(
                     mode: $mode,
-                    selectedCount: selectedPlacementIDs.count,
+                    selectedCount: selectedObjectIDs.count,
                     canOpenLink: selectedOpenableClip != nil,
                     onPaste: paste,
                     onCopy: copySelected,
@@ -95,7 +93,7 @@ struct CanvasContainerView: View {
             .allowsHitTesting(false)
         }
         .animation(.spring(response: 0.24, dampingFraction: 0.86), value: feedback)
-        .animation(.spring(response: 0.25, dampingFraction: 0.82), value: selectedPlacementIDs)
+        .animation(.spring(response: 0.25, dampingFraction: 0.82), value: selectedObjectIDs)
         .sheet(item: $detailClip) { clip in
             ClipDetailSheet(clip: clip)
         }
@@ -113,12 +111,6 @@ struct CanvasContainerView: View {
         if isNew { context.insert(clip) }
         workspace.place(clip: clip, at: workspace.nextPosition(around: visibleViewportCenter))
         showFeedback("Pasted")
-    }
-
-    private func copyToClipboard(_ clip: Clip) {
-        guard copyClipOnTap else { return }
-        ClipActionService.copy(clip)
-        showFeedback("Copied")
     }
 
     // MARK: - Rename
@@ -146,11 +138,13 @@ struct CanvasContainerView: View {
     // MARK: - Workspace actions
 
     private func clearAll() {
-        let toDelete = workspace.placements
-        toDelete.forEach { context.delete($0) }
+        let objects = Array(workspace.canvasObjects)
+        let placements = Array(workspace.placements)
+        objects.forEach { context.delete($0) }
+        placements.forEach { context.delete($0) }
         workspace.updatedAt = Date()
-        selectedPlacementIDs.removeAll()
-        showFeedback(toDelete.isEmpty ? "Canvas is already empty" : "Canvas cleared")
+        selectedObjectIDs.removeAll()
+        showFeedback(objects.count + placements.count == 0 ? "Canvas is already empty" : "Canvas cleared")
     }
 
     private func copySelected() {
@@ -176,16 +170,18 @@ struct CanvasContainerView: View {
     }
 
     private func deleteSelected() {
-        let selected = workspace.placements.filter { selectedPlacementIDs.contains($0.id) }
+        let selected = workspace.canvasObjects.filter { selectedObjectIDs.contains($0.id) }
+        let sourcePlacementIDs = Set(selected.compactMap(\.sourcePlacementID))
+        let legacyPlacements = workspace.placements.filter { sourcePlacementIDs.contains($0.id) }
         selected.forEach { context.delete($0) }
-        workspace.updatedAt = Date()
-        selectedPlacementIDs.removeAll()
-        showFeedback(selected.count == 1 ? "Deleted 1 clip" : "Deleted \(selected.count) clips")
+        legacyPlacements.forEach { context.delete($0) }
+        selectedObjectIDs.removeAll()
+        showFeedback(selected.count == 1 ? "Deleted 1 card" : "Deleted \(selected.count) cards")
     }
 
     private var selectedClips: [Clip] {
-        workspace.placements
-            .filter { selectedPlacementIDs.contains($0.id) }
+        workspace.canvasObjects
+            .filter { selectedObjectIDs.contains($0.id) }
             .compactMap(\.clip)
     }
 

@@ -76,7 +76,7 @@ struct WorkspaceRowView: View {
     }
 
     private var cardCountText: String {
-        let count = workspace.placements.count
+        let count = workspace.canvasObjects.filter(\.isVisible).count
         return "\(count) card\(count == 1 ? "" : "s")"
     }
 }

@@ -14,15 +14,24 @@ enum CanvasPlacementSizing {
         return expandedSize(for: placement.clip, availableScreenWidth: availableScreenWidth)
     }
 
+    static func toggledSize(for object: CanvasObject, availableScreenWidth: CGFloat? = nil) -> CGSize {
+        if isExpanded(width: object.width, height: object.height) { return defaultSize }
+        return expandedSize(for: object.clip, fallbackText: object.text, availableScreenWidth: availableScreenWidth)
+    }
+
     static func expandedSize(for clip: Clip?, availableScreenWidth: CGFloat? = nil) -> CGSize {
-        guard let clip else { return defaultSize }
-        if clip.type == .image {
+        expandedSize(for: clip, fallbackText: nil, availableScreenWidth: availableScreenWidth)
+    }
+
+    static func expandedSize(for clip: Clip?, fallbackText: String?, availableScreenWidth: CGFloat? = nil) -> CGSize {
+        if clip?.type == .image {
             let width = min(max((availableScreenWidth ?? 360) - 48, 300), 520)
             return CGSize(width: width, height: min(width * 0.78, 420))
         }
 
-        let count = max(clip.content.count, 1)
-        let lines = clip.content.components(separatedBy: .newlines).count
+        let content = clip?.content.isEmpty == false ? (clip?.content ?? "") : (fallbackText ?? "")
+        let count = max(content.count, 1)
+        let lines = content.components(separatedBy: .newlines).count
         let estimatedWrappedLines = max(lines, Int((Double(count) / 32.0).rounded(.up)))
         let height = min(max(CGFloat(estimatedWrappedLines) * estimatedLineHeight + 34, defaultSize.height), 420)
         let width: CGFloat = count > 220 ? 300 : 260
@@ -52,6 +61,10 @@ enum CanvasPlacementSizing {
     }
 
     private static func isExpanded(_ placement: CanvasPlacement) -> Bool {
-        abs(placement.width - defaultSize.width) > 1 || abs(placement.height - defaultSize.height) > 1
+        isExpanded(width: placement.width, height: placement.height)
+    }
+
+    private static func isExpanded(width: Double, height: Double) -> Bool {
+        abs(width - defaultSize.width) > 1 || abs(height - defaultSize.height) > 1
     }
 }

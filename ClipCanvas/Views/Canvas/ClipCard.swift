@@ -78,7 +78,7 @@ struct ClipCard: View {
     }
 }
 
-private struct ResizeHandle: View {
+struct ResizeHandle: View {
     var body: some View {
         Canvas { ctx, size in
             let count = 3

@@ -34,7 +34,7 @@ final class Workspace: SoftDeletable {
 
     // Staggers new cards so they don't all land on top of each other.
     func nextPosition() -> CGPoint {
-        let i = Double(placements.count)
+        let i = Double(max(canvasObjects.count, placements.count))
         return CGPoint(
             x: 200 + i.truncatingRemainder(dividingBy: 6) * 30,
             y: 180 + i.truncatingRemainder(dividingBy: 8) * 24
@@ -42,7 +42,7 @@ final class Workspace: SoftDeletable {
     }
 
     func nextPosition(around anchor: CGPoint) -> CGPoint {
-        let i = Double(placements.count)
+        let i = Double(max(canvasObjects.count, placements.count))
         let column = i.truncatingRemainder(dividingBy: 4)
         let row = floor(i.truncatingRemainder(dividingBy: 12) / 4)
         return CGPoint(
@@ -57,6 +57,18 @@ final class Workspace: SoftDeletable {
         let p = CanvasPlacement(clip: clip, x: pos.x, y: pos.y)
         p.workspace = self
         placements.append(p)
+        let object = CanvasObject(
+            kind: .clipNote,
+            workspace: self,
+            clip: clip,
+            x: p.x,
+            y: p.y,
+            width: p.width,
+            height: p.height
+        )
+        object.sourcePlacementID = p.id
+        object.zIndex = Double(canvasObjects.count)
+        canvasObjects.append(object)
         updatedAt = Date()
         return p
     }

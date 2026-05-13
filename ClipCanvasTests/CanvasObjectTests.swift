@@ -116,4 +116,18 @@ import Testing
         #expect(workspace.canvasObjects.count == 1)
         #expect(workspace.canvasObjects.first?.id == object.id)
     }
+
+    @Test func workspacePlaceCreatesClipNoteCanvasObjectForCompatibility() {
+        let workspace = Workspace(name: "Board")
+        let clip = Clip(content: "Dropped from history", origin: .clipboard)
+
+        let placement = workspace.place(clip: clip, at: CGPoint(x: 120, y: 180))
+
+        #expect(workspace.placements.count == 1)
+        #expect(workspace.canvasObjects.count == 1)
+        #expect(workspace.canvasObjects[0].kind == .clipNote)
+        #expect(workspace.canvasObjects[0].clip?.id == clip.id)
+        #expect(workspace.canvasObjects[0].sourcePlacementID == placement.id)
+        #expect(workspace.canvasObjects[0].frame == placement.frame)
+    }
 }

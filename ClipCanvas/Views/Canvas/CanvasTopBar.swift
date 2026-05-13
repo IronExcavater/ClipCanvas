@@ -36,8 +36,8 @@ struct CanvasTopBar: View {
 
             Menu {
                 Button("Rename Workspace", systemImage: "pencil", action: onBeginRename)
-                Button("Fit Canvas to Cards", systemImage: "arrow.up.left.and.arrow.down.right", action: onFitContent)
-                Button("Arrange Cards in Grid", systemImage: "square.grid.2x2", action: onArrangeAll)
+                Button("Fit to Cards", systemImage: "arrow.up.left.and.arrow.down.right", action: onFitContent)
+                Button("Arrange Grid", systemImage: "square.grid.2x2", action: onArrangeAll)
                 Divider()
                 Button("Clear Workspace", systemImage: "trash", role: .destructive) {
                     confirmingClear = true

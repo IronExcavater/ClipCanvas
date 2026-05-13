@@ -216,11 +216,11 @@ Workspace actions intentionally excluded:
 - Create: `ClipCanvas/Views/Canvas/CanvasObjectView.swift`
 - Create: `ClipCanvas/Views/Canvas/ConnectorView.swift`
 
-- [ ] Replace the main `ForEach(placements)` path with live `workspace.canvasObjects`.
-- [ ] Render `.stickyNote` and `.clipNote` with one shared sticky-note view.
-- [ ] Render `.image`, `.shape`, `.drawing`, `.connector`, and `.group` as separate lightweight subviews.
-- [ ] Keep grid/background camera math unchanged.
-- [ ] Keep z-index reshuffle behavior when an object is selected.
+- [x] Replace the main `ForEach(placements)` path with live `workspace.canvasObjects`.
+- [x] Render `.stickyNote` and `.clipNote` with one shared sticky-note view.
+- [x] Render `.image`, `.shape`, `.drawing`, `.connector`, and `.group` as separate lightweight subviews.
+- [x] Keep grid/background camera math unchanged.
+- [x] Keep z-index reshuffle behavior when an object is selected.
 
 ### Task 5: Introduce WorkspaceActionRegistry
 
@@ -243,10 +243,10 @@ Workspace actions intentionally excluded:
 - Modify: `ClipCanvas/Views/Canvas/CanvasContainerView.swift`
 - Modify: `ClipCanvas/Views/Common/ClipRowView.swift`
 
-- [ ] Change canvas tap from copy-to-clipboard to select in normal mode.
-- [ ] Keep clipboard history row primary action as copy-to-clipboard.
-- [ ] Add explicit copy action to selected canvas object toolbar/context menu.
-- [ ] Update copy-on-tap setting text or remove it from canvas behavior.
+- [x] Change canvas tap from copy-to-clipboard to select in normal mode.
+- [x] Keep clipboard history row primary action as copy-to-clipboard.
+- [x] Add explicit copy action to selected canvas object toolbar/context menu.
+- [x] Update copy-on-tap setting text or remove it from canvas behavior.
 
 ## Acceptance Criteria
 
