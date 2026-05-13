@@ -210,10 +210,10 @@ Create an `AIChatDetailView` for the existing `AIChatsPage`.
 - Create: `ClipCanvas/Services/FoundationTransformProvider.swift`
 - Test: `ClipCanvasTests/TransformSkillRegistryTests.swift`
 
-- [ ] Register the initial skill list.
-- [ ] Route text transforms through Foundation Models when available.
-- [ ] Provide deterministic fallback implementations for tests and unavailable local models.
-- [ ] Return `TransformSkillResult` with changed clip IDs or proposed canvas actions.
+- [x] Register the initial skill list.
+- [x] Route text transforms through Foundation Models when available.
+- [x] Provide deterministic fallback implementations for tests and unavailable local models.
+- [x] Return `TransformSkillResult` with changed clip IDs or proposed canvas actions.
 
 ### Task 4: Add OpenAI Client
 
