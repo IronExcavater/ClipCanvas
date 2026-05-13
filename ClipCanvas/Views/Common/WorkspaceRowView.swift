@@ -16,8 +16,8 @@ struct WorkspaceRowView: View {
     var body: some View {
         AppListItemButton(tint: .secondary, opacity: workspace.isActive ? 0.16 : 0.12, action: onActivate) {
             rowContent
-                .frame(minHeight: 58)
-                .appListItemContentPadding(horizontal: 10, vertical: 8)
+                .frame(minHeight: 52)
+                .appListItemContentPadding(horizontal: 8, vertical: 7)
         }
         .contentShape(Rectangle())
         .listRowSeparator(.hidden)

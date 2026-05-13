@@ -23,6 +23,7 @@ struct SettingsPage: View {
             Section("Tags") {
                 ForEach(ClipType.allCases, id: \.self) { type in
                     BuiltInTagSettingsRow(type: type)
+                        .listRowSeparator(.hidden)
                 }
                 ForEach(userTags) { tag in
                     TagSettingsRow(
@@ -30,6 +31,7 @@ struct SettingsPage: View {
                         presets: colorPresets,
                         onDelete: { context.delete(tag) }
                     )
+                    .listRowSeparator(.hidden)
                 }
 
                 VStack(alignment: .leading, spacing: 10) {
@@ -52,6 +54,7 @@ struct SettingsPage: View {
                         .disabled(newTagName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                     }
                 }
+                .listRowSeparator(.hidden)
             }
 
             Section("Library") {
@@ -119,12 +122,12 @@ private struct TagSettingsRow: View {
                 Menu {
                     Button("Delete Tag", systemImage: "trash", role: .destructive, action: onDelete)
                 } label: {
-                    Image(systemName: AppSymbol.options)
-                        .font(.system(size: 15, weight: .semibold))
+                    Image(systemName: "ellipsis.circle")
+                        .font(.system(size: 19, weight: .regular))
                         .foregroundStyle(.secondary)
                         .frame(width: 36, height: 36)
                 }
-                .buttonStyle(BlendedIconButtonStyle())
+                .buttonStyle(.plain)
             }
         }
         .padding(.vertical, 3)

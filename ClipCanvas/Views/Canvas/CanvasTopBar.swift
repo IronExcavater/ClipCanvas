@@ -39,19 +39,21 @@ struct CanvasTopBar: View {
                     confirmingClear = true
                 }
             } label: {
-                BlendedIconCircle {
-                    Image(systemName: AppSymbol.options)
-                        .font(.system(size: 20, weight: .bold))
-                }
+                Image(systemName: "ellipsis.circle")
+                    .font(.system(size: 25, weight: .regular))
+                    .foregroundStyle(.primary)
+                    .frame(width: 46, height: 46)
+                    .contentShape(Circle())
             }
             .buttonStyle(.plain)
         }
         .padding(.horizontal, 16)
         .padding(.top, 4)
         .padding(.bottom, 10)
-        .background(alignment: .bottom) {
+        .background(alignment: .top) {
             CanvasTopBarFade()
                 .allowsHitTesting(false)
+                .ignoresSafeArea(.container, edges: .top)
         }
         .alert("Clear all clips from this workspace?", isPresented: $confirmingClear) {
             Button("Cancel", role: .cancel) {}
@@ -88,14 +90,14 @@ private struct CanvasTopBarFade: View {
     var body: some View {
         Rectangle()
             .fill(.ultraThinMaterial)
-            .frame(height: 88)
+            .frame(height: 132)
             .mask(
                 LinearGradient(
-                    colors: [.black, .black.opacity(0.75), .clear],
+                    colors: [.black, .black.opacity(0.86), .black.opacity(0.40), .clear],
                     startPoint: .top,
                     endPoint: .bottom
                 )
             )
-            .offset(y: 36)
+            .offset(y: -54)
     }
 }

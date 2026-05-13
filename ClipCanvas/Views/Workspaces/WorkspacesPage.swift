@@ -14,6 +14,7 @@ struct WorkspacesPage: View {
     @State private var editingName = ""
     @State private var isSelecting = false
     @State private var selectedWorkspaceIDs = Set<UUID>()
+    @State private var searchPresented = false
 
     private var filteredWorkspaces: [Workspace] {
         guard !search.isEmpty else { return workspaces }
@@ -81,8 +82,9 @@ struct WorkspacesPage: View {
         .contentMargins(.top, 0, for: .scrollContent)
         .navigationTitle("Workspaces")
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: searchBinding, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search workspaces")
+        .searchable(text: searchBinding, isPresented: $searchPresented, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search workspaces")
         .animation(.easeInOut(duration: 0.18), value: search.isEmpty)
+        .animation(.easeInOut(duration: 0.18), value: searchPresented)
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
                 if !isSelecting {
@@ -93,6 +95,8 @@ struct WorkspacesPage: View {
                     }
                     .buttonStyle(BlendedIconButtonStyle())
                     .accessibilityLabel("New Workspace")
+                    .opacity(searchPresented ? 0 : 1)
+                    .disabled(searchPresented)
                 }
             }
         }

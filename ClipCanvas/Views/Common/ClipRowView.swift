@@ -30,8 +30,8 @@ struct ClipRowView: View {
                         .accessibilityLabel("Pinned")
                     }
             }
-            .frame(minHeight: compact ? 54 : 64)
-            .appListItemContentPadding(horizontal: 10, vertical: 8)
+            .frame(minHeight: compact ? 46 : 58)
+            .appListItemContentPadding(horizontal: 8, vertical: compact ? 6 : 7)
         }
         .contentShape(Rectangle())
         .listRowSeparator(.hidden)

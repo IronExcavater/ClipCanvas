@@ -25,15 +25,15 @@ struct HistoryFilterBar: View {
     private func fadingFilterRow<Content: View>(@ViewBuilder content: () -> Content) -> some View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 6, content: content)
-                .padding(.horizontal, 16)
+                .padding(.horizontal, 12)
         }
         .mask(
             HStack(spacing: 0) {
                 LinearGradient(colors: [.clear, .black], startPoint: .leading, endPoint: .trailing)
-                    .frame(width: 10)
+                    .frame(width: 8)
                 Rectangle()
                 LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing)
-                    .frame(width: 10)
+                    .frame(width: 8)
             }
         )
     }

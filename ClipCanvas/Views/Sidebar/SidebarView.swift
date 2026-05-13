@@ -193,7 +193,8 @@ struct SidebarView: View {
             .buttonStyle(BlendedIconButtonStyle())
         }
         .padding(.horizontal, 20)
-        .padding(.vertical, 10)
+        .padding(.top, 2)
+        .padding(.bottom, 24)
         .ignoresSafeArea(.container, edges: .bottom)
         .ignoresSafeArea(.keyboard, edges: .bottom)
     }

@@ -12,6 +12,7 @@ struct HistoryPage: View {
     @State private var tagEditSelection: ClipTagEditSelection?
     @State private var isSelecting = false
     @State private var selectedClipIDs = Set<UUID>()
+    @State private var searchPresented = false
 
     private var filtered: [Clip] {
         clips
@@ -67,8 +68,9 @@ struct HistoryPage: View {
         .listSectionSpacing(.compact)
         .navigationTitle("History")
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: searchBinding, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search history")
+        .searchable(text: searchBinding, isPresented: $searchPresented, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search history")
         .animation(.easeInOut(duration: 0.18), value: filter.search.isEmpty)
+        .animation(.easeInOut(duration: 0.18), value: searchPresented)
         .sheet(item: $detailClip) { clip in
             ClipDetailSheet(clip: clip)
         }

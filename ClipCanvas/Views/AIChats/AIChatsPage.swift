@@ -9,6 +9,7 @@ struct AIChatsPage: View {
     @State private var isSelecting = false
     @State private var selection = Set<UUID>()
     @State private var confirmingDelete = false
+    @State private var searchPresented = false
 
     private var filteredChats: [AIChat] {
         guard !search.isEmpty else { return chats }
@@ -55,7 +56,8 @@ struct AIChatsPage: View {
         .contentMargins(.top, 0, for: .scrollContent)
         .navigationTitle("AI Chats")
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search chats")
+        .searchable(text: $search, isPresented: $searchPresented, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search chats")
+        .animation(.easeInOut(duration: 0.18), value: searchPresented)
         .alert("Delete selected chats?", isPresented: $confirmingDelete) {
             Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive, action: deleteSelected)

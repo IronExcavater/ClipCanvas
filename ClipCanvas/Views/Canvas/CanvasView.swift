@@ -19,6 +19,7 @@ struct CanvasView: View {
     @State private var activeResize: (id: UUID, start: CGSize, translation: CGSize)?
     @State private var zOrder: [UUID: Double] = [:]
     @State private var nextZOrder: Double = 1
+    @State private var cameraMotionTask: Task<Void, Never>?
 
     private var placements: [CanvasPlacement] {
         workspace.placements.filter { $0.clip?.deletedAt == nil }
@@ -68,6 +69,9 @@ struct CanvasView: View {
             .onAppear {
                 visibleScale = canvasScale
             }
+            .onDisappear {
+                cameraMotionTask?.cancel()
+            }
         }
     }
 
@@ -77,6 +81,7 @@ struct CanvasView: View {
         Canvas { ctx, size in
             let spacing = max(28.0 * canvasScale, 12)
             let radius = min(1.35 * canvasScale, 2.2)
+            let opacity = gridOpacity(viewportSize: size)
             var x = canvasOffset.width.truncatingRemainder(dividingBy: spacing)
             if x < 0 { x += spacing }
             while x < size.width + spacing {
@@ -90,7 +95,7 @@ struct CanvasView: View {
                             width: radius * 2,
                             height: radius * 2
                         )),
-                        with: .color(.secondary.opacity(0.32))
+                        with: .color(.secondary.opacity(opacity))
                     )
                     y += spacing
                 }
@@ -145,6 +150,7 @@ struct CanvasView: View {
     private func canvasPanGesture(in geo: GeometryProxy) -> some Gesture {
         DragGesture(minimumDistance: 4)
             .onChanged { value in
+                stopCameraMotion()
                 let proposed = CGSize(
                     width: baseOffset.width + value.translation.width,
                     height: baseOffset.height + value.translation.height
@@ -152,34 +158,21 @@ struct CanvasView: View {
                 canvasOffset = boundedOffset(proposed, viewportSize: geo.size, rubberBand: true)
             }
             .onEnded { value in
-                let projected = CGSize(
-                    width: value.translation.width + (value.predictedEndTranslation.width - value.translation.width) * 0.48,
-                    height: value.translation.height + (value.predictedEndTranslation.height - value.translation.height) * 0.48
-                )
-                let proposed = CGSize(
-                    width: baseOffset.width + projected.width,
-                    height: baseOffset.height + projected.height
-                )
-                let target = boundedOffset(proposed, viewportSize: geo.size, rubberBand: false)
-                withAnimation(.interactiveSpring(response: 0.42, dampingFraction: 0.84, blendDuration: 0.08)) {
-                    canvasOffset = target
-                }
-                baseOffset = target
+                startCameraInertia(from: value, viewportSize: geo.size)
             }
     }
 
     private func pinchGesture(in geo: GeometryProxy) -> some Gesture {
         MagnificationGesture()
             .onChanged { value in
+                stopCameraMotion()
                 let next = min(max(baseScale * value, 0.2), 4.0)
                 zoom(to: next, in: geo)
             }
             .onEnded { _ in
                 baseScale = canvasScale
                 let target = boundedOffset(canvasOffset, viewportSize: geo.size, rubberBand: false)
-                withAnimation(.interactiveSpring(response: 0.28, dampingFraction: 0.86)) {
-                    canvasOffset = target
-                }
+                canvasOffset = target
                 baseOffset = target
             }
     }
@@ -336,8 +329,61 @@ struct CanvasView: View {
         let center = CGPoint(x: usable.midX, y: usable.midY)
         let contentRadius = hypot(usable.width, usable.height) / 2
         let viewportRadius = hypot(viewportSize.width / canvasScale, viewportSize.height / canvasScale) / 2
-        let expansion = max(520, viewportRadius * 0.75 + CGFloat(placements.count) * 28 + contentRadius * 0.22)
-        return CanvasRadiusBounds(center: center, radius: max(680, contentRadius + expansion))
+        let expansion = max(220, viewportRadius * 0.34 + CGFloat(placements.count) * 16 + contentRadius * 0.12)
+        return CanvasRadiusBounds(center: center, radius: max(360, contentRadius + expansion))
+    }
+
+    private func gridOpacity(viewportSize: CGSize) -> Double {
+        let bounds = canvasRadiusBounds(viewportSize: viewportSize)
+        let center = viewportCenter(for: canvasOffset, viewportSize: viewportSize)
+        let distance = hypot(center.x - bounds.center.x, center.y - bounds.center.y)
+        let progress = min(max((distance / bounds.radius - 0.68) / 0.32, 0), 1)
+        return 0.32 - progress * 0.20
+    }
+
+    private func startCameraInertia(from value: DragGesture.Value, viewportSize: CGSize) {
+        stopCameraMotion()
+        let throwVector = CGSize(
+            width: (value.predictedEndTranslation.width - value.translation.width) * 0.34,
+            height: (value.predictedEndTranslation.height - value.translation.height) * 0.34
+        )
+        let target = boundedOffset(canvasOffset + throwVector, viewportSize: viewportSize, rubberBand: false)
+        let start = canvasOffset
+        let distance = hypot(target.width - start.width, target.height - start.height)
+        guard distance > 1 else {
+            canvasOffset = target
+            baseOffset = target
+            return
+        }
+
+        cameraMotionTask = Task {
+            let frames = min(max(Int(distance / 28), 10), 24)
+            for frame in 1...frames {
+                guard !Task.isCancelled else { return }
+                let t = Double(frame) / Double(frames)
+                let eased = 1 - pow(1 - t, 3)
+                let next = CGSize(
+                    width: start.width + (target.width - start.width) * eased,
+                    height: start.height + (target.height - start.height) * eased
+                )
+                await MainActor.run {
+                    canvasOffset = next
+                    baseOffset = next
+                }
+                try? await Task.sleep(for: .seconds(1.0 / 60.0))
+            }
+            await MainActor.run {
+                canvasOffset = target
+                baseOffset = target
+                cameraMotionTask = nil
+            }
+        }
+    }
+
+    private func stopCameraMotion() {
+        cameraMotionTask?.cancel()
+        cameraMotionTask = nil
+        baseOffset = canvasOffset
     }
 
     private func arrangePlacements(_ target: [CanvasPlacement], at center: CGPoint, fitAfter: Bool, in geo: GeometryProxy) {

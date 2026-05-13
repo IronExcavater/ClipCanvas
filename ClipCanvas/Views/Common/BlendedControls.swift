@@ -21,19 +21,6 @@ struct BlendedIconButtonStyle: ButtonStyle {
     }
 }
 
-struct BlendedIconCircle<Content: View>: View {
-    private let size: CGFloat = 46
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        content
-            .foregroundStyle(.primary)
-            .frame(width: size, height: size)
-            .modifier(BlendedIconButtonBackground(isPressed: false, size: size))
-            .contentShape(Circle())
-    }
-}
-
 private struct BlendedIconButtonBackground: ViewModifier {
     let isPressed: Bool
     let size: CGFloat
@@ -42,11 +29,11 @@ private struct BlendedIconButtonBackground: ViewModifier {
     func body(content: Content) -> some View {
         if #available(iOS 26, *) {
             content
-                .background(Color(uiColor: .systemBackground).opacity(isPressed ? 0.92 : 0.78), in: Circle())
+                .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground).opacity(isPressed ? 0.96 : 0.88), in: Circle())
                 .glassEffect(.regular.interactive(), in: .rect(cornerRadius: size / 2))
         } else {
             content
-                .background(Color(uiColor: .systemBackground), in: Circle())
+                .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: Circle())
                 .overlay(
                     Circle()
                         .stroke(Color.primary.opacity(isPressed ? 0.16 : 0.08), lineWidth: 1)
@@ -185,19 +172,10 @@ struct AppListSelectionControl<Actions: View>: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Button(action: onToggle) {
-                Label(isSelecting ? "Done" : selectTitle, systemImage: isSelecting ? "checkmark.circle.fill" : "checkmark.circle")
-                    .labelStyle(.titleAndIcon)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(isSelecting ? Color.accentColor : .primary)
-                    .padding(.horizontal, 2)
-            }
-            .appSelectionButtonStyle()
-
             if isSelecting {
                 Text("\(selectedCount) selected")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
                     .transition(.opacity.combined(with: .move(edge: .leading)))
             }
 
@@ -207,9 +185,16 @@ struct AppListSelectionControl<Actions: View>: View {
                 actions
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
+
+            Button(action: onToggle) {
+                Text(isSelecting ? "Done" : selectTitle)
+                    .font(.subheadline.weight(.semibold))
+                    .padding(.horizontal, 2)
+            }
+            .appSelectionButtonStyle()
         }
         .padding(.horizontal, 2)
-        .frame(minHeight: 44)
+        .frame(minHeight: 38)
         .animation(.easeInOut(duration: 0.18), value: isSelecting)
         .animation(.easeInOut(duration: 0.18), value: selectedCount)
     }
@@ -304,7 +289,7 @@ extension View {
         }
     }
 
-    func appListItemRowInsets(horizontal: CGFloat = 8, vertical: CGFloat = 3) -> some View {
+    func appListItemRowInsets(horizontal: CGFloat = 6, vertical: CGFloat = 2) -> some View {
         self
             .listRowInsets(EdgeInsets(top: vertical, leading: horizontal, bottom: vertical, trailing: horizontal))
             .listRowSeparator(.hidden)

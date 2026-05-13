@@ -23,6 +23,7 @@ struct TrashPage: View {
     @State private var selectedItemIDs = Set<String>()
     @State private var confirmingDeleteAll = false
     @State private var confirmingDeleteSelected = false
+    @State private var searchPresented = false
 
     private var filteredWorkspaces: [Workspace] {
         guard !search.isEmpty else { return deletedWorkspaces }
@@ -104,7 +105,25 @@ struct TrashPage: View {
         .contentMargins(.top, 0, for: .scrollContent)
         .navigationTitle("Recently Deleted")
         .navigationBarTitleDisplayMode(.inline)
-        .searchable(text: $search, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search deleted")
+        .searchable(text: $search, isPresented: $searchPresented, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search deleted")
+        .animation(.easeInOut(duration: 0.18), value: searchPresented)
+        .toolbar {
+            if hasDeletedItems && !isSelecting && !searchPresented {
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        Button("Restore All", systemImage: "arrow.counterclockwise", action: restoreAll)
+                        Button("Delete All", systemImage: "trash", role: .destructive) {
+                            confirmingDeleteAll = true
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis.circle")
+                            .font(.system(size: 22, weight: .regular))
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+        }
         .task {
             TrashRetentionService.purgeExpired(in: context)
         }
@@ -124,22 +143,13 @@ struct TrashPage: View {
 
     private var trashControls: some View {
         HStack(spacing: 10) {
-            Button {
-                isSelecting ? endSelection() : beginSelection()
-            } label: {
-                Label(isSelecting ? "Done" : "Select", systemImage: isSelecting ? "checkmark.circle.fill" : "checkmark.circle")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(isSelecting ? Color.accentColor : .primary)
-            }
-            .appSelectionButtonStyle()
-
             if isSelecting {
                 Text("\(selectedItemIDs.count) selected")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
             }
 
-            Spacer()
+            Spacer(minLength: 8)
 
             if isSelecting {
                 Button(action: restoreSelected) {
@@ -159,19 +169,15 @@ struct TrashPage: View {
                 }
                 .appSelectionIconButtonStyle()
                 .disabled(selectedItemIDs.isEmpty)
-            } else {
-                Menu {
-                    Button("Restore All", systemImage: "arrow.counterclockwise", action: restoreAll)
-                    Button("Delete All", systemImage: "trash", role: .destructive) {
-                        confirmingDeleteAll = true
-                    }
-                } label: {
-                    Image(systemName: AppSymbol.options)
-                        .font(.system(size: 16, weight: .semibold))
-                        .frame(width: 40, height: 40)
-                }
-                .appSelectionIconButtonStyle()
             }
+
+            Button {
+                isSelecting ? endSelection() : beginSelection()
+            } label: {
+                Text(isSelecting ? "Done" : "Select")
+                    .font(.subheadline.weight(.semibold))
+            }
+            .appSelectionButtonStyle()
         }
         .frame(minHeight: 44)
         .animation(.easeInOut(duration: 0.18), value: isSelecting)
