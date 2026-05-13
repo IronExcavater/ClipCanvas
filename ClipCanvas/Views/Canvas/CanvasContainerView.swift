@@ -11,6 +11,7 @@ struct CanvasContainerView: View {
     @State private var feedbackToken = UUID()
     @State private var zoomCommand: ZoomCommand?
     @State private var visibleScale: CGFloat = 1
+    @State private var visibleViewportCenter: CGPoint = .zero
     @State private var selectedPlacementIDs: Set<UUID> = []
     @State private var detailClip: Clip?
     @State private var tagEditSelection: ClipTagEditSelection?
@@ -27,6 +28,7 @@ struct CanvasContainerView: View {
                 zoomCommand: $zoomCommand,
                 selectedPlacementIDs: $selectedPlacementIDs,
                 visibleScale: $visibleScale,
+                visibleViewportCenter: $visibleViewportCenter,
                 onCopyClip: copyToClipboard
             )
             .ignoresSafeArea()
@@ -73,6 +75,15 @@ struct CanvasContainerView: View {
             }
             .ignoresSafeArea(.container, edges: .bottom)
 
+            if let selection = tagEditSelection {
+                CanvasTagPanel(
+                    clips: selection.clips,
+                    onDismiss: { tagEditSelection = nil }
+                )
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .zIndex(8)
+            }
+
             VStack {
                 Spacer().frame(height: 70)
                 FeedbackBanner(message: feedback ?? "")
@@ -88,20 +99,6 @@ struct CanvasContainerView: View {
         .sheet(item: $detailClip) { clip in
             ClipDetailSheet(clip: clip)
         }
-        .sheet(item: $tagEditSelection) { selection in
-            NavigationStack {
-                ScrollView {
-                    ClipTagEditor(clips: selection.clips)
-                        .padding(.horizontal, 16)
-                        .padding(.top, 12)
-                        .padding(.bottom, 120)
-                }
-                .scrollDismissesKeyboard(.interactively)
-                .navigationTitle("Tags")
-                .navigationBarTitleDisplayMode(.inline)
-            }
-            .presentationDetents([.medium, .large])
-        }
         .ignoresSafeArea(.keyboard, edges: .bottom)
     }
 
@@ -114,7 +111,7 @@ struct CanvasContainerView: View {
         }
         let (clip, isNew) = Clip.findOrMake(from: content, origin: .clipboard, in: context)
         if isNew { context.insert(clip) }
-        workspace.place(clip: clip)
+        workspace.place(clip: clip, at: workspace.nextPosition(around: visibleViewportCenter))
         showFeedback("Pasted")
     }
 

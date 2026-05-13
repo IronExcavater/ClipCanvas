@@ -30,13 +30,20 @@ enum CanvasPlacementSizing {
     }
 
     static func snappedSize(_ proposed: CGSize, for clip: Clip?) -> CGSize {
-        let widthStep = clip?.type == .image ? 12 : estimatedCharacterWidth
-        let heightStep = clip?.type == .image ? 12 : estimatedLineHeight
+        let widthStep = clip?.type == .image ? 16 : estimatedCharacterWidth
+        let heightStep = clip?.type == .image ? 16 : estimatedLineHeight
         let width = snap(proposed.width, chrome: contentChrome.width, step: widthStep)
             .clamped(to: minimumSize.width...maximumSize.width)
         let height = snap(proposed.height, chrome: contentChrome.height, step: heightStep)
             .clamped(to: minimumSize.height...maximumSize.height)
         return CGSize(width: width, height: height)
+    }
+
+    static func fluidSize(_ proposed: CGSize) -> CGSize {
+        CGSize(
+            width: proposed.width.clamped(to: minimumSize.width...maximumSize.width),
+            height: proposed.height.clamped(to: minimumSize.height...maximumSize.height)
+        )
     }
 
     private static func snap(_ value: CGFloat, chrome: CGFloat, step: CGFloat) -> CGFloat {

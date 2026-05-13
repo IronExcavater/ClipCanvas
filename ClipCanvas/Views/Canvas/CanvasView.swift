@@ -7,6 +7,7 @@ struct CanvasView: View {
     @Binding var zoomCommand: ZoomCommand?
     @Binding var selectedPlacementIDs: Set<UUID>
     @Binding var visibleScale: CGFloat
+    @Binding var visibleViewportCenter: CGPoint
     let onCopyClip: (Clip) -> Void
 
     @Query private var allClips: [Clip]
@@ -29,7 +30,8 @@ struct CanvasView: View {
             ZStack(alignment: .topLeading) {
                 CanvasDotGrid(
                     viewportOrigin: viewportOrigin,
-                    canvasScale: canvasScale
+                    canvasScale: canvasScale,
+                    boundsRadius: canvasWorldBounds(viewportSize: geo.size).radius
                 )
                     .contentShape(Rectangle())
                     .onTapGesture {
@@ -60,7 +62,7 @@ struct CanvasView: View {
             .clipped()
             .simultaneousGesture(pinchGesture(in: geo))
             .dropDestination(for: String.self) { ids, location in
-                placeDroppedClips(ids, at: location)
+                placeDroppedClips(ids, at: location, in: geo)
             }
             .onChange(of: zoomCommand) { _, command in
                 guard let command else { return }
@@ -69,9 +71,15 @@ struct CanvasView: View {
             }
             .onChange(of: canvasScale) { _, newValue in
                 visibleScale = newValue
+                visibleViewportCenter = viewportCenter(in: geo)
+            }
+            .onChange(of: viewportOrigin) { _, _ in
+                visibleViewportCenter = viewportCenter(in: geo)
             }
             .onAppear {
                 visibleScale = canvasScale
+                visibleViewportCenter = viewportCenter(in: geo)
+                clampAllPlacements(in: geo)
             }
         }
     }
@@ -90,6 +98,7 @@ struct CanvasView: View {
         return ClipCard(
             clip: clip,
             isSelected: isSelected,
+            showsContent: scale >= 0.34 || isSelected || isDragging,
             onTap: {
                 bringToFront(placement.id)
                 if selectedPlacementIDs.contains(placement.id) {
@@ -101,14 +110,14 @@ struct CanvasView: View {
             },
             onDoubleTap: { toggleExpandedSize(for: placement, in: geo) },
             onResize: { updateResizePreview(for: placement, translation: $0) },
-            onResizeEnded: { commitResize(for: placement) },
+            onResizeEnded: { commitResize(for: placement, in: geo) },
             onToggleExpandedSize: { toggleExpandedSize(for: placement, in: geo) }
         )
         .frame(width: size.width, height: size.height)
         .scaleEffect(scale * (isDragging ? 1.05 : 1.0), anchor: .topLeading)
         .offset(x: screenX + dragOffset.width, y: screenY + dragOffset.height)
         .shadow(color: .black.opacity(isDragging ? 0.22 : 0), radius: isDragging ? 16 : 0, y: isDragging ? 8 : 0)
-        .gesture(cardDragGesture(for: placement))
+        .gesture(cardDragGesture(for: placement, in: geo))
         .zIndex(zIndex(for: placement, isSelected: isSelected, isDragging: isDragging))
         .animation(.spring(response: 0.22, dampingFraction: 0.78), value: isDragging)
     }
@@ -166,7 +175,7 @@ struct CanvasView: View {
             }
     }
 
-    private func cardDragGesture(for placement: CanvasPlacement) -> some Gesture {
+    private func cardDragGesture(for placement: CanvasPlacement, in geo: GeometryProxy) -> some Gesture {
         DragGesture(minimumDistance: 4, coordinateSpace: .global)
             .onChanged { value in
                 guard activeResize?.id != placement.id else { return }
@@ -177,6 +186,7 @@ struct CanvasView: View {
                 guard activeResize?.id != placement.id else { return }
                 placement.x += value.translation.width / canvasScale
                 placement.y += value.translation.height / canvasScale
+                clampPlacement(placement, in: geo)
                 activeDrag = nil
                 workspace.updatedAt = Date()
             }
@@ -208,7 +218,7 @@ struct CanvasView: View {
 
     private func zoom(to next: CGFloat, around center: CGPoint, in geo: GeometryProxy) {
         canvasScale = next
-        viewportOrigin = origin(forCenter: center, viewportSize: geo.size)
+        viewportOrigin = boundedOrigin(origin(forCenter: center, viewportSize: geo.size), viewportSize: geo.size, rubberBand: false)
     }
 
     private func fitContent(in geo: GeometryProxy) {
@@ -228,10 +238,11 @@ struct CanvasView: View {
         let availableHeight = max(geo.size.height - 180, 1)
         let next = min(max(min(availableWidth / contentWidth, availableHeight / contentHeight), 0.2), 2.5)
         canvasScale = next
-        viewportOrigin = CGPoint(
+        let proposedOrigin = CGPoint(
             x: CGFloat(minX + contentWidth / 2) - geo.size.width / (2 * next),
             y: CGFloat(minY + contentHeight / 2) - geo.size.height / (2 * next)
         )
+        viewportOrigin = boundedOrigin(proposedOrigin, viewportSize: geo.size, rubberBand: false)
     }
 
     private func updateResizePreview(for placement: CanvasPlacement, translation: CGSize) {
@@ -242,10 +253,11 @@ struct CanvasView: View {
         bringToFront(placement.id)
     }
 
-    private func commitResize(for placement: CanvasPlacement) {
-        let size = displaySize(for: placement)
+    private func commitResize(for placement: CanvasPlacement, in geo: GeometryProxy) {
+        let size = CanvasPlacementSizing.snappedSize(displaySize(for: placement), for: placement.clip)
         placement.width = size.width
         placement.height = size.height
+        clampPlacement(placement, in: geo)
         activeResize = nil
         activeDrag = nil
         workspace.updatedAt = Date()
@@ -257,10 +269,10 @@ struct CanvasView: View {
               let translation = activeResize?.translation else {
             return CGSize(width: placement.width, height: placement.height)
         }
-        return CanvasPlacementSizing.snappedSize(CGSize(
+        return CanvasPlacementSizing.fluidSize(CGSize(
             width: start.width + translation.width / canvasScale,
             height: start.height + translation.height / canvasScale
-        ), for: placement.clip)
+        ))
     }
 
     private func toggleExpandedSize(for placement: CanvasPlacement, in geo: GeometryProxy) {
@@ -269,6 +281,7 @@ struct CanvasView: View {
         withAnimation(.spring(response: 0.25, dampingFraction: 0.82)) {
             placement.width = size.width
             placement.height = size.height
+            clampPlacement(placement, in: geo)
         }
         activeResize = nil
         workspace.updatedAt = Date()
@@ -296,28 +309,24 @@ struct CanvasView: View {
     }
 
     private func boundedOrigin(_ proposed: CGPoint, viewportSize: CGSize, rubberBand: Bool) -> CGPoint {
-        let bounds = canvasRadiusBounds(viewportSize: viewportSize)
+        let bounds = canvasWorldBounds(viewportSize: viewportSize)
         let proposedCenter = viewportCenter(for: proposed, viewportSize: viewportSize)
         let boundedCenter = bounds.bounded(proposedCenter, rubberBand: rubberBand)
         return origin(forCenter: boundedCenter, viewportSize: viewportSize)
     }
 
-    private func canvasRadiusBounds(viewportSize: CGSize) -> CanvasRadiusBounds {
-        let fallback = CGRect(x: 120, y: 140, width: 280, height: 180)
-        let contentRect = placements.reduce(CGRect.null) { partial, placement in
-            partial.union(CGRect(
-                x: CGFloat(placement.x),
-                y: CGFloat(placement.y),
-                width: CGFloat(placement.width),
-                height: CGFloat(placement.height)
-            ))
+    private func canvasWorldBounds(viewportSize: CGSize) -> CanvasRadiusBounds {
+        let totalArea = placements.reduce(CGFloat(0)) { partial, placement in
+            partial + CGFloat(placement.width * placement.height)
         }
-        let usable = contentRect.isNull ? fallback : contentRect
-        let center = CGPoint(x: usable.midX, y: usable.midY)
-        let contentRadius = hypot(usable.width, usable.height) / 2
+        let largestDiagonal = placements.map { hypot(CGFloat($0.width), CGFloat($0.height)) }.max() ?? 260
         let viewportRadius = hypot(viewportSize.width / canvasScale, viewportSize.height / canvasScale) / 2
-        let expansion = max(220, viewportRadius * 0.34 + CGFloat(placements.count) * 16 + contentRadius * 0.12)
-        return CanvasRadiusBounds(center: center, radius: max(360, contentRadius + expansion))
+        let contentWeight = sqrt(max(totalArea, CanvasPlacementSizing.defaultSize.width * CanvasPlacementSizing.defaultSize.height))
+        let radius = max(
+            620,
+            viewportRadius * 0.52 + contentWeight * 1.05 + largestDiagonal * 0.45 + CGFloat(placements.count) * 18
+        )
+        return CanvasRadiusBounds(center: .zero, radius: radius)
     }
 
     private func arrangePlacements(_ target: [CanvasPlacement], at center: CGPoint, fitAfter: Bool, in geo: GeometryProxy) {
@@ -345,6 +354,7 @@ struct CanvasView: View {
             let row = index / columns
             placement.x = originX + columnWidths.prefix(col).reduce(0.0, +) + spacing * Double(col)
             placement.y = originY + rowHeights.prefix(row).reduce(0.0, +) + spacing * Double(row)
+            clampPlacement(placement, in: geo)
             bringToFront(placement.id)
         }
         workspace.updatedAt = Date()
@@ -365,124 +375,37 @@ struct CanvasView: View {
 
     // MARK: - Actions
 
-    private func placeDroppedClips(_ ids: [String], at location: CGPoint) -> Bool {
+    private func placeDroppedClips(_ ids: [String], at location: CGPoint, in geo: GeometryProxy) -> Bool {
         var didPlace = false
-        for id in ids {
+        for (index, id) in ids.enumerated() {
             guard let uuid = UUID(uuidString: id),
                   let clip = allClips.first(where: { $0.id == uuid }) else { continue }
             let canvasPoint = CGPoint(
-                x: viewportOrigin.x + location.x / canvasScale,
-                y: viewportOrigin.y + location.y / canvasScale
+                x: viewportOrigin.x + location.x / canvasScale + CGFloat(index * 26),
+                y: viewportOrigin.y + location.y / canvasScale + CGFloat(index * 22)
             )
             if clip.deletedAt != nil {
                 clip.restore()
             }
             let placement = workspace.place(clip: clip, at: canvasPoint)
+            clampPlacement(placement, in: geo)
             selectedPlacementIDs = [placement.id]
             didPlace = true
         }
         return didPlace
     }
-}
 
-private struct CanvasRadiusBounds {
-    let center: CGPoint
-    let radius: CGFloat
-
-    func bounded(_ point: CGPoint, rubberBand: Bool) -> CGPoint {
-        let dx = point.x - center.x
-        let dy = point.y - center.y
-        let distance = hypot(dx, dy)
-        guard distance > radius, distance > 0 else { return point }
-
-        let overflow = distance - radius
-        let boundedDistance = rubberBand ? radius + overflow * 0.24 : radius
-        return CGPoint(
-            x: center.x + dx / distance * boundedDistance,
-            y: center.y + dy / distance * boundedDistance
-        )
-    }
-}
-
-private struct CanvasDotGrid: View, Animatable {
-    var viewportOrigin: CGPoint
-    var canvasScale: CGFloat
-
-    private let spacing: CGFloat = 28
-
-    var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, CGFloat> {
-        get {
-            AnimatablePair(
-                AnimatablePair(viewportOrigin.x, viewportOrigin.y),
-                canvasScale
-            )
-        }
-        set {
-            viewportOrigin = CGPoint(x: newValue.first.first, y: newValue.first.second)
-            canvasScale = newValue.second
-        }
+    private func clampPlacement(_ placement: CanvasPlacement, in geo: GeometryProxy?) {
+        let viewportSize = geo?.size ?? CGSize(width: 393, height: 852)
+        let bounds = canvasWorldBounds(viewportSize: viewportSize)
+        let topLeft = CGPoint(x: placement.x, y: placement.y)
+        let size = CGSize(width: placement.width, height: placement.height)
+        let clamped = bounds.clampedTopLeft(topLeft, size: size)
+        placement.x = clamped.x
+        placement.y = clamped.y
     }
 
-    var body: some View {
-        Canvas { ctx, size in
-            let scale = max(canvasScale, 0.001)
-            let radius = min(max(1.18 * scale, 0.65), 2.2)
-            let visibleMinX = viewportOrigin.x - spacing
-            let visibleMinY = viewportOrigin.y - spacing
-            let visibleMaxX = viewportOrigin.x + size.width / scale + spacing
-            let visibleMaxY = viewportOrigin.y + size.height / scale + spacing
-            let startColumn = Int(floor(visibleMinX / spacing))
-            let endColumn = Int(ceil(visibleMaxX / spacing))
-            let startRow = Int(floor(visibleMinY / spacing))
-            let endRow = Int(ceil(visibleMaxY / spacing))
-
-            for column in startColumn...endColumn {
-                let worldX = CGFloat(column) * spacing
-                let screenX = (worldX - viewportOrigin.x) * scale
-
-                for row in startRow...endRow {
-                    let worldY = CGFloat(row) * spacing
-                    let screenY = (worldY - viewportOrigin.y) * scale
-                    let opacity = dotOpacity(at: CGPoint(x: worldX, y: worldY))
-
-                    ctx.fill(
-                        Path(ellipseIn: CGRect(
-                            x: screenX - radius,
-                            y: screenY - radius,
-                            width: radius * 2,
-                            height: radius * 2
-                        )),
-                        with: .color(.secondary.opacity(opacity))
-                    )
-                }
-            }
-        }
-        .background(Color(uiColor: .systemBackground))
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-    }
-
-    private func dotOpacity(at point: CGPoint) -> Double {
-        let distanceFromOrigin = hypot(point.x, point.y)
-        let progress = ((distanceFromOrigin - 280) / 820).clamped(to: 0...1)
-        let eased = progress * progress * (3 - 2 * progress)
-        return 0.46 - eased * 0.42
-    }
-}
-
-private struct EmptyCanvasHint: View {
-    var body: some View {
-        VStack(spacing: 12) {
-            Image(systemName: "square.on.square.dashed")
-                .font(.system(size: 36))
-                .foregroundStyle(.tertiary)
-            Text("Nothing here yet")
-                .font(.headline)
-                .foregroundStyle(.secondary)
-            Text("Tap Paste to add your first clip")
-                .font(.caption)
-                .foregroundStyle(.tertiary)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .allowsHitTesting(false)
+    private func clampAllPlacements(in geo: GeometryProxy) {
+        placements.forEach { clampPlacement($0, in: geo) }
     }
 }

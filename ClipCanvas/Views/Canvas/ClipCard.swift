@@ -4,6 +4,7 @@ import UIKit
 struct ClipCard: View {
     let clip: Clip
     let isSelected: Bool
+    var showsContent = true
     let onTap: () -> Void
     let onDoubleTap: () -> Void
     let onResize: (CGSize) -> Void
@@ -36,7 +37,9 @@ struct ClipCard: View {
 
     private var content: some View {
         Group {
-            if clip.type == .image, let data = clip.imageData, let uiImage = UIImage(data: data) {
+            if !showsContent {
+                Color.clear
+            } else if clip.type == .image, let data = clip.imageData, let uiImage = UIImage(data: data) {
                 Image(uiImage: uiImage)
                     .resizable()
                     .scaledToFill()

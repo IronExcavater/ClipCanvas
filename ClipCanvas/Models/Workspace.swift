@@ -1,3 +1,4 @@
+import CoreGraphics
 import Foundation
 import SwiftData
 
@@ -28,12 +29,22 @@ final class Workspace: SoftDeletable {
         isActive = false
     }
 
-    // Staggers new cards so they don't all land on top of each other
+    // Staggers new cards so they don't all land on top of each other.
     func nextPosition() -> CGPoint {
         let i = Double(placements.count)
         return CGPoint(
             x: 200 + i.truncatingRemainder(dividingBy: 6) * 30,
             y: 180 + i.truncatingRemainder(dividingBy: 8) * 24
+        )
+    }
+
+    func nextPosition(around anchor: CGPoint) -> CGPoint {
+        let i = Double(placements.count)
+        let column = i.truncatingRemainder(dividingBy: 4)
+        let row = floor(i.truncatingRemainder(dividingBy: 12) / 4)
+        return CGPoint(
+            x: anchor.x - 110 + column * 28,
+            y: anchor.y - 75 + row * 24
         )
     }
 
