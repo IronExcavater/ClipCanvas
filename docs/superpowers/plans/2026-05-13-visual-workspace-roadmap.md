@@ -229,11 +229,11 @@ Workspace actions intentionally excluded:
 - Create: `ClipCanvas/Services/WorkspaceActionPermissionService.swift`
 - Test: `ClipCanvasTests/WorkspaceActionRegistryTests.swift`
 
-- [ ] Implement pure validation for all initial action names.
-- [ ] Implement mutation handlers for safe object actions first: create sticky note, update object text, move, resize, duplicate, arrange grid, fit view.
-- [ ] Implement destructive object delete with `needsConfirmation == true` when `source == .ai`.
-- [ ] Reject workspace create/delete/rename/activate actions for AI, App Intent, and MCP sources.
-- [ ] Add tests for the permission matrix.
+- [x] Implement pure validation for all initial action names.
+- [x] Implement mutation handlers for safe object actions first: create sticky note, update object text, move, resize, duplicate, arrange grid, fit view.
+- [x] Implement destructive object delete with `needsConfirmation == true` when `source == .ai`.
+- [x] Reject workspace create/delete/rename/activate actions for AI, App Intent, and MCP sources.
+- [x] Add tests for the permission matrix.
 
 ### Task 6: Change Canvas Primary Interaction
 
