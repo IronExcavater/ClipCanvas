@@ -37,7 +37,7 @@ struct CanvasContainerView: View {
                     isRenaming: $isRenaming,
                     renameText: $renameText,
                     renameFocused: $renameFocused,
-                    onToggleSidebar: onToggleSidebar,
+                    onToggleSidebar: toggleSidebar,
                     onBeginRename: beginRename,
                     onCommitRename: commitRename,
                     onClearAll: clearAll,
@@ -138,6 +138,11 @@ struct CanvasContainerView: View {
         }
         isRenaming = false
         renameFocused = false
+    }
+
+    private func toggleSidebar() {
+        if isRenaming { commitRename() }
+        onToggleSidebar()
     }
 
     // MARK: - Workspace actions

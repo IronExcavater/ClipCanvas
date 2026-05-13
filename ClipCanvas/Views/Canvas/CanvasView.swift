@@ -9,12 +9,9 @@ struct CanvasView: View {
     @Binding var visibleScale: CGFloat
     let onCopyClip: (Clip) -> Void
 
-    @Environment(\.modelContext) private var context
     @Query private var allClips: [Clip]
     @State private var viewportOrigin: CGPoint = .zero
-    @State private var baseViewportOrigin: CGPoint = .zero
     @State private var canvasScale: CGFloat = 1.0
-    @State private var baseScale: CGFloat = 1.0
     @State private var activeDrag: (id: UUID, offset: CGSize)?
     @State private var activeResize: (id: UUID, start: CGSize, translation: CGSize)?
     @State private var zOrder: [UUID: Double] = [:]
@@ -32,14 +29,14 @@ struct CanvasView: View {
             ZStack(alignment: .topLeading) {
                 CanvasDotGrid(
                     viewportOrigin: viewportOrigin,
-                    canvasScale: canvasScale,
-                    opacity: gridOpacity(viewportSize: geo.size)
+                    canvasScale: canvasScale
                 )
                     .contentShape(Rectangle())
                     .onTapGesture {
                         selectedPlacementIDs.removeAll()
                     }
                     .gesture(mode == .pan ? canvasPanGesture(in: geo) : nil)
+                    .zIndex(0)
 
                 ForEach(placements) { placement in
                     if let clip = placement.clip {
@@ -56,6 +53,7 @@ struct CanvasView: View {
                             y: (220 - viewportOrigin.y) * canvasScale
                         )
                         .allowsHitTesting(false)
+                        .zIndex(1)
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height)
@@ -123,7 +121,6 @@ struct CanvasView: View {
                 let start = panStartOrigin ?? viewportOrigin
                 if panStartOrigin == nil {
                     panStartOrigin = start
-                    baseViewportOrigin = start
                 }
                 let proposed = CGPoint(
                     x: start.x - value.translation.width / canvasScale,
@@ -132,7 +129,7 @@ struct CanvasView: View {
                 viewportOrigin = boundedOrigin(proposed, viewportSize: geo.size, rubberBand: true)
             }
             .onEnded { value in
-                let start = panStartOrigin ?? baseViewportOrigin
+                let start = panStartOrigin ?? viewportOrigin
                 let throwVector = CGSize(
                     width: (value.predictedEndTranslation.width - value.translation.width) * 0.18,
                     height: (value.predictedEndTranslation.height - value.translation.height) * 0.18
@@ -145,7 +142,6 @@ struct CanvasView: View {
                 withAnimation(.smooth(duration: 0.22)) {
                     viewportOrigin = target
                 }
-                baseViewportOrigin = target
                 panStartOrigin = nil
             }
     }
@@ -163,10 +159,8 @@ struct CanvasView: View {
                 zoom(to: next, around: anchorCenter, in: geo)
             }
             .onEnded { _ in
-                baseScale = canvasScale
                 let target = boundedOrigin(viewportOrigin, viewportSize: geo.size, rubberBand: false)
                 viewportOrigin = target
-                baseViewportOrigin = target
                 pinchStartScale = nil
                 pinchAnchorCenter = nil
             }
@@ -205,8 +199,6 @@ struct CanvasView: View {
                 let selected = placements.filter { selectedPlacementIDs.contains($0.id) }
                 arrangePlacements(selected, at: viewportCenter(in: geo), fitAfter: false, in: geo)
             }
-            baseScale = canvasScale
-            baseViewportOrigin = viewportOrigin
         }
     }
 
@@ -222,9 +214,7 @@ struct CanvasView: View {
     private func fitContent(in geo: GeometryProxy) {
         guard !placements.isEmpty else {
             viewportOrigin = .zero
-            baseViewportOrigin = .zero
             canvasScale = 1
-            baseScale = 1
             return
         }
 
@@ -330,14 +320,6 @@ struct CanvasView: View {
         return CanvasRadiusBounds(center: center, radius: max(360, contentRadius + expansion))
     }
 
-    private func gridOpacity(viewportSize: CGSize) -> Double {
-        let bounds = canvasRadiusBounds(viewportSize: viewportSize)
-        let center = viewportCenter(for: viewportOrigin, viewportSize: viewportSize)
-        let distance = hypot(center.x - bounds.center.x, center.y - bounds.center.y)
-        let progress = min(max((distance / bounds.radius - 0.54) / 0.46, 0), 1)
-        return 0.42 - progress * 0.36
-    }
-
     private func arrangePlacements(_ target: [CanvasPlacement], at center: CGPoint, fitAfter: Bool, in geo: GeometryProxy) {
         guard !target.isEmpty else { return }
         let columns = max(1, Int(ceil(sqrt(Double(target.count)))))
@@ -376,18 +358,12 @@ struct CanvasView: View {
 
     private func zIndex(for placement: CanvasPlacement, isSelected: Bool, isDragging: Bool) -> Double {
         let base = zOrder[placement.id] ?? 0
-        if isDragging { return base + 20_000 }
-        if isSelected { return base + 10_000 }
-        return base
+        if isDragging { return base + 20_010 }
+        if isSelected { return base + 10_010 }
+        return base + 10
     }
 
     // MARK: - Actions
-
-    private func deletePlacement(_ placement: CanvasPlacement) {
-        selectedPlacementIDs.remove(placement.id)
-        context.delete(placement)
-        workspace.updatedAt = Date()
-    }
 
     private func placeDroppedClips(_ ids: [String], at location: CGPoint) -> Bool {
         var didPlace = false
@@ -431,50 +407,64 @@ private struct CanvasRadiusBounds {
 private struct CanvasDotGrid: View, Animatable {
     var viewportOrigin: CGPoint
     var canvasScale: CGFloat
-    var opacity: Double
 
-    var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, AnimatablePair<CGFloat, Double>> {
+    private let spacing: CGFloat = 28
+
+    var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, CGFloat> {
         get {
             AnimatablePair(
                 AnimatablePair(viewportOrigin.x, viewportOrigin.y),
-                AnimatablePair(canvasScale, opacity)
+                canvasScale
             )
         }
         set {
             viewportOrigin = CGPoint(x: newValue.first.first, y: newValue.first.second)
-            canvasScale = newValue.second.first
-            opacity = newValue.second.second
+            canvasScale = newValue.second
         }
     }
 
     var body: some View {
         Canvas { ctx, size in
-            let spacing = max(28.0 * canvasScale, 12)
-            let radius = min(1.35 * canvasScale, 2.2)
-            var x = (-viewportOrigin.x * canvasScale).truncatingRemainder(dividingBy: spacing)
-            if x < 0 { x += spacing }
+            let scale = max(canvasScale, 0.001)
+            let radius = min(max(1.18 * scale, 0.65), 2.2)
+            let visibleMinX = viewportOrigin.x - spacing
+            let visibleMinY = viewportOrigin.y - spacing
+            let visibleMaxX = viewportOrigin.x + size.width / scale + spacing
+            let visibleMaxY = viewportOrigin.y + size.height / scale + spacing
+            let startColumn = Int(floor(visibleMinX / spacing))
+            let endColumn = Int(ceil(visibleMaxX / spacing))
+            let startRow = Int(floor(visibleMinY / spacing))
+            let endRow = Int(ceil(visibleMaxY / spacing))
 
-            while x < size.width + spacing {
-                var y = (-viewportOrigin.y * canvasScale).truncatingRemainder(dividingBy: spacing)
-                if y < 0 { y += spacing }
+            for column in startColumn...endColumn {
+                let worldX = CGFloat(column) * spacing
+                let screenX = (worldX - viewportOrigin.x) * scale
 
-                while y < size.height + spacing {
+                for row in startRow...endRow {
+                    let worldY = CGFloat(row) * spacing
+                    let screenY = (worldY - viewportOrigin.y) * scale
+                    let opacity = dotOpacity(at: CGPoint(x: worldX, y: worldY))
+
                     ctx.fill(
                         Path(ellipseIn: CGRect(
-                            x: x - radius,
-                            y: y - radius,
+                            x: screenX - radius,
+                            y: screenY - radius,
                             width: radius * 2,
                             height: radius * 2
                         )),
                         with: .color(.secondary.opacity(opacity))
                     )
-                    y += spacing
                 }
-                x += spacing
             }
         }
         .background(Color(uiColor: .systemBackground))
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func dotOpacity(at point: CGPoint) -> Double {
+        let distanceFromOrigin = hypot(point.x, point.y)
+        let progress = ((distanceFromOrigin - 640) / 980).clamped(to: 0...1)
+        return 0.44 - progress * 0.38
     }
 }
 
