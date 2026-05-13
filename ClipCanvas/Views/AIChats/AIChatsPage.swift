@@ -4,12 +4,17 @@ import SwiftData
 struct AIChatsPage: View {
     @Environment(\.modelContext) private var context
     @Query(sort: \AIChat.updatedAt, order: .reverse) private var chats: [AIChat]
+    @Query(
+        filter: #Predicate<Workspace> { $0.deletedAt == nil },
+        sort: \Workspace.sortIndex
+    ) private var workspaces: [Workspace]
 
     @State private var search = ""
     @State private var isSelecting = false
     @State private var selection = Set<UUID>()
     @State private var confirmingDelete = false
     @State private var searchPresented = false
+    @State private var activeChat: AIChat?
 
     private var filteredChats: [AIChat] {
         guard !search.isEmpty else { return chats }
@@ -44,7 +49,7 @@ struct AIChatsPage: View {
                         chat: chat,
                         isSelecting: isSelecting,
                         isSelected: selection.contains(chat.id),
-                        onTap: { toggle(chat) },
+                        onTap: { handleTap(chat) },
                         onDelete: { context.delete(chat) }
                     )
                     .appListItemRowInsets(vertical: 3)
@@ -60,6 +65,22 @@ struct AIChatsPage: View {
         .alert("Delete selected chats?", isPresented: $confirmingDelete) {
             Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive, action: deleteSelected)
+        }
+        .toolbar {
+            ToolbarItem(placement: .primaryAction) {
+                if !isSelecting {
+                    Button(action: createChat) {
+                        AppCircleIconButtonLabel(systemImage: "plus")
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("New Chat")
+                    .opacity(searchPresented ? 0 : 1)
+                    .disabled(searchPresented)
+                }
+            }
+        }
+        .sheet(item: $activeChat) { chat in
+            AIChatDetailSheet(chat: chat)
         }
     }
 
@@ -90,13 +111,30 @@ struct AIChatsPage: View {
         }
     }
 
+    private func handleTap(_ chat: AIChat) {
+        if isSelecting {
+            toggle(chat)
+        } else {
+            activeChat = chat
+        }
+    }
+
     private func toggle(_ chat: AIChat) {
-        guard isSelecting else { return }
         if selection.contains(chat.id) {
             selection.remove(chat.id)
         } else {
             selection.insert(chat.id)
         }
+    }
+
+    private func createChat() {
+        let chat = AIChat(title: "New Chat")
+        if let workspace = workspaces.first(where: \.isActive) ?? workspaces.first {
+            chat.workspace = workspace
+            workspace.chats.append(chat)
+        }
+        context.insert(chat)
+        activeChat = chat
     }
 
     private func deleteSelected() {
