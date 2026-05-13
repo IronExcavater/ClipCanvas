@@ -12,9 +12,9 @@ struct HistoryFilterBar: View {
 
     var body: some View {
         fadingFilterRow {
-            typeChip(nil, label: "All", color: .secondary, icon: "tray.full")
+            typeChip(nil, label: "All", color: .secondary)
             ForEach(ClipType.allCases, id: \.self) { type in
-                typeChip(type, label: ClipTag.builtInName(for: type), color: ClipTag.builtInColor(for: type), icon: type.icon)
+                typeChip(type, label: ClipTag.builtInName(for: type), color: ClipTag.builtInColor(for: type))
             }
             ForEach(userTags) { tag in
                 userTagChip(tag.id, label: tag.name, color: tag.color)
@@ -38,12 +38,11 @@ struct HistoryFilterBar: View {
         )
     }
 
-    private func typeChip(_ type: ClipType?, label: String, color: Color, icon: String) -> some View {
+    private func typeChip(_ type: ClipType?, label: String, color: Color) -> some View {
         let active = filter.type == type && (type != nil || filter.userTagID == nil)
         return AppTagChip(
             title: label,
             color: color,
-            icon: icon,
             isSelected: active
         ) {
             if type == nil {
@@ -59,7 +58,6 @@ struct HistoryFilterBar: View {
         return AppTagChip(
             title: label,
             color: color,
-            icon: "tag",
             isSelected: active
         ) {
             filter.userTagID = active ? nil : tagID

@@ -42,6 +42,8 @@ struct WorkspaceRowView: View {
                 if isRenaming {
                     TextField("Workspace name", text: $editingName)
                         .font(.subheadline.weight(.semibold))
+                        .lineLimit(1)
+                        .submitLabel(.done)
                         .focused($focused)
                         .onSubmit(onCommitRename)
                         .onDisappear(perform: onCommitRename)
@@ -60,8 +62,7 @@ struct WorkspaceRowView: View {
                 .foregroundStyle(.primary.opacity(0.66))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
-
-            Spacer(minLength: 8)
+            .layoutPriority(1)
 
             if workspace.isActive {
                 Circle()

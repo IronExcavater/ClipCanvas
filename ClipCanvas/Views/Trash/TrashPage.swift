@@ -293,7 +293,7 @@ private struct DeletedItemRow: View {
                 Spacer()
 
                 if let tagTitle {
-                    AppTagPill(title: tagTitle, color: tint, icon: "tag", isSelected: false)
+                    AppTagPill(title: tagTitle, color: tint, isSelected: false)
                 }
             }
             .frame(minHeight: 58)

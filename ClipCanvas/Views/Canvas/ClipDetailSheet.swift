@@ -11,17 +11,20 @@ struct ClipDetailSheet: View {
         NavigationStack {
             List {
                 Section {
+                    ClipInfoPanel(clip: clip)
+                }
+                .appListItemRowInsets(vertical: 4)
+
+                Section {
                     contentEditor
                         .appListCard(tint: clip.primaryDisplayColor, opacity: 0.16)
                 }
                 .appListItemRowInsets(vertical: 4)
 
                 Section {
-                    actionStrip
-                    metadataGrid
+                    actionRows
                 }
                 .appListItemRowInsets(vertical: 4)
-                .buttonStyle(.plain)
 
                 Section("Tags") {
                     ClipTagEditor(clips: [clip])
@@ -32,26 +35,17 @@ struct ClipDetailSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button {
+                    Button("Cancel") {
                         dismiss()
-                    } label: {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 17, weight: .semibold))
-                            .frame(width: 44, height: 44)
                     }
-                    .buttonStyle(BlendedIconButtonStyle())
                     .accessibilityLabel("Cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
-                    Button {
+                    Button("Done") {
                         commitEdit()
                         dismiss()
-                    } label: {
-                        Image(systemName: "checkmark")
-                            .font(.system(size: 17, weight: .semibold))
-                            .frame(width: 44, height: 44)
                     }
-                    .buttonStyle(BlendedIconButtonStyle())
+                    .fontWeight(.semibold)
                     .accessibilityLabel("Done")
                 }
             }
@@ -67,62 +61,35 @@ struct ClipDetailSheet: View {
             .focused($contentFocused)
     }
 
-    private var actionStrip: some View {
-        HStack(spacing: 10) {
-            detailAction("Copy", icon: "doc.on.doc") {
+    private var actionRows: some View {
+        Group {
+            Button {
                 ClipActionService.copy(clip)
+            } label: {
+                Label("Copy", systemImage: "doc.on.doc")
             }
 
             if ClipActionService.openableURL(for: clip) != nil {
-                detailAction("Open", icon: "safari") {
+                Button {
                     ClipActionService.openURL(for: clip)
+                } label: {
+                    Label("Open Link", systemImage: "safari")
                 }
             }
 
-            detailAction(clip.isPinned ? "Pinned" : "Pin", icon: clip.isPinned ? "pin.fill" : "pin") {
+            Button {
                 ClipActionService.togglePin(clip)
+            } label: {
+                Label(clip.isPinned ? "Unpin" : "Pin", systemImage: clip.isPinned ? "pin.slash" : "pin")
             }
-
-            Spacer()
 
             Button(role: .destructive) {
                 ClipActionService.softDelete(clip)
                 dismiss()
             } label: {
                 Label("Delete", systemImage: "trash")
-                    .font(.caption.weight(.semibold))
-                    .labelStyle(.iconOnly)
-                    .frame(width: 40, height: 40)
             }
-            .buttonStyle(.plain)
         }
-    }
-
-    private var metadataGrid: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Label(ClipTag.builtInName(for: clip.type), systemImage: clip.type.icon)
-            Label(clip.origin.label, systemImage: "tray")
-            Label {
-                RelativeAgeText(date: clip.updatedAt, prefix: "Last updated ", emptyText: "Last updated just now")
-            } icon: {
-                Image(systemName: "clock")
-            }
-            Label(clip.createdAt.formatted(date: .abbreviated, time: .shortened), systemImage: "calendar")
-        }
-        .font(.caption)
-        .foregroundStyle(.secondary)
-    }
-
-    private func detailAction(_ title: String, icon: String, action: @escaping () -> Void) -> some View {
-        Button(action: action) {
-            Label(title, systemImage: icon)
-                .font(.caption.weight(.semibold))
-                .labelStyle(.titleAndIcon)
-                .padding(.horizontal, 10)
-                .frame(height: 40)
-                .background(Color.secondary.opacity(0.08), in: Capsule())
-        }
-        .buttonStyle(.plain)
     }
 
     private func commitEdit() {
@@ -132,6 +99,39 @@ struct ClipDetailSheet: View {
             clip.type = Clip.detect(content: trimmed, imageData: clip.imageData)
             clip.sensitivity = ClipClassificationService.detectSensitivity(trimmed)
             clip.updatedAt = Date()
+        }
+    }
+}
+
+private struct ClipInfoPanel: View {
+    let clip: Clip
+
+    var body: some View {
+        VStack(spacing: 10) {
+            infoRow("Type", value: ClipTag.builtInName(for: clip.type), icon: clip.type.icon)
+            Divider()
+            infoRow("From", value: clip.origin.label, icon: "tray")
+            Divider()
+            LabeledContent {
+                RelativeAgeText(date: clip.updatedAt, prefix: "Updated ", suffix: " ago", emptyText: "Updated just now")
+                    .foregroundStyle(.primary)
+            } label: {
+                Label("Last Updated", systemImage: "clock")
+                    .foregroundStyle(.primary.opacity(0.68))
+            }
+            Divider()
+            infoRow("Created", value: clip.createdAt.formatted(date: .abbreviated, time: .shortened), icon: "calendar")
+        }
+        .font(.subheadline)
+    }
+
+    private func infoRow(_ title: String, value: String, icon: String) -> some View {
+        LabeledContent {
+            Text(value)
+                .foregroundStyle(.primary)
+        } label: {
+            Label(title, systemImage: icon)
+                .foregroundStyle(.primary.opacity(0.68))
         }
     }
 }

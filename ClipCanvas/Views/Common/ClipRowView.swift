@@ -16,13 +16,14 @@ struct ClipRowView: View {
 
     var body: some View {
         AppListItemButton(tint: primaryTagColor, opacity: 0.20, action: primaryAction) {
-            HStack(alignment: .center, spacing: 8) {
+            HStack(alignment: .center, spacing: 10) {
                 if isSelecting {
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                         .foregroundStyle(isSelected ? Color.accentColor : .secondary)
                 }
+
                 textContent
-                Spacer(minLength: 4)
+
                 if clip.isPinned {
                     Image(systemName: "pin.fill")
                         .font(.caption2)
@@ -111,5 +112,6 @@ struct ClipRowView: View {
             .foregroundStyle(.primary.opacity(0.66))
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .layoutPriority(1)
     }
 }

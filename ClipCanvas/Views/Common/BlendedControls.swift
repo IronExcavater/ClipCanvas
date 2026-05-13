@@ -62,52 +62,15 @@ struct AppDivider: View {
     }
 }
 
-struct AppActionPanel<Content: View>: View {
-    @ViewBuilder var content: Content
-
-    var body: some View {
-        VStack(spacing: 4) {
-            content
-        }
-        .padding(8)
-        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .overlay(
-            RoundedRectangle(cornerRadius: 18, style: .continuous)
-                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
-        )
-        .shadow(color: .black.opacity(0.16), radius: 18, y: 8)
-    }
-}
-
-struct AppActionPanelRow: View {
-    let title: String
-    let icon: String
-    var destructive = false
-    let action: () -> Void
-
-    var body: some View {
-        Button(action: action) {
-            Label(title, systemImage: icon)
-                .font(.subheadline.weight(.medium))
-                .foregroundStyle(destructive ? .red : .primary)
-                .frame(maxWidth: .infinity, minHeight: 42, alignment: .leading)
-                .padding(.horizontal, 10)
-                .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
-        }
-        .buttonStyle(.plain)
-    }
-}
-
 struct AppTagChip: View {
     let title: String
     let color: Color
-    var icon: String?
     var isSelected: Bool
     var action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            AppTagPill(title: title, color: color, icon: icon, isSelected: isSelected)
+            AppTagPill(title: title, color: color, isSelected: isSelected)
         }
         .buttonStyle(.plain)
     }
@@ -116,15 +79,13 @@ struct AppTagChip: View {
 struct AppTagPill: View {
     let title: String
     let color: Color
-    var icon: String?
     var isSelected: Bool
 
     var body: some View {
         HStack(spacing: 6) {
-            if let icon {
-                Image(systemName: icon)
-                    .font(.caption)
-            }
+            Circle()
+                .fill(color)
+                .frame(width: 8, height: 8)
             Text(title)
                 .font(.caption.weight(.semibold))
                 .lineLimit(1)
@@ -158,6 +119,7 @@ struct AppListItemButton<Content: View>: View {
                 .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
         }
         .buttonStyle(.plain)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -174,7 +136,8 @@ struct AppListItemContainer<Content: View>: View {
             .background {
                 AppListItemBackground(tint: tint, opacity: opacity)
             }
-            .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 }
 
@@ -228,13 +191,6 @@ private struct AppListItemBackground: View {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(Color(uiColor: .systemBackground).opacity(0.18))
         }
-    }
-}
-
-extension View {
-    func appListItemContentPadding(horizontal: CGFloat = 9, vertical: CGFloat = 8) -> some View {
-        self.padding(.horizontal, horizontal)
-            .padding(.vertical, vertical)
     }
 }
 
