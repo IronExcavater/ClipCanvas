@@ -4,7 +4,7 @@ import Foundation
 import FoundationModels
 #endif
 
-struct FoundationTransformProvider {
+nonisolated struct FoundationTransformProvider {
     var isAvailable: Bool = true
 
     func transform(skillID: String, input: TransformSkillInput) async throws -> String? {

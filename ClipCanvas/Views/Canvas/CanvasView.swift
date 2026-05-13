@@ -43,7 +43,7 @@ struct CanvasView: View {
                 .onTapGesture {
                     selectedObjectIDs.removeAll()
                 }
-                .gesture(mode == .pan ? canvasPanGesture(in: geo) : nil)
+                .gesture(mode.allowsCanvasPan ? canvasPanGesture(in: geo) : nil)
                 .zIndex(0)
 
                 ForEach(canvasObjects) { object in

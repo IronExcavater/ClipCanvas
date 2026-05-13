@@ -43,14 +43,14 @@ nonisolated enum TransformSkillError: Error, Equatable {
     case missingWorkspace
 }
 
-protocol TransformSkill {
+nonisolated protocol TransformSkill {
     var id: String { get }
     var title: String { get }
     var risk: WorkspaceActionRisk { get }
     func run(input: TransformSkillInput, provider: FoundationTransformProvider) async throws -> TransformSkillResult
 }
 
-struct TransformSkillRegistry {
+nonisolated struct TransformSkillRegistry {
     let skills: [any TransformSkill]
     private let provider: FoundationTransformProvider
 
@@ -78,7 +78,7 @@ struct TransformSkillRegistry {
     }
 }
 
-private struct BuiltInTransformSkill: TransformSkill {
+private nonisolated struct BuiltInTransformSkill: TransformSkill {
     let id: String
     let title: String
     let risk: WorkspaceActionRisk

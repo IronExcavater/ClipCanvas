@@ -6,7 +6,7 @@ struct CanvasContainerView: View {
     let onToggleSidebar: () -> Void
 
     @Environment(\.modelContext) private var context
-    @State private var mode: CanvasMode = .pan
+    @State private var mode: CanvasMode = .normal
     @State private var feedback: String?
     @State private var feedbackToken = UUID()
     @State private var zoomCommand: ZoomCommand?

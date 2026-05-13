@@ -101,10 +101,10 @@ Arrange:
 - Modify: `ClipCanvas/Views/Canvas/CanvasToolbar.swift`
 - Test: `ClipCanvasTests/CanvasModeTests.swift`
 
-- [ ] Replace `.pan` with `.normal`.
-- [ ] Keep `.draw` and add `.edit`.
-- [ ] Add mode-specific toolbar configuration tests for available actions.
-- [ ] Preserve existing pan gesture in normal mode.
+- [x] Replace `.pan` with `.normal`.
+- [x] Keep `.draw` and add `.edit`.
+- [x] Add mode-specific toolbar configuration tests for available actions.
+- [x] Preserve existing pan gesture in normal mode.
 
 ### Task 2: Add Edit Mode Behavior
 

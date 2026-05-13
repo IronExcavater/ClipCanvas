@@ -13,31 +13,16 @@ struct CanvasToolbar: View {
     let onManageTags: () -> Void
 
     private var hasSelection: Bool { selectedCount > 0 }
+    private var configuration: CanvasToolbarConfiguration {
+        CanvasToolbarConfiguration.make(selectedCount: selectedCount, canOpenLink: canOpenLink)
+    }
     private let buttonSize: CGFloat = 52
     private let iconSize: CGFloat = 19
 
     var body: some View {
         HStack(spacing: 0) {
-            if hasSelection {
-                toolButton("doc.on.doc", action: onCopy)
-                if canOpenLink {
-                    toolButton("safari", action: onOpenLink)
-                }
-                AppDivider()
-                toolButton("info.circle", action: onDetails)
-                    .disabled(selectedCount != 1)
-                    .opacity(selectedCount == 1 ? 1 : 0.42)
-                toolButton("tag", action: onManageTags)
-                toolButton("square.grid.2x2", action: onArrangeSelection)
-                AppDivider()
-                destructiveButton("trash", action: onDelete)
-            } else {
-                toolButton("doc.on.clipboard", action: onPaste)
-
-                AppDivider()
-
-                modeButton("hand.point.up.left", for: .pan)
-                modeButton("pencil.tip", for: .draw)
+            ForEach(Array(configuration.items.enumerated()), id: \.offset) { _, item in
+                toolbarItem(item)
             }
         }
         .padding(.horizontal, 12)
@@ -52,6 +37,32 @@ struct CanvasToolbar: View {
         .frame(maxWidth: .infinity)
         .ignoresSafeArea(.container, edges: .bottom)
         .ignoresSafeArea(.keyboard, edges: .bottom)
+    }
+
+    @ViewBuilder
+    private func toolbarItem(_ item: CanvasToolbarItem) -> some View {
+        switch item {
+        case .paste:
+            toolButton("doc.on.clipboard", action: onPaste)
+        case .copy:
+            toolButton("doc.on.doc", action: onCopy)
+        case .openLink:
+            toolButton("safari", action: onOpenLink)
+        case .details:
+            toolButton("info.circle", action: onDetails)
+                .disabled(selectedCount != 1)
+                .opacity(selectedCount == 1 ? 1 : 0.42)
+        case .manageTags:
+            toolButton("tag", action: onManageTags)
+        case .arrangeSelection:
+            toolButton("square.grid.2x2", action: onArrangeSelection)
+        case .delete:
+            destructiveButton("trash", action: onDelete)
+        case .divider:
+            AppDivider()
+        case .mode(let canvasMode):
+            modeButton(canvasMode.systemImage, for: canvasMode)
+        }
     }
 
     private func modeButton(_ icon: String, for target: CanvasMode) -> some View {
