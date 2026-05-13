@@ -198,10 +198,10 @@ Create an `AIChatDetailView` for the existing `AIChatsPage`.
 - Create: `ClipCanvas/Services/AIContextPacker.swift`
 - Test: `ClipCanvasTests/AIContextPackerTests.swift`
 
-- [ ] Build context snapshots from attachments, selected object IDs, visible object IDs, workspace summary, and recent history.
-- [ ] Enforce quick vs thinking object limits.
-- [ ] Exclude private clip content by default.
-- [ ] Test truncation, ordering, and private clipping behavior.
+- [x] Build context snapshots from attachments, selected object IDs, visible object IDs, workspace summary, and recent history.
+- [x] Enforce quick vs thinking object limits.
+- [x] Exclude private clip content by default.
+- [x] Test truncation, ordering, and private clipping behavior.
 
 ### Task 3: Add TransformSkillRegistry
 
