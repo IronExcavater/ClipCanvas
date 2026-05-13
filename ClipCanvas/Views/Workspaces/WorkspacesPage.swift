@@ -90,7 +90,6 @@ struct WorkspacesPage: View {
                     Button(action: createWorkspace) {
                         Image(systemName: "plus")
                             .font(.system(size: 18, weight: .semibold))
-                            .frame(width: 44, height: 44)
                     }
                     .buttonStyle(BlendedIconButtonStyle())
                     .accessibilityLabel("New Workspace")

@@ -139,16 +139,13 @@ struct TrashPage: View {
     }
 
     private var trashControls: some View {
-        HStack(spacing: 10) {
-            if isSelecting {
-                Text("\(selectedItemIDs.count) selected")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-            }
-
-            Spacer(minLength: 8)
-
-            if isSelecting {
+        AppListSelectionControl(
+            isSelecting: isSelecting,
+            selectedCount: selectedItemIDs.count,
+            selectTitle: "Select",
+            onToggle: { isSelecting ? endSelection() : beginSelection() }
+        ) {
+            HStack(spacing: 2) {
                 Button(action: restoreSelected) {
                     Image(systemName: "arrow.counterclockwise")
                         .font(.system(size: 16, weight: .semibold))
@@ -167,18 +164,7 @@ struct TrashPage: View {
                 .appSelectionIconButtonStyle()
                 .disabled(selectedItemIDs.isEmpty)
             }
-
-            Button {
-                isSelecting ? endSelection() : beginSelection()
-            } label: {
-                Text(isSelecting ? "Done" : "Select")
-                    .font(.subheadline.weight(.semibold))
-            }
-            .appSelectionButtonStyle()
         }
-        .frame(minHeight: 44)
-        .animation(.easeInOut(duration: 0.18), value: isSelecting)
-        .animation(.easeInOut(duration: 0.18), value: selectedItemIDs.count)
     }
 
     // MARK: - Actions

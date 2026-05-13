@@ -20,7 +20,6 @@ struct CanvasTopBar: View {
                 Image(systemName: AppSymbol.sidebar)
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.primary)
-                    .frame(width: 46, height: 46)
             }
             .buttonStyle(BlendedIconButtonStyle())
 
@@ -29,18 +28,18 @@ struct CanvasTopBar: View {
             title
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
-                .background(.ultraThinMaterial, in: Capsule())
-                .overlay(Capsule().stroke(Color.primary.opacity(0.07), lineWidth: 1))
-                .shadow(color: .black.opacity(0.10), radius: 12, y: 4)
+                .background {
+                    WorkspaceTitleBackdrop()
+                }
 
             Spacer()
 
             Menu {
-                Button("Rename", systemImage: "pencil", action: onBeginRename)
-                Button("Fit View to Content", systemImage: "arrow.up.left.and.arrow.down.right", action: onFitContent)
-                Button("Arrange All in Grid", systemImage: "square.grid.2x2", action: onArrangeAll)
+                Button("Rename Workspace", systemImage: "pencil", action: onBeginRename)
+                Button("Fit Canvas to Cards", systemImage: "arrow.up.left.and.arrow.down.right", action: onFitContent)
+                Button("Arrange Cards in Grid", systemImage: "square.grid.2x2", action: onArrangeAll)
                 Divider()
-                Button("Clear All", systemImage: "trash", role: .destructive) {
+                Button("Clear Workspace", systemImage: "trash", role: .destructive) {
                     confirmingClear = true
                 }
             } label: {
@@ -121,5 +120,42 @@ private struct CanvasTopBarFade: View {
             startPoint: .top,
             endPoint: .bottom
         )
+    }
+}
+
+private struct WorkspaceTitleBackdrop: View {
+    var body: some View {
+        Capsule()
+            .fill(.ultraThinMaterial)
+            .mask(
+                LinearGradient(
+                    stops: [
+                        .init(color: .clear, location: 0),
+                        .init(color: .black, location: 0.14),
+                        .init(color: .black, location: 0.86),
+                        .init(color: .clear, location: 1),
+                    ],
+                    startPoint: .leading,
+                    endPoint: .trailing
+                )
+            )
+            .overlay {
+                Capsule()
+                    .stroke(Color.primary.opacity(0.10), lineWidth: 1)
+                    .blur(radius: 2.5)
+                    .mask(
+                        LinearGradient(
+                            stops: [
+                                .init(color: .clear, location: 0),
+                                .init(color: .black.opacity(0.8), location: 0.22),
+                                .init(color: .black.opacity(0.8), location: 0.78),
+                                .init(color: .clear, location: 1),
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                    )
+            }
+            .shadow(color: .black.opacity(0.12), radius: 14, y: 5)
     }
 }

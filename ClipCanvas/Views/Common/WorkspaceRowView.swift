@@ -64,12 +64,14 @@ struct WorkspaceRowView: View {
             .frame(maxWidth: .infinity, alignment: .leading)
             .layoutPriority(1)
 
-            if workspace.isActive {
-                Circle()
-                    .fill(Color.accentColor)
-                    .frame(width: 9, height: 9)
-                    .accessibilityLabel("Active")
-            }
+            Image(systemName: "checkmark")
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(Color.accentColor)
+                .frame(width: 20, height: 20)
+                .opacity(workspace.isActive ? 1 : 0)
+                .scaleEffect(workspace.isActive ? 1 : 0.82)
+                .accessibilityLabel("Active")
+                .animation(.easeInOut(duration: 0.18), value: workspace.isActive)
         }
     }
 

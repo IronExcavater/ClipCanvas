@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct ClipDetailSheet: View {
     let clip: Clip
@@ -9,39 +10,42 @@ struct ClipDetailSheet: View {
 
     var body: some View {
         NavigationStack {
-            List {
-                Section("Info") {
-                    ClipInfoRow("Type", value: ClipTag.builtInName(for: clip.type), icon: clip.type.icon)
-                    ClipInfoRow("From", value: clip.origin.label, icon: "tray")
-                    ClipUpdatedRow(date: clip.updatedAt)
-                    ClipInfoRow("Created", value: clip.createdAt.formatted(date: .abbreviated, time: .shortened), icon: "calendar")
-                }
+            ScrollView {
+                VStack(alignment: .leading, spacing: 14) {
+                    ClipDetailSection("Info") {
+                        ClipInfoPanel(clip: clip)
+                    }
 
-                Section("Content") {
-                    contentEditor
-                        .appListCard(tint: clip.primaryDisplayColor, opacity: 0.16)
-                }
-                .appListItemRowInsets(vertical: 4)
+                    ClipDetailSection("Content") {
+                        contentEditor
+                            .padding(12)
+                            .frame(minHeight: 180)
+                            .background {
+                                ClipDetailContentBackground(tint: clip.primaryDisplayColor)
+                            }
+                    }
 
-                Section("Actions") {
-                    ClipDetailActionToolbar(
-                        isPinned: clip.isPinned,
-                        canOpenLink: ClipActionService.openableURL(for: clip) != nil,
-                        onCopy: { ClipActionService.copy(clip) },
-                        onOpen: { ClipActionService.openURL(for: clip) },
-                        onPin: { ClipActionService.togglePin(clip) },
-                        onDelete: {
-                            ClipActionService.softDelete(clip)
-                            dismiss()
-                        }
-                    )
-                }
-                .appListItemRowInsets(vertical: 4)
+                    ClipDetailSection("Actions") {
+                        ClipDetailActionToolbar(
+                            isPinned: clip.isPinned,
+                            canOpenLink: ClipActionService.openableURL(for: clip) != nil,
+                            onCopy: { ClipActionService.copy(clip) },
+                            onOpen: { ClipActionService.openURL(for: clip) },
+                            onPin: { ClipActionService.togglePin(clip) },
+                            onDelete: {
+                                ClipActionService.softDelete(clip)
+                                dismiss()
+                            }
+                        )
+                    }
 
-                Section("Tags") {
-                    ClipTagEditor(clips: [clip])
-                        .appListItemRowInsets(vertical: 4)
+                    ClipDetailSection("Tags") {
+                        ClipTagEditor(clips: [clip])
+                    }
                 }
+                .padding(.horizontal, 16)
+                .padding(.top, 14)
+                .padding(.bottom, 120)
             }
             .navigationTitle("Clip Details")
             .navigationBarTitleDisplayMode(.inline)
@@ -52,6 +56,7 @@ struct ClipDetailSheet: View {
                     } label: {
                         Image(systemName: "xmark")
                     }
+                    .buttonStyle(BlendedIconButtonStyle(size: 36))
                     .accessibilityLabel("Cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -61,13 +66,13 @@ struct ClipDetailSheet: View {
                     } label: {
                         Image(systemName: "checkmark")
                     }
+                    .buttonStyle(BlendedIconButtonStyle(size: 36))
                     .fontWeight(.semibold)
                     .accessibilityLabel("Done")
                 }
             }
             .onAppear { editedContent = clip.content }
             .scrollDismissesKeyboard(.interactively)
-            .safeAreaPadding(.bottom, 72)
         }
     }
 
@@ -75,7 +80,6 @@ struct ClipDetailSheet: View {
         TextEditor(text: $editedContent)
             .font(.body)
             .scrollContentBackground(.hidden)
-            .frame(minHeight: 150)
             .focused($contentFocused)
     }
 
@@ -87,6 +91,55 @@ struct ClipDetailSheet: View {
             clip.sensitivity = ClipClassificationService.detectSensitivity(trimmed)
             clip.updatedAt = Date()
         }
+    }
+}
+
+private struct ClipDetailSection<Content: View>: View {
+    let title: String
+    @ViewBuilder let content: Content
+
+    init(_ title: String, @ViewBuilder content: () -> Content) {
+        self.title = title
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(title)
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(.primary)
+            content
+        }
+    }
+}
+
+private struct ClipInfoPanel: View {
+    let clip: Clip
+
+    var body: some View {
+        VStack(spacing: 9) {
+            ClipInfoRow("Type", value: ClipTag.builtInName(for: clip.type), icon: clip.type.icon)
+            ClipInfoRow("From", value: clip.origin.label, icon: "tray")
+            ClipUpdatedRow(date: clip.updatedAt)
+            ClipInfoRow("Created", value: clip.createdAt.formatted(date: .abbreviated, time: .shortened), icon: "calendar")
+        }
+        .padding(12)
+        .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .shadow(color: .black.opacity(0.06), radius: 8, y: 3)
+    }
+}
+
+private struct ClipDetailContentBackground: View {
+    let tint: Color
+
+    var body: some View {
+        ZStack {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground))
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(tint.opacity(0.20))
+        }
+        .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
     }
 }
 
@@ -145,6 +198,17 @@ private struct ClipDetailActionToolbar: View {
             action(isPinned ? "Unpin" : "Pin", icon: isPinned ? "pin.slash" : "pin", action: onPin)
             action("Delete", icon: "trash", destructive: true, action: onDelete)
         }
+        .padding(7)
+        .background {
+            if #available(iOS 26, *) {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(Color.clear)
+                    .glassEffect(.regular, in: .rect(cornerRadius: 24))
+            } else {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .fill(.regularMaterial)
+            }
+        }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
@@ -160,7 +224,7 @@ private struct ClipDetailActionToolbar: View {
             }
             .foregroundStyle(destructive ? .red : .primary)
             .frame(maxWidth: .infinity, minHeight: 58)
-            .background(Color.primary.opacity(0.055), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground).opacity(0.72), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
         .buttonStyle(.plain)
     }

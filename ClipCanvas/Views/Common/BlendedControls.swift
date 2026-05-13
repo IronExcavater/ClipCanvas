@@ -4,11 +4,15 @@ import UIKit
 enum AppSymbol {
     static let sidebar = "rectangle.leadinghalf.inset.filled"
     static let options = "ellipsis"
-    static let settings = "gearshape"
+    static let settings = "slider.horizontal.3"
 }
 
 struct BlendedIconButtonStyle: ButtonStyle {
-    private let size: CGFloat = 46
+    let size: CGFloat
+
+    init(size: CGFloat = 46) {
+        self.size = size
+    }
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
@@ -29,10 +33,6 @@ private struct BlendedIconButtonBackground: ViewModifier {
     func body(content: Content) -> some View {
         content
             .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: Circle())
-            .overlay(
-                Circle()
-                    .stroke(Color.primary.opacity(isPressed ? 0.12 : 0.06), lineWidth: 1)
-            )
             .shadow(color: .black.opacity(isPressed ? 0.08 : 0.14), radius: isPressed ? 5 : 10, y: isPressed ? 2 : 5)
     }
 }
@@ -44,10 +44,6 @@ struct AppMenuIconLabel: View {
             .foregroundStyle(.primary)
             .frame(width: 46, height: 46)
             .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: Circle())
-            .overlay(
-                Circle()
-                    .stroke(Color.primary.opacity(0.06), lineWidth: 1)
-            )
             .shadow(color: .black.opacity(0.14), radius: 10, y: 5)
             .contentShape(Circle())
     }
@@ -173,14 +169,22 @@ struct AppListSelectionControl<Actions: View>: View {
                     .transition(.opacity.combined(with: .scale(scale: 0.95)))
             }
 
-            Button(action: onToggle) {
-                Label(isSelecting ? "Done" : selectTitle, systemImage: isSelecting ? "checkmark" : "checklist")
-                    .font(.subheadline.weight(.semibold))
+            if isSelecting {
+                Button(action: onToggle) {
+                    Label("Done", systemImage: "checkmark")
+                        .font(.subheadline.weight(.semibold))
+                }
+                .appSelectionButtonStyle()
+            } else {
+                Button(action: onToggle) {
+                    Image(systemName: "checklist")
+                        .font(.system(size: 16, weight: .semibold))
+                }
+                .appSelectionIconButtonStyle()
             }
-            .appSelectionButtonStyle()
         }
         .padding(.horizontal, 2)
-        .frame(minHeight: 38)
+        .frame(minHeight: 36)
         .animation(.easeInOut(duration: 0.18), value: isSelecting)
         .animation(.easeInOut(duration: 0.18), value: selectedCount)
     }
@@ -289,10 +293,9 @@ extension View {
         self
             .buttonStyle(.plain)
             .foregroundStyle(.primary)
-            .padding(.horizontal, 13)
-            .frame(height: 38)
+            .padding(.horizontal, 12)
+            .frame(height: 36)
             .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: Capsule())
-            .overlay(Capsule().stroke(Color.primary.opacity(0.07), lineWidth: 1))
             .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
     }
 
@@ -301,9 +304,8 @@ extension View {
         self
             .buttonStyle(.plain)
             .foregroundStyle(.primary)
-            .frame(width: 38, height: 38)
+            .frame(width: 36, height: 36)
             .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: Circle())
-            .overlay(Circle().stroke(Color.primary.opacity(0.07), lineWidth: 1))
             .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
     }
 }
@@ -315,12 +317,37 @@ extension View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .principal) {
-                    Text(title)
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                        .opacity(isSearching ? 0 : 1)
-                        .scaleEffect(isSearching ? 0.96 : 1)
-                        .animation(.easeInOut(duration: 0.22), value: isSearching)
+                    AppSearchAwareTitle(title: title, isSearching: isSearching)
+                }
+            }
+    }
+}
+
+private struct AppSearchAwareTitle: View {
+    let title: String
+    let isSearching: Bool
+
+    @State private var visible = false
+
+    var body: some View {
+        Text(title)
+            .font(.headline.weight(.semibold))
+            .foregroundStyle(.primary)
+            .opacity(visible ? 1 : 0)
+            .scaleEffect(visible ? 1 : 0.96)
+            .onAppear {
+                visible = false
+                if !isSearching {
+                    DispatchQueue.main.async {
+                        withAnimation(.easeInOut(duration: 0.24)) {
+                            visible = true
+                        }
+                    }
+                }
+            }
+            .onChange(of: isSearching) { _, searching in
+                withAnimation(.easeInOut(duration: 0.22)) {
+                    visible = !searching
                 }
             }
     }

@@ -65,7 +65,7 @@ struct SidebarView: View {
                 Text("ClipCanvas")
                     .font(.title3.weight(.bold))
                     .foregroundStyle(Color.accentColor)
-                Text("Workspaces, clips, and chats")
+                Text("Capture, arrange, and reuse ideas")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
@@ -74,7 +74,6 @@ struct SidebarView: View {
                 Button(action: closeSidebar) {
                     Image(systemName: AppSymbol.sidebar)
                         .font(.system(size: 18, weight: .semibold))
-                        .frame(width: 46, height: 46)
                 }
                 .buttonStyle(BlendedIconButtonStyle())
                 .accessibilityLabel("Collapse Sidebar")
@@ -184,7 +183,6 @@ struct SidebarView: View {
                 Image(systemName: "trash")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.secondary)
-                    .frame(width: 46, height: 46)
             }
             .buttonStyle(BlendedIconButtonStyle())
             Spacer()
@@ -192,7 +190,6 @@ struct SidebarView: View {
                 Image(systemName: AppSymbol.settings)
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.secondary)
-                    .frame(width: 46, height: 46)
             }
             .buttonStyle(BlendedIconButtonStyle())
         }
