@@ -14,6 +14,8 @@ struct HistoryPage: View {
     @State private var selectedClipIDs = Set<UUID>()
     @State private var expandedClipID: UUID?
     @State private var confirmingClearHistory = false
+    @State private var feedback: String?
+    @State private var feedbackToken = UUID()
 
     private var filtered: [Clip] {
         clips
@@ -33,15 +35,26 @@ struct HistoryPage: View {
             }
         )
         List {
-            HistorySearchSelectionRow(
+            AppSearchSelectionBar(
                 search: searchBinding,
+                prompt: "Search clipboard",
                 isSelecting: isSelecting,
                 selectedCount: selectedClipIDs.count,
                 onBeginSelection: beginSelection,
-                onEditTags: { tagEditSelection = ClipTagEditSelection(clips: selectedClips) },
-                onDelete: deleteSelected,
-                onDone: endSelection
-            )
+                onEndSelection: endSelection
+            ) {
+                Button(action: { tagEditSelection = ClipTagEditSelection(clips: selectedClips) }) {
+                    AppToolbarCircleLabel(systemImage: "tag", size: 40, symbolSize: 15)
+                }
+                .buttonStyle(.plain)
+                .disabled(selectedClipIDs.isEmpty)
+
+                Button(role: .destructive, action: deleteSelected) {
+                    AppToolbarCircleLabel(systemImage: "trash", size: 40, symbolSize: 15)
+                }
+                .buttonStyle(.plain)
+                .disabled(selectedClipIDs.isEmpty)
+            }
             .appListItemRowInsets(horizontal: 14, vertical: 4)
 
             HistoryFilterBar(filter: filter)
@@ -82,6 +95,14 @@ struct HistoryPage: View {
                 toolbarActions
             }
         }
+        .overlay(alignment: .top) {
+            FeedbackBanner(message: feedback ?? "")
+                .opacity(feedback == nil ? 0 : 1)
+                .offset(y: feedback == nil ? -12 : 10)
+                .scaleEffect(feedback == nil ? 0.96 : 1)
+                .allowsHitTesting(false)
+        }
+        .animation(.spring(response: 0.22, dampingFraction: 0.86), value: feedback)
         .confirmationDialog("Clear clipboard history?", isPresented: $confirmingClearHistory, titleVisibility: .visible) {
             Button("Clear History", role: .destructive, action: clearHistory)
             Button("Cancel", role: .cancel) {}
@@ -137,73 +158,6 @@ struct HistoryPage: View {
 
 }
 
-private struct HistorySearchSelectionRow: View {
-    @Binding var search: String
-    let isSelecting: Bool
-    let selectedCount: Int
-    let onBeginSelection: () -> Void
-    let onEditTags: () -> Void
-    let onDelete: () -> Void
-    let onDone: () -> Void
-
-    var body: some View {
-        HStack(spacing: 10) {
-            if isSelecting {
-                Text("\(selectedCount) selected")
-                    .font(.headline.weight(.semibold))
-                    .monospacedDigit()
-                    .foregroundStyle(.primary)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                Button(action: onEditTags) {
-                    AppToolbarCircleLabel(systemImage: "tag", size: 36, symbolSize: 15)
-                }
-                .buttonStyle(.plain)
-                .disabled(selectedCount == 0)
-
-                Button(role: .destructive, action: onDelete) {
-                    AppToolbarCircleLabel(systemImage: "trash", size: 36, symbolSize: 15)
-                }
-                .buttonStyle(.plain)
-                .disabled(selectedCount == 0)
-
-                Button(action: onDone) {
-                    AppToolbarCircleLabel(systemImage: "checkmark", size: 36, symbolSize: 15)
-                }
-                .buttonStyle(.plain)
-            } else {
-                HStack(spacing: 8) {
-                    Image(systemName: "magnifyingglass")
-                        .font(.system(size: 15, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                    TextField("Search clipboard", text: $search)
-                        .textFieldStyle(.plain)
-                        .submitLabel(.search)
-                    if !search.isEmpty {
-                        Button {
-                            search = ""
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .foregroundStyle(.secondary)
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-                .padding(.horizontal, 12)
-                .frame(height: 40)
-                .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground), in: Capsule())
-                .shadow(color: .black.opacity(0.06), radius: 8, y: 3)
-
-                Button(action: onBeginSelection) {
-                    AppToolbarCircleLabel(systemImage: "checklist", size: 40, symbolSize: 16)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Select")
-            }
-        }
-    }
-}
-
 private extension HistoryPage {
     func toggleSelection(_ clip: Clip) {
         if selectedClipIDs.contains(clip.id) {
@@ -219,6 +173,7 @@ private extension HistoryPage {
         } else {
             ClipActionService.copy(clip)
             expandedClipID = clip.id
+            showFeedback("Copied")
         }
     }
 
@@ -242,6 +197,23 @@ private extension HistoryPage {
     func endSelection() {
         selectedClipIDs.removeAll()
         isSelecting = false
+    }
+
+    func showFeedback(_ message: String) {
+        let token = UUID()
+        feedbackToken = token
+        withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
+            feedback = message
+        }
+        Task {
+            try? await Task.sleep(for: .seconds(1.5))
+            await MainActor.run {
+                guard feedbackToken == token else { return }
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    feedback = nil
+                }
+            }
+        }
     }
 }
 

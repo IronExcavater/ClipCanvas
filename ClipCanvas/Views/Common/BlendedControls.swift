@@ -247,6 +247,76 @@ struct AppListSelectionControl<Actions: View>: View {
     }
 }
 
+struct AppSearchSelectionBar<Actions: View>: View {
+    @Binding var search: String
+    let prompt: String
+    let isSelecting: Bool
+    let selectedCount: Int
+    let onBeginSelection: () -> Void
+    let onEndSelection: () -> Void
+    @ViewBuilder var actions: Actions
+
+    var body: some View {
+        HStack(spacing: 9) {
+            searchField
+                .layoutPriority(1)
+
+            if isSelecting {
+                actions
+                    .transition(.opacity.combined(with: .scale(scale: 0.94)))
+
+                Button(action: onEndSelection) {
+                    AppToolbarCircleLabel(systemImage: "checkmark", size: 40, symbolSize: 15)
+                        .overlay(alignment: .topTrailing) {
+                            if selectedCount > 0 {
+                                Text("\(selectedCount)")
+                                    .font(.system(size: 10, weight: .bold).monospacedDigit())
+                                    .foregroundStyle(.white)
+                                    .frame(minWidth: 16, minHeight: 16)
+                                    .background(Color.accentColor, in: Capsule())
+                                    .offset(x: 3, y: -3)
+                            }
+                        }
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Done")
+            } else {
+                Button(action: onBeginSelection) {
+                    AppToolbarCircleLabel(systemImage: "checklist", size: 40, symbolSize: 16)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Select")
+            }
+        }
+        .animation(.easeInOut(duration: 0.18), value: isSelecting)
+        .animation(.easeInOut(duration: 0.18), value: selectedCount)
+    }
+
+    private var searchField: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 15, weight: .semibold))
+                .foregroundStyle(.secondary)
+            TextField(prompt, text: $search)
+                .textFieldStyle(.plain)
+                .submitLabel(.search)
+            if !search.isEmpty {
+                Button {
+                    search = ""
+                } label: {
+                    Image(systemName: "xmark.circle.fill")
+                        .foregroundStyle(.secondary)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(.horizontal, 12)
+        .frame(height: 40)
+        .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground), in: Capsule())
+        .shadow(color: .black.opacity(0.06), radius: 8, y: 3)
+    }
+}
+
 private struct AppListItemBackground: View {
     let tint: Color
     let opacity: Double
@@ -425,32 +495,5 @@ extension View {
             .frame(width: 36, height: 36)
             .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground), in: Circle())
             .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
-    }
-}
-
-extension View {
-    func appSearchAwareNavigationTitle(_ title: String, isSearching: Bool) -> some View {
-        self
-            .navigationTitle("")
-            .appInlineNavigationTitleDisplayMode()
-            .toolbar {
-                ToolbarItem(placement: .principal) {
-                    AppSearchAwareTitle(title: title, isSearching: isSearching)
-                }
-            }
-    }
-}
-
-private struct AppSearchAwareTitle: View {
-    let title: String
-    let isSearching: Bool
-
-    var body: some View {
-        Text(title)
-            .font(.headline.weight(.semibold))
-            .foregroundStyle(.primary)
-            .opacity(isSearching ? 0 : 1)
-            .scaleEffect(isSearching ? 0.96 : 1)
-            .animation(.easeInOut(duration: 0.24), value: isSearching)
     }
 }

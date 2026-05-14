@@ -73,9 +73,6 @@ extension Clip {
     }
 
     var primaryDisplayColor: Color {
-        if let first = tags.min(by: { $0.sortIndex < $1.sortIndex }) {
-            return first.color
-        }
         return ClipTag.builtInColor(for: type)
     }
 }

@@ -23,7 +23,6 @@ struct TrashPage: View {
     @State private var selectedItemIDs = Set<String>()
     @State private var confirmingDeleteAll = false
     @State private var confirmingDeleteSelected = false
-    @State private var searchPresented = false
 
     private var filteredWorkspaces: [Workspace] {
         guard !search.isEmpty else { return deletedWorkspaces }
@@ -43,7 +42,39 @@ struct TrashPage: View {
     private var activeWorkspace: Workspace? { liveWorkspaces.first(where: \.isActive) ?? liveWorkspaces.first }
 
     var body: some View {
+        let searchBinding = Binding(
+            get: { search },
+            set: { newValue in
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    search = newValue
+                }
+            }
+        )
         List {
+            AppSearchSelectionBar(
+                search: searchBinding,
+                prompt: "Search deleted",
+                isSelecting: isSelecting,
+                selectedCount: selectedItemIDs.count,
+                onBeginSelection: beginSelection,
+                onEndSelection: endSelection
+            ) {
+                Button(action: restoreSelected) {
+                    AppToolbarCircleLabel(systemImage: "arrow.counterclockwise", size: 40, symbolSize: 15)
+                }
+                .buttonStyle(.plain)
+                .disabled(selectedItemIDs.isEmpty)
+
+                Button(role: .destructive) {
+                    confirmingDeleteSelected = true
+                } label: {
+                    AppToolbarCircleLabel(systemImage: "trash", size: 40, symbolSize: 15)
+                }
+                .buttonStyle(.plain)
+                .disabled(selectedItemIDs.isEmpty)
+            }
+            .appListItemRowInsets(horizontal: 14, vertical: 4)
+
             if deletedWorkspaces.isEmpty && deletedClips.isEmpty {
                 ContentUnavailableView(
                     "Recently Deleted is Empty",
@@ -98,11 +129,10 @@ struct TrashPage: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .contentMargins(.top, 0, for: .scrollContent)
-        .appSearchAwareNavigationTitle("Recently Deleted", isSearching: searchPresented)
-        .appSearchable(text: $search, isPresented: $searchPresented, prompt: "Search deleted")
-        .animation(.easeInOut(duration: 0.18), value: searchPresented)
+        .navigationTitle("Recently Deleted")
+        .animation(.easeInOut(duration: 0.18), value: search.isEmpty)
         .toolbar {
-            if hasDeletedItems && !searchPresented {
+            if hasDeletedItems {
                 ToolbarItem(placement: .primaryAction) {
                     toolbarActions
                 }
@@ -127,51 +157,17 @@ struct TrashPage: View {
 
     @ViewBuilder
     private var toolbarActions: some View {
-        if isSelecting {
-            HStack(spacing: 8) {
-                Text("\(selectedItemIDs.count)")
-                    .font(.headline.weight(.semibold))
-                    .monospacedDigit()
-                    .frame(minWidth: 22)
-
-                Button(action: restoreSelected) {
-                    AppToolbarCircleLabel(systemImage: "arrow.counterclockwise", size: 36, symbolSize: 15)
-                }
-                .buttonStyle(.plain)
-                .disabled(selectedItemIDs.isEmpty)
-
-                Button(role: .destructive) {
-                    confirmingDeleteSelected = true
-                } label: {
-                    AppToolbarCircleLabel(systemImage: "trash", size: 36, symbolSize: 15)
-                }
-                .buttonStyle(.plain)
-                .disabled(selectedItemIDs.isEmpty)
-
-                Button(action: endSelection) {
-                    AppToolbarCircleLabel(systemImage: "checkmark", size: 36, symbolSize: 15)
-                }
-                .buttonStyle(.plain)
+        Menu {
+            Button("Restore All", systemImage: "arrow.counterclockwise", action: restoreAll)
+            Button("Delete All", systemImage: "trash", role: .destructive) {
+                confirmingDeleteAll = true
             }
-        } else {
-            HStack(spacing: 8) {
-                Button(action: beginSelection) {
-                    AppToolbarCircleLabel(systemImage: "checklist", size: 36, symbolSize: 15)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Select")
-
-                Menu {
-                    Button("Restore All", systemImage: "arrow.counterclockwise", action: restoreAll)
-                    Button("Delete All", systemImage: "trash", role: .destructive) {
-                        confirmingDeleteAll = true
-                    }
-                } label: {
-                    AppToolbarCircleLabel(systemImage: AppSymbol.options, size: 36, symbolSize: 18)
-                }
-                .accessibilityLabel("Recently deleted options")
-            }
+        } label: {
+            AppToolbarCircleLabel(systemImage: AppSymbol.options, size: 36, symbolSize: 18)
         }
+        .accessibilityLabel("Recently deleted options")
+        .opacity(isSelecting ? 0 : 1)
+        .disabled(isSelecting)
     }
 
     // MARK: - Actions

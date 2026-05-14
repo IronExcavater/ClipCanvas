@@ -14,7 +14,6 @@ struct WorkspacesPage: View {
     @State private var editingName = ""
     @State private var isSelecting = false
     @State private var selectedWorkspaceIDs = Set<UUID>()
-    @State private var searchPresented = false
 
     private var filteredWorkspaces: [Workspace] {
         guard !search.isEmpty else { return workspaces }
@@ -34,6 +33,22 @@ struct WorkspacesPage: View {
             }
         )
         List {
+            AppSearchSelectionBar(
+                search: searchBinding,
+                prompt: "Search workspaces",
+                isSelecting: isSelecting,
+                selectedCount: selectedWorkspaceIDs.count,
+                onBeginSelection: beginSelection,
+                onEndSelection: endSelection
+            ) {
+                Button(role: .destructive, action: deleteSelected) {
+                    AppToolbarCircleLabel(systemImage: "trash", size: 40, symbolSize: 15)
+                }
+                .buttonStyle(.plain)
+                .disabled(selectedWorkspaceIDs.isEmpty)
+            }
+            .appListItemRowInsets(horizontal: 14, vertical: 4)
+
             if filteredWorkspaces.isEmpty {
                 if workspaces.isEmpty {
                     ContentUnavailableView(
@@ -79,10 +94,8 @@ struct WorkspacesPage: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .contentMargins(.top, 0, for: .scrollContent)
-        .appSearchAwareNavigationTitle("Workspaces", isSearching: searchPresented)
-        .appSearchable(text: searchBinding, isPresented: $searchPresented, prompt: "Search workspaces")
+        .navigationTitle("Workspaces")
         .animation(.easeInOut(duration: 0.18), value: search.isEmpty)
-        .animation(.easeInOut(duration: 0.18), value: searchPresented)
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
                 toolbarActions
@@ -92,36 +105,10 @@ struct WorkspacesPage: View {
 
     @ViewBuilder
     private var toolbarActions: some View {
-        if isSelecting {
-            Text("\(selectedWorkspaceIDs.count)")
-                .font(.headline.weight(.semibold))
-                .monospacedDigit()
-                .frame(minWidth: 22)
-
-            Button(role: .destructive, action: deleteSelected) {
-                AppToolbarCircleLabel(systemImage: "trash", size: 36, symbolSize: 15)
-            }
-            .buttonStyle(.plain)
-            .disabled(selectedWorkspaceIDs.isEmpty)
-
-            Button(action: endSelection) {
-                AppToolbarCircleLabel(systemImage: "checkmark", size: 36, symbolSize: 15)
-            }
-            .buttonStyle(.plain)
-        } else {
-            Button(action: beginSelection) {
-                AppToolbarCircleLabel(systemImage: "checklist", size: 36, symbolSize: 15)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Select")
-            .opacity(searchPresented ? 0 : 1)
-            .disabled(searchPresented)
-
-            AppToolbarCircleButton(systemImage: "plus", action: createWorkspace)
-                .accessibilityLabel("New Workspace")
-                .opacity(searchPresented ? 0 : 1)
-                .disabled(searchPresented)
-        }
+        AppToolbarCircleButton(systemImage: "plus", action: createWorkspace)
+            .accessibilityLabel("New Workspace")
+            .opacity(isSelecting ? 0 : 1)
+            .disabled(isSelecting)
     }
 
     private func activateWorkspace(_ ws: Workspace) {
@@ -131,7 +118,6 @@ struct WorkspacesPage: View {
 
     private func createWorkspace() {
         search = ""
-        searchPresented = false
         endSelection()
         let workspace = WorkspaceActionService.create(in: context, existing: workspaces, name: "")
         editingName = ""

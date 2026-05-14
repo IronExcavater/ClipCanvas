@@ -76,7 +76,6 @@ private struct ClipInfoPanel: View {
     var body: some View {
         VStack(spacing: 9) {
             ClipInfoRow("Type", value: ClipTag.builtInName(for: clip.type), icon: clip.type.icon)
-            ClipInfoRow("From", value: clip.origin.label, icon: "tray")
             ClipUpdatedRow(date: clip.updatedAt)
             ClipInfoRow("Created", value: clip.createdAt.formatted(date: .abbreviated, time: .shortened), icon: "calendar")
         }

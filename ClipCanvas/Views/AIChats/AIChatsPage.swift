@@ -13,7 +13,6 @@ struct AIChatsPage: View {
     @State private var isSelecting = false
     @State private var selection = Set<UUID>()
     @State private var confirmingDelete = false
-    @State private var searchPresented = false
     @State private var activeChat: AIChat?
     @State private var renamingChat: AIChat?
     @State private var renameText = ""
@@ -32,7 +31,33 @@ struct AIChatsPage: View {
     }
 
     var body: some View {
+        let searchBinding = Binding(
+            get: { search },
+            set: { newValue in
+                withAnimation(.easeInOut(duration: 0.18)) {
+                    search = newValue
+                }
+            }
+        )
         List {
+            AppSearchSelectionBar(
+                search: searchBinding,
+                prompt: "Search chats",
+                isSelecting: isSelecting,
+                selectedCount: selection.count,
+                onBeginSelection: beginSelection,
+                onEndSelection: endSelection
+            ) {
+                Button(role: .destructive) {
+                    confirmingDelete = true
+                } label: {
+                    AppToolbarCircleLabel(systemImage: "trash", size: 40, symbolSize: 15)
+                }
+                .buttonStyle(.plain)
+                .disabled(selection.isEmpty)
+            }
+            .appListItemRowInsets(horizontal: 14, vertical: 4)
+
             if chats.isEmpty {
                 ContentUnavailableView(
                     "No Chats Yet",
@@ -60,9 +85,8 @@ struct AIChatsPage: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .contentMargins(.top, 0, for: .scrollContent)
-        .appSearchAwareNavigationTitle("AI Chats", isSearching: searchPresented)
-        .appSearchable(text: $search, isPresented: $searchPresented, prompt: "Search chats")
-        .animation(.easeInOut(duration: 0.18), value: searchPresented)
+        .navigationTitle("AI Chats")
+        .animation(.easeInOut(duration: 0.18), value: search.isEmpty)
         .alert("Delete selected chats?", isPresented: $confirmingDelete) {
             Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive, action: deleteSelected)
@@ -84,38 +108,10 @@ struct AIChatsPage: View {
 
     @ViewBuilder
     private var toolbarActions: some View {
-        if isSelecting {
-            Text("\(selection.count)")
-                .font(.headline.weight(.semibold))
-                .monospacedDigit()
-                .frame(minWidth: 22)
-
-            Button(role: .destructive) {
-                confirmingDelete = true
-            } label: {
-                AppToolbarCircleLabel(systemImage: "trash", size: 36, symbolSize: 15)
-            }
-            .buttonStyle(.plain)
-            .disabled(selection.isEmpty)
-
-            Button(action: endSelection) {
-                AppToolbarCircleLabel(systemImage: "checkmark", size: 36, symbolSize: 15)
-            }
-            .buttonStyle(.plain)
-        } else {
-            Button(action: beginSelection) {
-                AppToolbarCircleLabel(systemImage: "checklist", size: 36, symbolSize: 15)
-            }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Select")
-            .opacity(searchPresented ? 0 : 1)
-            .disabled(searchPresented)
-
-            AppToolbarCircleButton(systemImage: "plus", action: createChat)
-                .accessibilityLabel("New Chat")
-                .opacity(searchPresented ? 0 : 1)
-                .disabled(searchPresented)
-        }
+        AppToolbarCircleButton(systemImage: "sparkles", action: createChat)
+            .accessibilityLabel("New Chat")
+            .opacity(isSelecting ? 0 : 1)
+            .disabled(isSelecting)
     }
 
     private func handleTap(_ chat: AIChat) {
@@ -136,7 +132,6 @@ struct AIChatsPage: View {
 
     private func createChat() {
         search = ""
-        searchPresented = false
         endSelection()
         activeChat = AIChatService.createChat(in: context, workspaces: workspaces)
     }
@@ -182,33 +177,94 @@ private struct AIChatRow: View {
 
     var body: some View {
         Button(action: onTap) {
-            HStack(spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
                 if isSelecting {
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                        .padding(.top, 3)
                 }
 
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(chat.title)
-                        .font(.subheadline.weight(.medium))
-                        .lineLimit(1)
-                    Text(chat.preview)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 8) {
+                        Image(systemName: statusIcon)
+                            .font(.system(size: 13, weight: .bold))
+                            .foregroundStyle(.white)
+                            .frame(width: 24, height: 24)
+                            .background(statusTint, in: Circle())
+
+                        Text(chat.title)
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(.primary)
+                            .lineLimit(1)
+
+                        Spacer(minLength: 8)
+
+                        RelativeAgeText(date: chat.updatedAt, prefix: "Updated ", suffix: " ago")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.primary.opacity(0.68))
+                    }
+
+                    Text(description)
                         .font(.caption)
-                        .foregroundStyle(.secondary)
-                        .lineLimit(1)
-                }
+                        .foregroundStyle(.primary.opacity(0.78))
+                        .lineLimit(2)
+                        .frame(maxWidth: .infinity, alignment: .leading)
 
-                Spacer()
-
-                RelativeAgeText(date: chat.updatedAt, prefix: "Updated ", suffix: " ago")
-                    .font(.caption2)
+                    HStack(spacing: 14) {
+                        stat("bubble.left", value: chat.messages.count)
+                        stat("paperclip", value: attachmentCount)
+                        stat("hammer", value: toolEventCount)
+                    }
                     .foregroundStyle(.primary.opacity(0.66))
+                }
             }
         }
-        .appListCard(tint: .secondary, opacity: 0.08)
+        .appListCard(tint: statusTint, opacity: 0.08)
         .contextMenu {
             Button("Rename", systemImage: "pencil", action: onRename)
             Button("Delete", systemImage: "trash", role: .destructive, action: onDelete)
+        }
+    }
+
+    private var latestToolEvent: AIToolEvent? {
+        chat.sortedMessages.flatMap(\.sortedToolEvents).last
+    }
+
+    private var statusIcon: String {
+        if latestToolEvent?.status == .running || latestToolEvent?.status == .queued { return "waveform" }
+        if latestToolEvent?.status == .failed { return "exclamationmark" }
+        if chat.lastMessage?.status == .streaming { return "sparkles" }
+        return "sparkles"
+    }
+
+    private var statusTint: Color {
+        if latestToolEvent?.status == .failed { return .red }
+        if latestToolEvent?.status == .running || latestToolEvent?.status == .queued { return .orange }
+        return .accentColor
+    }
+
+    private var description: String {
+        if let event = latestToolEvent {
+            return event.summary
+        }
+        return chat.preview
+    }
+
+    private var attachmentCount: Int {
+        chat.sortedMessages.reduce(0) { $0 + $1.attachments.count }
+    }
+
+    private var toolEventCount: Int {
+        chat.sortedMessages.reduce(0) { $0 + $1.toolEvents.count }
+    }
+
+    private func stat(_ icon: String, value: Int) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .semibold))
+            Text("\(value)")
+                .font(.caption2.weight(.semibold).monospacedDigit())
         }
     }
 }

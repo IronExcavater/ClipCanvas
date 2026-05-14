@@ -16,8 +16,6 @@ struct AIChatDetailSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 0) {
-                chatHeader
-                Divider()
                 messageList
                 Divider()
                 inputBar
@@ -34,19 +32,6 @@ struct AIChatDetailSheet: View {
             }
         }
         .appSheetPresentationDetents()
-    }
-
-    private var chatHeader: some View {
-        HStack(spacing: 8) {
-            Label(chat.workspace?.name ?? "No workspace", systemImage: "rectangle.3.group")
-            Spacer()
-            Text(AIModelPresetService.preset(for: chat.mode).model)
-                .monospaced()
-        }
-        .font(.caption)
-        .foregroundStyle(.secondary)
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
     }
 
     private var messageList: some View {
@@ -98,9 +83,10 @@ struct AIChatDetailSheet: View {
             } label: {
                 Image(systemName: chat.mode == .quick ? "bolt.fill" : "brain")
                     .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(Color.accentColor)
                     .frame(width: 36, height: 36)
-                    .background(Color.secondary.opacity(0.10), in: Circle())
+                    .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground), in: Circle())
+                    .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
             }
             .buttonStyle(.plain)
 

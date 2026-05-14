@@ -112,7 +112,7 @@ struct ClipRowView: View {
                 .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: 5) {
-                Text("From \(clip.origin.label)").font(.caption2)
+                Text(ClipTag.builtInName(for: clip.type)).font(.caption2)
                 Spacer()
                 RelativeAgeText(date: clip.updatedAt, prefix: "Updated ", suffix: " ago")
                     .font(.caption2)
