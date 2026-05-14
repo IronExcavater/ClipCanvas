@@ -151,7 +151,7 @@ Real-time collaboration comes after the action log is proven.
 - [x] Move zoom stepping into a tested service.
 - [x] Move resize snapping into a tested service.
 - [x] Move arrange-grid layout math out of `CanvasView`.
-- [ ] Move bounds math out of `CanvasView`.
+- [x] Move bounds math out of `CanvasView`.
 - [ ] Keep `CanvasView` focused on rendering and gesture orchestration.
 
 ### Task 3: Build AI Tool Executor
@@ -166,7 +166,7 @@ Real-time collaboration comes after the action log is proven.
 
 - [ ] Replace placeholder assistant replies with streaming message updates.
 - [ ] Show a throbber while waiting.
-- [ ] Render tool events inline.
+- [x] Render tool events inline.
 - [ ] Add Quick/Thinking mode persistence.
 - [ ] Add attach selected/visible object actions.
 
