@@ -117,7 +117,7 @@ struct CanvasView: View {
     }
 
     private func positionedClipObject(_ object: CanvasObject, clip: Clip, in geo: GeometryProxy) -> some View {
-        let isDragging = activeDrag?.id == object.id
+        let isDragging = isObjectDragging(object)
         let isSelected = selectedObjectIDs.contains(object.id)
         let size = displaySize(for: object)
 
@@ -139,7 +139,7 @@ struct CanvasView: View {
             viewportOrigin: viewportOrigin,
             canvasScale: canvasScale,
             size: size,
-            dragOffset: isDragging ? activeDrag?.offset ?? .zero : .zero,
+            dragOffset: dragOffset(for: object),
             isDragging: isDragging
         ))
         .gesture(objectDragGesture(for: object, in: geo))
@@ -147,7 +147,7 @@ struct CanvasView: View {
     }
 
     private func positionedCardObject(_ object: CanvasObject, in geo: GeometryProxy) -> some View {
-        let isDragging = activeDrag?.id == object.id
+        let isDragging = isObjectDragging(object)
         let isSelected = selectedObjectIDs.contains(object.id)
         let size = displaySize(for: object)
 
@@ -169,7 +169,7 @@ struct CanvasView: View {
             viewportOrigin: viewportOrigin,
             canvasScale: canvasScale,
             size: size,
-            dragOffset: isDragging ? activeDrag?.offset ?? .zero : .zero,
+            dragOffset: dragOffset(for: object),
             isDragging: isDragging
         ))
         .gesture(objectDragGesture(for: object, in: geo))
@@ -237,13 +237,39 @@ struct CanvasView: View {
             }
             .onEnded { value in
                 guard activeResize?.id != object.id else { return }
-                object.x += value.translation.width / canvasScale
-                object.y += value.translation.height / canvasScale
-                clampObject(object, in: geo)
-                object.markUpdated()
+                // If the dragged card is selected, move all selected cards together.
+                // Otherwise only move the one card that was touched.
+                let objectsToMove: [CanvasObject] = selectedObjectIDs.contains(object.id)
+                    ? canvasObjects.filter { selectedObjectIDs.contains($0.id) }
+                    : [object]
+                for obj in objectsToMove {
+                    obj.x += value.translation.width / canvasScale
+                    obj.y += value.translation.height / canvasScale
+                    clampObject(obj, in: geo)
+                    obj.markUpdated()
+                }
                 activeDrag = nil
                 updateVisibleObjectIDs(in: geo)
             }
+    }
+
+    // Returns the live drag offset for a card — all selected cards share the same
+    // offset when a selected card is being dragged (group drag preview).
+    private func dragOffset(for object: CanvasObject) -> CGSize {
+        guard let drag = activeDrag else { return .zero }
+        if selectedObjectIDs.contains(drag.id) {
+            return selectedObjectIDs.contains(object.id) ? drag.offset : .zero
+        }
+        return drag.id == object.id ? drag.offset : .zero
+    }
+
+    // True when this card should show the drag visual (scale-up + shadow).
+    private func isObjectDragging(_ object: CanvasObject) -> Bool {
+        guard let drag = activeDrag else { return false }
+        if selectedObjectIDs.contains(drag.id) {
+            return selectedObjectIDs.contains(object.id)
+        }
+        return drag.id == object.id
     }
 
     // MARK: - Zoom

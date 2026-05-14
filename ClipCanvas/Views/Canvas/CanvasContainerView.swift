@@ -105,6 +105,13 @@ struct CanvasContainerView: View {
         .onChange(of: mode) { _, newMode in
             if newMode != .edit { editingObjectID = nil }
         }
+        // Tapping the canvas background deselects everything — also exit inline editing
+        // so the keyboard dismisses instead of staying up with no selected card.
+        .onChange(of: selectedObjectIDs) { _, newIDs in
+            if let editing = editingObjectID, !newIDs.contains(editing) {
+                editingObjectID = nil
+            }
+        }
         .sheet(item: $detailClip) { clip in
             ClipDetailSheet(clip: clip)
         }

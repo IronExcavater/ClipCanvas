@@ -20,13 +20,22 @@ struct CanvasHost: View {
             if let workspace = activeWorkspace {
                 CanvasContainerView(workspace: workspace, onToggleSidebar: onToggleSidebar)
             } else {
-                ContentUnavailableView(
-                    "No Workspace",
-                    systemImage: "rectangle.3.group",
-                    description: Text("Create a workspace to get started.")
-                )
+                ContentUnavailableView {
+                    Label("No Workspace", systemImage: "rectangle.3.group")
+                } description: {
+                    Text("Create a workspace to get started.")
+                } actions: {
+                    Button("New Workspace") {
+                        AppBootstrap.ensureActiveWorkspace(in: context)
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
             }
         }
         .task { AppBootstrap.ensureActiveWorkspace(in: context) }
+        // Also react when all workspaces are deleted while the view is already visible.
+        .onChange(of: workspaces.isEmpty) { _, isEmpty in
+            if isEmpty { AppBootstrap.ensureActiveWorkspace(in: context) }
+        }
     }
 }

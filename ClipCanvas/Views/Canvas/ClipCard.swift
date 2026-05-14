@@ -120,9 +120,11 @@ struct InlineNoteEditor: View {
             .foregroundStyle(.primary)
             .lineLimit(3...14)
             .textFieldStyle(.plain)
-            .submitLabel(.done)
+            .submitLabel(.return)
             .focused($focused)
-            .onSubmit(commit)
+            // "Done" / checkmark key dismisses the keyboard — saving is handled by
+            // the onChange(of: focused) below so we never double-commit.
+            .onSubmit { focused = false }
             .onAppear {
                 draft = text
                 focused = true

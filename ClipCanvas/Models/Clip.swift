@@ -55,7 +55,7 @@ enum CardColor: String, Codable, CaseIterable {
 // MARK: - Model
 
 @Model
-final class Clip: SoftDeletable {
+final class Clip: SoftDeletable, Identifiable {
     var id: UUID = UUID()
     var content: String
     var imageData: Data?

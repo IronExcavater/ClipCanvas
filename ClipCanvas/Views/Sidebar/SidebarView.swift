@@ -23,6 +23,9 @@ struct SidebarView: View {
     @State private var detailClip: Clip?
     @State private var renamingWorkspace: Workspace?
     @State private var renameText = ""
+    @State private var renamingChat: AIChat?
+    @State private var renameChatText = ""
+    @State private var showRenameChatAlert = false
 
     private var recentWorkspaces: [Workspace] { Array(workspaces.prefix(3)) }
     private var recentClips: [Clip] { Array(clips.sortedForPinnedRecency().prefix(5)) }
@@ -56,6 +59,14 @@ struct SidebarView: View {
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .sheet(item: $detailClip) { clip in
             ClipDetailSheet(clip: clip)
+        }
+        .alert("Rename Chat", isPresented: $showRenameChatAlert) {
+            TextField("Chat name", text: $renameChatText)
+            Button("Save", action: commitChatRename)
+            Button("Cancel", role: .cancel) {
+                renamingChat = nil
+                renameChatText = ""
+            }
         }
         .onChange(of: isOpen) { _, newValue in
             if !newValue { finishRenaming() }
@@ -140,23 +151,23 @@ struct SidebarView: View {
                     .appListItemRowInsets(horizontal: 16, vertical: 2)
             } else {
                 ForEach(recentChats) { chat in
-                    Button {
-                        onOpenAIChat?(chat)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(chat.title)
-                                .font(.subheadline)
-                                .foregroundStyle(.primary)
-                            Text(chat.preview)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text(chat.title)
+                            .font(.subheadline)
+                            .foregroundStyle(.primary)
+                        Text(chat.preview)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                            .lineLimit(1)
                     }
-                    .buttonStyle(.plain)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                    .onTapGesture { onOpenAIChat?(chat) }
                     .appListCard(tint: .secondary, opacity: 0.08)
                     .contextMenu {
+                        Button("Rename", systemImage: "pencil") {
+                            beginChatRename(chat)
+                        }
                         Button("Delete", systemImage: "trash", role: .destructive) {
                             context.delete(chat)
                         }
@@ -280,6 +291,23 @@ struct SidebarView: View {
         WorkspaceActionService.rename(renamingWorkspace, to: renameText)
         renamingWorkspace = nil
         renameText = ""
+        commitChatRename()
+    }
+
+    private func beginChatRename(_ chat: AIChat) {
+        renamingChat = chat
+        renameChatText = chat.title
+        showRenameChatAlert = true
+    }
+
+    private func commitChatRename() {
+        let trimmed = renameChatText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty, let chat = renamingChat {
+            chat.title = trimmed
+            chat.updatedAt = Date()
+        }
+        renamingChat = nil
+        renameChatText = ""
     }
 
     private func createChat() {

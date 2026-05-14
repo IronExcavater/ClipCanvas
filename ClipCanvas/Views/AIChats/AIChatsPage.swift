@@ -15,6 +15,9 @@ struct AIChatsPage: View {
     @State private var confirmingDelete = false
     @State private var searchPresented = false
     @State private var activeChat: AIChat?
+    @State private var renamingChat: AIChat?
+    @State private var renameText = ""
+    @State private var showRenameAlert = false
 
     private var filteredChats: [AIChat] {
         guard !search.isEmpty else { return chats }
@@ -50,6 +53,7 @@ struct AIChatsPage: View {
                         isSelecting: isSelecting,
                         isSelected: selection.contains(chat.id),
                         onTap: { handleTap(chat) },
+                        onRename: { beginRename(chat) },
                         onDelete: { context.delete(chat) }
                     )
                     .appListItemRowInsets(vertical: 3)
@@ -65,6 +69,11 @@ struct AIChatsPage: View {
         .alert("Delete selected chats?", isPresented: $confirmingDelete) {
             Button("Cancel", role: .cancel) {}
             Button("Delete", role: .destructive, action: deleteSelected)
+        }
+        .alert("Rename Chat", isPresented: $showRenameAlert) {
+            TextField("Chat name", text: $renameText)
+            Button("Save") { commitRename() }
+            Button("Cancel", role: .cancel) { renamingChat = nil }
         }
         .toolbar {
             ToolbarItem(placement: .primaryAction) {
@@ -131,6 +140,21 @@ struct AIChatsPage: View {
         activeChat = AIChatService.createChat(in: context, workspaces: workspaces)
     }
 
+    private func beginRename(_ chat: AIChat) {
+        renamingChat = chat
+        renameText = chat.title
+        showRenameAlert = true
+    }
+
+    private func commitRename() {
+        let trimmed = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty, let chat = renamingChat {
+            chat.title = trimmed
+            chat.updatedAt = Date()
+        }
+        renamingChat = nil
+    }
+
     private func deleteSelected() {
         selectedChats.forEach { context.delete($0) }
         selection.removeAll()
@@ -143,6 +167,7 @@ private struct AIChatRow: View {
     let isSelecting: Bool
     let isSelected: Bool
     let onTap: () -> Void
+    let onRename: () -> Void
     let onDelete: () -> Void
 
     var body: some View {
@@ -172,6 +197,7 @@ private struct AIChatRow: View {
         }
         .appListCard(tint: .secondary, opacity: 0.08)
         .contextMenu {
+            Button("Rename", systemImage: "pencil", action: onRename)
             Button("Delete", systemImage: "trash", role: .destructive, action: onDelete)
         }
     }
