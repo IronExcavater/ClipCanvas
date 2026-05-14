@@ -63,54 +63,72 @@ struct SidebarView: View {
     }
 
     private var sidebarHeader: some View {
-        HStack(alignment: .top, spacing: 12) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("ClipCanvas")
-                    .font(.title3.weight(.bold))
-                    .foregroundStyle(Color.accentColor)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("ClipCanvas")
+                        .font(.title3.weight(.bold))
+                        .foregroundStyle(Color.accentColor)
+                    Text("Capture, arrange, and reuse ideas")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                Button(action: createChat) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 15, weight: .semibold))
+                        .frame(width: 38, height: 38)
+                }
+                .buttonStyle(BlendedIconButtonStyle(size: 38))
+                .accessibilityLabel("New AI Chat")
+
+                if onClose != nil {
+                    Button(action: closeSidebar) {
+                        Image(systemName: AppSymbol.sidebar)
+                            .font(.system(size: 18, weight: .semibold))
+                    }
+                    .buttonStyle(BlendedIconButtonStyle(size: 38))
+                    .accessibilityLabel("Collapse Sidebar")
+                }
+            }
+
+            HStack(spacing: 8) {
                 Text(activeWorkspace?.name ?? "Choose a workspace")
                     .font(.headline.weight(.semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
-                Text("AI chats for this canvas")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
-            Spacer()
-
-            Menu {
-                ForEach(workspaces) { workspace in
-                    Button {
-                        activateWorkspace(workspace)
-                    } label: {
-                        Label(workspace.name, systemImage: workspace.id == activeWorkspace?.id ? "checkmark" : "square")
+                Menu {
+                    ForEach(workspaces) { workspace in
+                        Button {
+                            activateWorkspace(workspace)
+                        } label: {
+                            Label(workspace.name, systemImage: workspace.id == activeWorkspace?.id ? "checkmark" : "square")
+                        }
                     }
+                } label: {
+                    Image(systemName: "arrow.up.arrow.down")
+                        .font(.system(size: 14, weight: .semibold))
+                        .frame(width: 34, height: 34)
                 }
-            } label: {
-                Image(systemName: "arrow.up.arrow.down")
-                    .font(.system(size: 14, weight: .semibold))
-                    .frame(width: 38, height: 38)
-            }
-            .buttonStyle(BlendedIconButtonStyle(size: 38))
-            .accessibilityLabel("Switch Workspace")
+                .buttonStyle(BlendedIconButtonStyle(size: 34))
+                .accessibilityLabel("Switch Workspace")
 
-            Button(action: createChat) {
-                Image(systemName: "plus")
-                    .font(.system(size: 15, weight: .semibold))
-                    .frame(width: 38, height: 38)
-            }
-            .buttonStyle(BlendedIconButtonStyle(size: 38))
-            .accessibilityLabel("New Chat")
-
-            if onClose != nil {
-                Button(action: closeSidebar) {
-                    Image(systemName: AppSymbol.sidebar)
-                        .font(.system(size: 18, weight: .semibold))
+                NavigationLink(destination: WorkspacesPage()) {
+                    HStack(spacing: 3) {
+                        Text("View all")
+                        Image(systemName: "chevron.right")
+                            .font(.system(size: 10, weight: .bold))
+                    }
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .padding(.horizontal, 10)
+                    .frame(height: 34)
                 }
-                .buttonStyle(BlendedIconButtonStyle(size: 38))
-                .accessibilityLabel("Collapse Sidebar")
+                .buttonStyle(.plain)
+                .background(.thinMaterial, in: Capsule())
             }
         }
         .padding(.top, 4)
@@ -126,19 +144,50 @@ struct SidebarView: View {
             onOpenAIChat?(chat)
         } label: {
             VStack(alignment: .leading, spacing: 3) {
-                Text(chat.title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Image(systemName: chat.mode == .thinking ? "brain" : "bolt.fill")
+                        .font(.system(size: 12, weight: .bold))
+                        .foregroundStyle(Color.accentColor)
+                        .frame(width: 22, height: 22)
+                        .background(Color.accentColor.opacity(0.14), in: Circle())
+
+                    Text(chat.title)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                        .lineLimit(1)
+
+                    Spacer(minLength: 6)
+
+                    RelativeAgeText(date: chat.updatedAt, suffix: " ago")
+                        .font(.caption2)
+                        .foregroundStyle(.primary.opacity(0.62))
+                }
+
                 Text(chat.preview)
-                    .font(.caption)
-                    .foregroundStyle(.primary.opacity(0.68))
+                    .font(.callout)
+                    .foregroundStyle(.primary.opacity(0.78))
                     .lineLimit(2)
+
+                HStack(spacing: 6) {
+                    Label("\(chat.sortedMessages.count)", systemImage: "bubble.left.and.bubble.right")
+                    Label("\(chat.sortedMessages.flatMap(\.sortedAttachments).count)", systemImage: "paperclip")
+                }
+                .font(.caption2.weight(.semibold))
+                .foregroundStyle(.primary.opacity(0.58))
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 11)
+            .background {
+                RoundedRectangle(cornerRadius: 18, style: .continuous)
+                    .fill(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground).opacity(0.78))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(Color.primary.opacity(0.06), lineWidth: 1)
+                    }
+            }
         }
         .buttonStyle(.plain)
-        .appListCard(tint: .secondary, opacity: 0.05)
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
             Button(role: .destructive) {
                 context.delete(chat)
@@ -159,13 +208,6 @@ struct SidebarView: View {
         HStack(spacing: 0) {
             NavigationLink(destination: HistoryPage()) {
                 Image(systemName: "doc.on.clipboard")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.secondary)
-            }
-            .buttonStyle(BlendedIconButtonStyle())
-            Spacer()
-            NavigationLink(destination: WorkspacesPage()) {
-                Image(systemName: "square.grid.2x2")
                     .font(.system(size: 18, weight: .semibold))
                     .foregroundStyle(.secondary)
             }
