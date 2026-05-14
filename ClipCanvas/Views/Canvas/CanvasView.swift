@@ -27,6 +27,7 @@ struct CanvasView: View {
     @State private var panStartOrigin: CGPoint?
     @State private var pinchStartScale: CGFloat?
     @State private var pinchAnchorCenter: CGPoint?
+    @State private var didInitializeViewport = false
 
     private var canvasObjects: [CanvasObject] {
         workspace.canvasObjects
@@ -101,10 +102,7 @@ struct CanvasView: View {
                 updateVisibleObjectIDs(in: geo)
             }
             .onAppear {
-                visibleScale = canvasScale
-                visibleViewportCenter = viewportCenter(in: geo)
-                updateVisibleObjectIDs(in: geo)
-                clampAllObjects(in: geo)
+                initializeViewport(in: geo)
             }
         }
     }
@@ -142,7 +140,7 @@ struct CanvasView: View {
             fillColor: Color(hex: object.style.fillHex),
             isSelected: isSelected,
             showsContent: canvasScale >= 0.34 || isSelected || isDragging,
-            onTap: { handleTap(for: object) },
+            onTap: { handleTap(for: object, in: geo) },
             onDoubleTap: { handleDoubleTap(for: object, in: geo) },
             isEditing: editingObjectID == object.id,
             editingText: clip.content,
@@ -174,7 +172,7 @@ struct CanvasView: View {
             object: object,
             isSelected: isSelected,
             showsContent: canvasScale >= 0.34 || isSelected || isDragging,
-            onTap: { handleTap(for: object) },
+            onTap: { handleTap(for: object, in: geo) },
             onDoubleTap: { handleDoubleTap(for: object, in: geo) },
             isEditing: editingObjectID == object.id,
             editingText: object.text,
@@ -393,9 +391,23 @@ struct CanvasView: View {
     private func toggleExpandedSize(for object: CanvasObject, in geo: GeometryProxy) {
         let width = geo.size.width / canvasScale
         let size = CanvasPlacementSizing.toggledSize(for: object, availableScreenWidth: width)
+        let bounds = canvasBounds(viewportSize: geo.size)
+        let frame = CanvasViewportFitting.frame(
+            expanding: object.frame,
+            to: size,
+            bounds: bounds
+        )
+        let origin = CanvasViewportFitting.origin(
+            revealing: frame,
+            currentOrigin: viewportOrigin,
+            viewportSize: geo.size,
+            scale: canvasScale,
+            bounds: bounds
+        )
+
         withAnimation(.spring(response: 0.25, dampingFraction: 0.82)) {
-            object.width = size.width
-            object.height = size.height
+            object.frame = frame
+            viewportOrigin = origin
             clampObject(object, in: geo)
         }
         activeResize = nil
@@ -447,15 +459,24 @@ struct CanvasView: View {
             .clamped(to: 0.48...1.6)
         let maxHeight = max(visibleHeight - 180, CanvasPlacementSizing.defaultSize.height)
         let targetHeight = min(max(targetWidth * ratio, CanvasPlacementSizing.defaultSize.height), maxHeight)
-        let targetFrame = CGRect(
-            x: viewportOrigin.x + (visibleWidth - targetWidth) / 2,
-            y: viewportOrigin.y + max(84 / canvasScale, (visibleHeight - targetHeight) / 2),
-            width: targetWidth,
-            height: targetHeight
+        let bounds = canvasBounds(viewportSize: geo.size)
+        let targetFrame = CanvasViewportFitting.frame(
+            expanding: object.frame,
+            to: CGSize(width: targetWidth, height: targetHeight),
+            bounds: bounds
+        )
+        let targetOrigin = CanvasViewportFitting.origin(
+            revealing: targetFrame,
+            currentOrigin: viewportOrigin,
+            viewportSize: geo.size,
+            scale: canvasScale,
+            bounds: bounds,
+            margin: 42
         )
 
         withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
             object.frame = targetFrame
+            viewportOrigin = targetOrigin
             clampObject(object, in: geo)
         }
     }
@@ -565,11 +586,15 @@ struct CanvasView: View {
         updateVisibleObjectIDs(in: geo)
     }
 
-    private func handleTap(for object: CanvasObject) {
+    private func handleTap(for object: CanvasObject, in geo: GeometryProxy) {
         bringToFront(object.id)
         if mode == .edit, canEditText(object) {
             selectedObjectIDs = [object.id]
-            editingObjectID = object.id
+            if editingSnapshot?.id == object.id {
+                editingObjectID = object.id
+            } else {
+                prepareEditingFrame(for: object, in: geo)
+            }
         } else {
             if selectedObjectIDs.contains(object.id) {
                 selectedObjectIDs.remove(object.id)
@@ -667,6 +692,19 @@ struct CanvasView: View {
             width: geo.size.width / canvasScale,
             height: geo.size.height / canvasScale
         )
+    }
+
+    private func initializeViewport(in geo: GeometryProxy) {
+        guard !didInitializeViewport else { return }
+        didInitializeViewport = true
+        viewportOrigin = CanvasViewportFitting.initialOrigin(
+            viewportSize: geo.size,
+            scale: canvasScale
+        )
+        visibleScale = canvasScale
+        visibleViewportCenter = viewportCenter(in: geo)
+        updateVisibleObjectIDs(in: geo)
+        clampAllObjects(in: geo)
     }
 }
 

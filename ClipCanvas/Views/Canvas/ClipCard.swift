@@ -21,7 +21,17 @@ struct ClipCard: View {
         ZStack(alignment: .bottomTrailing) {
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .padding(14)
+                .padding(.horizontal, 14)
+                .padding(.top, 14)
+                .padding(.bottom, clip.tags.isEmpty ? 14 : 36)
+
+            if !clip.tags.isEmpty {
+                CanvasNoteTagFooter(tags: Array(clip.tags.sorted { $0.sortIndex < $1.sortIndex }.prefix(3)))
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                    .padding(.leading, 12)
+                    .padding(.bottom, 8)
+                    .padding(.trailing, 42)
+            }
 
             resizeHandle
         }
@@ -85,15 +95,30 @@ struct ClipCard: View {
     private var cardSurface: some View {
         ZStack {
             Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground)
-            (fillColor ?? primaryColor).opacity(0.24)
+            (fillColor ?? primaryColor).opacity(0.20)
         }
     }
 
     private var primaryColor: Color {
-        if let tag = clip.tags.min(by: { $0.sortIndex < $1.sortIndex }) {
-            return tag.color
-        }
         return clip.color.background
+    }
+}
+
+struct CanvasNoteTagFooter: View {
+    let tags: [ClipTag]
+
+    var body: some View {
+        HStack(spacing: 5) {
+            ForEach(tags) { tag in
+                Text(tag.name)
+                    .font(.system(size: 9, weight: .semibold))
+                    .lineLimit(1)
+                    .padding(.horizontal, 7)
+                    .padding(.vertical, 4)
+                    .foregroundStyle(.primary.opacity(0.78))
+                    .background((Color(hex: tag.colorHex) ?? .accentColor).opacity(0.18), in: Capsule())
+            }
+        }
     }
 }
 

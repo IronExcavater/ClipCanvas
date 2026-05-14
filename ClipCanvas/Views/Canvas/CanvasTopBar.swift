@@ -77,7 +77,7 @@ struct CanvasTopBar: View {
     }
 
     private var askAITitle: String {
-        selectedCount > 0 ? "Ask Selection" : "Ask View"
+        selectedCount > 0 ? "Ask About Selection" : "Ask About View"
     }
 
     @ViewBuilder
@@ -93,7 +93,7 @@ struct CanvasTopBar: View {
                 .onDisappear {
                     if isRenaming { onCommitRename() }
                 }
-                .frame(minWidth: 180, maxWidth: 260)
+                .frame(width: 190)
         } else {
             Menu {
                 ForEach(workspaces) { workspace in
@@ -110,6 +110,7 @@ struct CanvasTopBar: View {
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
+                    .fixedSize(horizontal: true, vertical: false)
                     .frame(maxWidth: 220)
             }
             .buttonStyle(.plain)

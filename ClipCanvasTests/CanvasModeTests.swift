@@ -14,7 +14,6 @@ import Testing
 
         #expect(configuration.items == [
             .paste,
-            .divider,
             .mode(.pan),
             .mode(.edit),
             .mode(.draw)
@@ -26,7 +25,6 @@ import Testing
 
         #expect(configuration.items == [
             .closeMode,
-            .divider,
             .newNote,
             .paste
         ])
@@ -37,7 +35,6 @@ import Testing
 
         #expect(configuration.items == [
             .askAI,
-            .divider,
             .arrangeSelection, .details
         ])
     }
@@ -47,11 +44,8 @@ import Testing
 
         #expect(configuration.items == [
             .closeMode,
-            .divider,
             .editContent,
-            .divider,
             .color, .manageTags,
-            .divider,
             .delete
         ])
     }

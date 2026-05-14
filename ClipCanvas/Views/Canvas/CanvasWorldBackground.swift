@@ -87,8 +87,8 @@ struct EmptyCanvasHint: View {
         .padding(.vertical, 18)
         .background {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .shadow(color: .black.opacity(0.10), radius: 16, y: 6)
+                .fill(Color(uiColor: .systemBackground).opacity(0.58))
+                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
         }
         .allowsHitTesting(false)
     }

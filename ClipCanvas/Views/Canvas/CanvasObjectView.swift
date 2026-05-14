@@ -19,7 +19,17 @@ struct CanvasObjectView: View {
         ZStack(alignment: .bottomTrailing) {
             content
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-                .padding(14)
+                .padding(.horizontal, 14)
+                .padding(.top, 14)
+                .padding(.bottom, noteTags.isEmpty ? 14 : 36)
+
+            if !noteTags.isEmpty {
+                CanvasNoteTagFooter(tags: noteTags)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomLeading)
+                    .padding(.leading, 12)
+                    .padding(.bottom, 8)
+                    .padding(.trailing, 42)
+            }
 
             CanvasResizeHandle(
                 onResize: onResize,
@@ -29,8 +39,12 @@ struct CanvasObjectView: View {
         }
         .background {
             if usesStickySurface {
-                StickyNoteShape()
-                    .fill(fillColor)
+                ZStack {
+                    StickyNoteShape()
+                        .fill(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground))
+                    StickyNoteShape()
+                        .fill(fillColor.opacity(0.20))
+                }
             } else {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(fillColor)
@@ -161,6 +175,10 @@ struct CanvasObjectView: View {
 
     private var usesEditableText: Bool {
         object.kind == .stickyNote
+    }
+
+    private var noteTags: [ClipTag] {
+        Array((object.clip?.tags ?? []).sorted { $0.sortIndex < $1.sortIndex }.prefix(3))
     }
 }
 

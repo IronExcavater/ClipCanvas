@@ -26,21 +26,24 @@ struct CanvasToolbar: View {
     private let iconSize: CGFloat = 19
 
     var body: some View {
-        ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: 2) {
-                ForEach(Array(configuration.items.enumerated()), id: \.offset) { _, item in
-                    toolbarItem(item)
+        HStack {
+            Spacer(minLength: 0)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 2) {
+                    ForEach(Array(configuration.items.enumerated()), id: \.offset) { _, item in
+                        toolbarItem(item)
+                    }
                 }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 7)
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
+            .background { toolbarBackground }
+            .shadow(color: .black.opacity(0.18), radius: 20, y: 8)
+            .frame(maxWidth: min(configuration.preferredWidth, 560))
+            Spacer(minLength: 0)
         }
-        .background { toolbarBackground }
-        .shadow(color: .black.opacity(0.18), radius: 20, y: 8)
         .padding(.horizontal, 20)
         .padding(.bottom, 24)
-        .frame(maxWidth: min(configuration.preferredWidth, 560))
-        .frame(maxWidth: .infinity)
         .ignoresSafeArea(.container, edges: .bottom)
         .ignoresSafeArea(.keyboard, edges: .bottom)
         .animation(.spring(response: 0.24, dampingFraction: 0.82), value: configuration)

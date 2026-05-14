@@ -75,7 +75,6 @@ nonisolated struct CanvasToolbarConfiguration: Equatable {
         case .draw:
             return CanvasToolbarConfiguration(items: [
                 .closeMode,
-                .divider,
                 .drawPen, .drawHighlighter, .drawEraser, .drawLasso
             ])
 
@@ -84,27 +83,20 @@ nonisolated struct CanvasToolbarConfiguration: Equatable {
                 if isEditing {
                     return CanvasToolbarConfiguration(items: [
                         .closeMode,
-                        .divider,
                         .editContent,
-                        .divider,
                         .color,
-                        .divider,
                         .done
                     ])
                 }
                 return CanvasToolbarConfiguration(items: [
                     .closeMode,
-                    .divider,
                     .editContent,
-                    .divider,
                     .color, .manageTags,
-                    .divider,
                     .delete
                 ])
             }
             return CanvasToolbarConfiguration(items: [
                 .closeMode,
-                .divider,
                 .newNote, .paste,
             ])
 
@@ -112,13 +104,11 @@ nonisolated struct CanvasToolbarConfiguration: Equatable {
             if selectedCount > 0 {
                 return CanvasToolbarConfiguration(items: [
                     .askAI,
-                    .divider,
                     .arrangeSelection, .details
                 ])
             }
             return CanvasToolbarConfiguration(items: [
                 .paste,
-                .divider,
                 .mode(.pan), .mode(.edit), .mode(.draw)
             ])
         }
