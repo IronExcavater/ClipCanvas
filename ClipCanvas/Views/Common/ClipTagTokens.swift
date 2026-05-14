@@ -261,7 +261,6 @@ struct NewTagComposer: View {
         .padding(.trailing, 6)
         .padding(.vertical, 4)
         .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: Capsule())
-        .shadow(color: .black.opacity(0.12), radius: 12, y: 5)
         .padding(.bottom, 8)
     }
 }
@@ -272,15 +271,11 @@ private struct TagColorPickerButton: View {
     let presets: [String]
     let onSelect: (String) -> Void
 
+    @State private var showingPalette = false
+
     var body: some View {
-        Menu {
-            ForEach(presets, id: \.self) { preset in
-                Button {
-                    onSelect(preset)
-                } label: {
-                    Label(preset, systemImage: preset == hex ? "checkmark.circle.fill" : "circle.fill")
-                }
-            }
+        Button {
+            showingPalette.toggle()
         } label: {
             Circle()
                 .fill(Color(hex: hex) ?? .accentColor)
@@ -294,6 +289,32 @@ private struct TagColorPickerButton: View {
                 }
         }
         .buttonStyle(.plain)
+        .popover(isPresented: $showingPalette, arrowEdge: .bottom) {
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 10) {
+                    ForEach(presets, id: \.self) { preset in
+                        Button {
+                            onSelect(preset)
+                            showingPalette = false
+                        } label: {
+                            Circle()
+                                .fill(Color(hex: preset) ?? .accentColor)
+                                .frame(width: 34, height: 34)
+                                .overlay {
+                                    if preset == hex {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 12, weight: .bold))
+                                            .foregroundStyle(.white)
+                                    }
+                                }
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+                .padding(14)
+            }
+            .presentationCompactAdaptation(.popover)
+        }
         .accessibilityLabel("Change color")
     }
 }
