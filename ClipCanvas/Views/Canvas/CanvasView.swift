@@ -38,7 +38,7 @@ struct CanvasView: View {
                 CanvasDotGrid(
                     viewportOrigin: viewportOrigin,
                     canvasScale: canvasScale,
-                    boundsRadius: canvasWorldBounds(viewportSize: geo.size).radius
+                    boundsRadius: canvasBounds(viewportSize: geo.size).radius
                 )
                 .contentShape(Rectangle())
                 .onTapGesture {
@@ -375,45 +375,37 @@ struct CanvasView: View {
     }
 
     private func viewportCenter(in geo: GeometryProxy) -> CGPoint {
-        CGPoint(
-            x: viewportOrigin.x + geo.size.width / (2 * canvasScale),
-            y: viewportOrigin.y + geo.size.height / (2 * canvasScale)
-        )
-    }
-
-    private func viewportCenter(for origin: CGPoint, viewportSize: CGSize) -> CGPoint {
-        CGPoint(
-            x: origin.x + viewportSize.width / (2 * canvasScale),
-            y: origin.y + viewportSize.height / (2 * canvasScale)
+        CanvasViewportBounds.viewportCenter(
+            origin: viewportOrigin,
+            viewportSize: geo.size,
+            scale: canvasScale
         )
     }
 
     private func origin(forCenter center: CGPoint, viewportSize: CGSize) -> CGPoint {
-        CGPoint(
-            x: center.x - viewportSize.width / (2 * canvasScale),
-            y: center.y - viewportSize.height / (2 * canvasScale)
+        CanvasViewportBounds.origin(
+            forCenter: center,
+            viewportSize: viewportSize,
+            scale: canvasScale
         )
     }
 
     private func boundedOrigin(_ proposed: CGPoint, viewportSize: CGSize, rubberBand: Bool) -> CGPoint {
-        let bounds = canvasWorldBounds(viewportSize: viewportSize)
-        let proposedCenter = viewportCenter(for: proposed, viewportSize: viewportSize)
-        let boundedCenter = bounds.bounded(proposedCenter, rubberBand: rubberBand)
-        return origin(forCenter: boundedCenter, viewportSize: viewportSize)
+        CanvasViewportBounds.boundedOrigin(
+            proposed,
+            viewportSize: viewportSize,
+            scale: canvasScale,
+            bounds: canvasBounds(viewportSize: viewportSize),
+            rubberBand: rubberBand
+        )
     }
 
-    private func canvasWorldBounds(viewportSize: CGSize) -> CanvasRadiusBounds {
-        let totalArea = canvasObjects.reduce(CGFloat(0)) { partial, object in
-            partial + CGFloat(object.width * object.height)
-        }
-        let largestDiagonal = canvasObjects.map { hypot(CGFloat($0.width), CGFloat($0.height)) }.max() ?? 260
-        let viewportRadius = hypot(viewportSize.width / canvasScale, viewportSize.height / canvasScale) / 2
-        let contentWeight = sqrt(max(totalArea, CanvasPlacementSizing.defaultSize.width * CanvasPlacementSizing.defaultSize.height))
-        let radius = max(
-            620,
-            viewportRadius * 0.52 + contentWeight * 1.05 + largestDiagonal * 0.45 + CGFloat(canvasObjects.count) * 18
+    private func canvasBounds(viewportSize: CGSize) -> CanvasRadiusBounds {
+        CanvasViewportBounds.radius(
+            forObjectSizes: canvasObjects.map { CGSize(width: $0.width, height: $0.height) },
+            viewportSize: viewportSize,
+            scale: canvasScale
         )
-        return CanvasRadiusBounds(center: .zero, radius: radius)
     }
 
     private func arrangeObjects(_ target: [CanvasObject], at center: CGPoint, fitAfter: Bool, in geo: GeometryProxy) {
@@ -487,8 +479,8 @@ struct CanvasView: View {
     }
 
     private func clampObject(_ object: CanvasObject, in geo: GeometryProxy?) {
-        let viewportSize = geo?.size ?? CGSize(width: 393, height: 852)
-        let bounds = canvasWorldBounds(viewportSize: viewportSize)
+        let viewportSize = geo?.size ?? CanvasViewportBounds.defaultViewportSize
+        let bounds = canvasBounds(viewportSize: viewportSize)
         let topLeft = CGPoint(x: object.x, y: object.y)
         let size = CGSize(width: object.width, height: object.height)
         let clamped = bounds.clampedTopLeft(topLeft, size: size)

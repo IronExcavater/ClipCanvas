@@ -1,40 +1,5 @@
 import SwiftUI
 
-struct CanvasRadiusBounds {
-    let center: CGPoint
-    let radius: CGFloat
-
-    func bounded(_ point: CGPoint, rubberBand: Bool) -> CGPoint {
-        let dx = point.x - center.x
-        let dy = point.y - center.y
-        let distance = hypot(dx, dy)
-        guard distance > radius, distance > 0 else { return point }
-
-        let overflow = distance - radius
-        let boundedDistance = rubberBand ? radius + overflow * 0.24 : radius
-        return CGPoint(
-            x: center.x + dx / distance * boundedDistance,
-            y: center.y + dy / distance * boundedDistance
-        )
-    }
-
-    func clampedTopLeft(_ topLeft: CGPoint, size: CGSize) -> CGPoint {
-        let halfWidth = size.width / 2
-        let halfHeight = size.height / 2
-        let cardCenter = CGPoint(x: topLeft.x + halfWidth, y: topLeft.y + halfHeight)
-        let usableRadius = max(radius - hypot(halfWidth, halfHeight), 120)
-        let dx = cardCenter.x - center.x
-        let dy = cardCenter.y - center.y
-        let distance = hypot(dx, dy)
-        guard distance > usableRadius, distance > 0 else { return topLeft }
-        let clampedCenter = CGPoint(
-            x: center.x + dx / distance * usableRadius,
-            y: center.y + dy / distance * usableRadius
-        )
-        return CGPoint(x: clampedCenter.x - halfWidth, y: clampedCenter.y - halfHeight)
-    }
-}
-
 struct CanvasDotGrid: View, Animatable {
     var viewportOrigin: CGPoint
     var canvasScale: CGFloat
