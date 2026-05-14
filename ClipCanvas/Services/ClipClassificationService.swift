@@ -1,6 +1,11 @@
 import Foundation
 
 enum ClipClassificationService {
+    nonisolated struct SensitivityClassification: Equatable {
+        var sensitivity: Sensitivity
+        var reason: SensitivityReason?
+    }
+
     static func detectType(content: String, imageData: Data?) -> ClipType {
         if imageData != nil { return .image }
         if looksLikeURL(content) { return .url }
@@ -9,11 +14,21 @@ enum ClipClassificationService {
     }
 
     static func detectSensitivity(_ text: String) -> Sensitivity {
+        classifySensitivity(text).sensitivity
+    }
+
+    static func classifySensitivity(_ text: String) -> SensitivityClassification {
         let range = NSRange(text.startIndex..., in: text)
-        if looksLikePassword(text) { return .privateContent }
-        if secretRegex.firstMatch(in: text, range: range) != nil { return .privateContent }
-        if piiPatterns.contains(where: { $0.firstMatch(in: text, range: range) != nil }) { return .sensitive }
-        return .normal
+        if looksLikePassword(text) {
+            return SensitivityClassification(sensitivity: .privateContent, reason: .passwordLike)
+        }
+        if secretRegex.firstMatch(in: text, range: range) != nil {
+            return SensitivityClassification(sensitivity: .privateContent, reason: .secretKeyword)
+        }
+        for (reason, pattern) in piiPatterns where pattern.firstMatch(in: text, range: range) != nil {
+            return SensitivityClassification(sensitivity: .sensitive, reason: reason)
+        }
+        return SensitivityClassification(sensitivity: .normal, reason: nil)
     }
 
     private static let urlPrefixRegex = try! NSRegularExpression(
@@ -34,10 +49,10 @@ enum ClipClassificationService {
         options: .caseInsensitive
     )
 
-    private static let piiPatterns: [NSRegularExpression] = [
-        try! NSRegularExpression(pattern: #"\b\d{3}-\d{2}-\d{4}\b"#),
-        try! NSRegularExpression(pattern: #"\b(?:\d[ -]?){13,19}\b"#),
-        try! NSRegularExpression(pattern: #"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}"#),
+    private static let piiPatterns: [(SensitivityReason, NSRegularExpression)] = [
+        (.ssn, try! NSRegularExpression(pattern: #"\b\d{3}-\d{2}-\d{4}\b"#)),
+        (.creditCard, try! NSRegularExpression(pattern: #"\b(?:\d[ -]?){13,19}\b"#)),
+        (.email, try! NSRegularExpression(pattern: #"[A-Za-z0-9._%+\-]+@[A-Za-z0-9.\-]+\.[A-Za-z]{2,}"#)),
     ]
 
     private static func looksLikeURL(_ text: String) -> Bool {

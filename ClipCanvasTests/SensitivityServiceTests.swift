@@ -47,4 +47,11 @@ import Testing
     @Test func clientSecretDetected() {
         #expect(ClipClassificationService.detectSensitivity("client_secret=abc123xyz") == .privateContent)
     }
+
+    @Test func classificationIncludesReason() {
+        let classification = ClipClassificationService.classifySensitivity("N0tArealP@ssword1")
+
+        #expect(classification.sensitivity == .privateContent)
+        #expect(classification.reason == .passwordLike)
+    }
 }

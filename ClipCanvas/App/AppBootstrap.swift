@@ -4,6 +4,7 @@ import Foundation
 enum AppBootstrap {
     static func ensureActiveWorkspace(in context: ModelContext) {
         TrashRetentionService.purgeExpired(in: context)
+        PrivateClipRetentionService.purgeExpired(in: context)
 
         let all = (try? context.fetch(
             FetchDescriptor<Workspace>(

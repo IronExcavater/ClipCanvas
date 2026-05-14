@@ -59,8 +59,13 @@ extension Clip {
         switch content {
         case .text(let text):
             let body = text.trimmedClipboardContent
-            let sensitivity = ClipClassificationService.detectSensitivity(body)
-            return Clip(content: body, origin: origin, sensitivity: sensitivity)
+            let classification = ClipClassificationService.classifySensitivity(body)
+            return Clip(
+                content: body,
+                origin: origin,
+                sensitivity: classification.sensitivity,
+                sensitivityReason: classification.reason
+            )
         case .image(let data, let uti):
             return Clip(content: "", imageData: data, imageUTI: uti, origin: origin)
         }

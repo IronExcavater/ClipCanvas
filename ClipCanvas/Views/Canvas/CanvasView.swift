@@ -512,9 +512,10 @@ struct CanvasView: View {
 
     private func commitClipText(_ text: String, clip: Clip, object: CanvasObject) {
         guard clip.content != text else { return }
+        let classification = ClipClassificationService.classifySensitivity(text)
         clip.content = text
         clip.type = Clip.detect(content: text, imageData: clip.imageData)
-        clip.sensitivity = ClipClassificationService.detectSensitivity(text)
+        clip.updateSensitivity(classification.sensitivity, reason: classification.reason)
         clip.updatedAt = Date()
         object.markUpdated()
     }

@@ -36,6 +36,15 @@ enum Sensitivity: String, Codable {
     case privateContent  // secrets (password, api_key, token)
 }
 
+enum SensitivityReason: String, Codable, CaseIterable {
+    case passwordLike
+    case secretKeyword
+    case creditCard
+    case ssn
+    case email
+    case userMarkedPrivate
+}
+
 enum CardColor: String, Codable, CaseIterable {
     case cloud, banana, flamingo, sage, sky, lavender, peach
 
@@ -63,6 +72,8 @@ final class Clip: SoftDeletable, Identifiable {
     var type: ClipType
     var origin: ClipOrigin
     var sensitivity: Sensitivity
+    var sensitivityReasonRaw: String?
+    var expiresAt: Date?
     var color: CardColor
     var isPinned: Bool = false
     var createdAt: Date = Date()
@@ -84,18 +95,34 @@ final class Clip: SoftDeletable, Identifiable {
         imageUTI: String? = nil,
         origin: ClipOrigin,
         sensitivity: Sensitivity = .normal,
+        sensitivityReason: SensitivityReason? = nil,
         color: CardColor = .cloud
     ) {
+        let now = Date()
         self.content = content
         self.imageData = imageData
         self.imageUTI = imageUTI
         self.origin = origin
         self.sensitivity = sensitivity
+        self.sensitivityReasonRaw = sensitivityReason?.rawValue
+        self.expiresAt = PrivateClipRetentionPolicy.expiryDate(for: sensitivity, from: now)
         self.color = color
+        self.createdAt = now
+        self.updatedAt = now
         self.type = Self.detect(content: content, imageData: imageData)
     }
 
     var isMasked: Bool { sensitivity != .normal }
+
+    var sensitivityReason: SensitivityReason? {
+        get {
+            guard let sensitivityReasonRaw else { return nil }
+            return SensitivityReason(rawValue: sensitivityReasonRaw)
+        }
+        set {
+            sensitivityReasonRaw = newValue?.rawValue
+        }
+    }
 
     var preview: String {
         guard !isMasked else {
@@ -108,6 +135,20 @@ final class Clip: SoftDeletable, Identifiable {
     func softDelete() {
         deletedAt = Date()
         isPinned = false
+    }
+
+    func updateSensitivity(
+        _ newSensitivity: Sensitivity,
+        reason: SensitivityReason? = nil,
+        at date: Date = Date()
+    ) {
+        sensitivity = newSensitivity
+        sensitivityReason = reason
+        if newSensitivity == .privateContent {
+            expiresAt = expiresAt ?? PrivateClipRetentionPolicy.expiryDate(for: newSensitivity, from: date)
+        } else {
+            expiresAt = nil
+        }
     }
 
     // MARK: - Type detection
