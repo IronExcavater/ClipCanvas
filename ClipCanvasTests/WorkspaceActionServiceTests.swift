@@ -18,6 +18,17 @@ import Testing
         #expect(!second.isActive)
     }
 
+    @Test func renameTrimsAndLimitsWorkspaceNames() throws {
+        let workspace = Workspace(name: "Old")
+        let longName = "   " + String(repeating: "Very Long Workspace Name ", count: 5)
+
+        WorkspaceActionService.rename(workspace, to: longName)
+
+        #expect(workspace.name.count == WorkspaceNamePolicy.maximumLength)
+        #expect(!workspace.name.hasPrefix(" "))
+        #expect(!workspace.name.hasSuffix(" "))
+    }
+
     private func makeContext() throws -> ModelContext {
         let container = try ModelContainer(
             for: Clip.self, ClipTag.self, Workspace.self, CanvasPlacement.self, CanvasObject.self,

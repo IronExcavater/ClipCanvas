@@ -269,16 +269,13 @@ struct CanvasContainerView: View {
     // MARK: - Rename
 
     private func beginRename() {
-        renameText = workspace.name
+        renameText = WorkspaceNamePolicy.limitedEditingText(workspace.name)
         isRenaming = true
         renameFocused = true
     }
 
     private func commitRename() {
-        let trimmed = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty {
-            WorkspaceActionService.rename(workspace, to: trimmed)
-        }
+        WorkspaceActionService.rename(workspace, to: renameText)
         isRenaming = false
         renameFocused = false
     }

@@ -139,13 +139,12 @@ struct WorkspacesPage: View {
     }
 
     private func beginRename(_ ws: Workspace) {
-        editingName = ws.name
+        editingName = WorkspaceNamePolicy.limitedEditingText(ws.name)
         renamingID = ws.id
     }
 
     private func commitRename(_ ws: Workspace) {
-        let name = editingName.trimmingCharacters(in: .whitespacesAndNewlines)
-        WorkspaceActionService.rename(ws, to: name.isEmpty ? "Untitled" : name)
+        WorkspaceActionService.rename(ws, to: editingName)
         renamingID = nil
     }
 

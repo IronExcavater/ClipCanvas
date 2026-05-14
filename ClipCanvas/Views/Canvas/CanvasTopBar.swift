@@ -89,11 +89,15 @@ struct CanvasTopBar: View {
                 .textFieldStyle(.plain)
                 .focused(renameFocused)
                 .submitLabel(.done)
+                .onChange(of: renameText) { _, newValue in
+                    let limited = WorkspaceNamePolicy.limitedEditingText(newValue)
+                    if limited != newValue { renameText = limited }
+                }
                 .onSubmit(onCommitRename)
                 .onDisappear {
                     if isRenaming { onCommitRename() }
                 }
-                .frame(width: 190)
+                .frame(width: titleWidth(for: renameText))
         } else {
             Menu {
                 ForEach(workspaces) { workspace in
@@ -110,12 +114,17 @@ struct CanvasTopBar: View {
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
-                    .fixedSize(horizontal: true, vertical: false)
-                    .frame(maxWidth: 220)
+                    .frame(width: titleWidth(for: workspaceName))
             }
             .buttonStyle(.plain)
             .simultaneousGesture(LongPressGesture(minimumDuration: 0.45).onEnded { _ in onBeginRename() })
         }
+    }
+
+    private func titleWidth(for text: String) -> CGFloat {
+        let visibleCharacters = min(max(text.count, 6), WorkspaceNamePolicy.maximumLength)
+        let estimated = CGFloat(visibleCharacters) * 12 + 18
+        return min(max(estimated, 82), 236)
     }
 }
 

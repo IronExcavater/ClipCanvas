@@ -45,6 +45,10 @@ struct WorkspaceRowView: View {
                         .lineLimit(1)
                         .submitLabel(.done)
                         .focused($focused)
+                        .onChange(of: editingName) { _, newValue in
+                            let limited = WorkspaceNamePolicy.limitedEditingText(newValue)
+                            if limited != newValue { editingName = limited }
+                        }
                         .onSubmit(onCommitRename)
                         .onDisappear(perform: onCommitRename)
                 } else {

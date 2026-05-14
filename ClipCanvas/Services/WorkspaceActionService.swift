@@ -8,8 +8,10 @@ enum WorkspaceActionService {
 
     @discardableResult
     static func create(in context: ModelContext, existing workspaces: [Workspace], name: String? = nil) -> Workspace {
+        let resolvedName = name.map(WorkspaceNamePolicy.limitedEditingText)
+            ?? WorkspaceNamePolicy.normalized("Canvas \(workspaces.count + 1)")
         let workspace = Workspace(
-            name: name ?? "Canvas \(workspaces.count + 1)",
+            name: resolvedName,
             sortIndex: (workspaces.map(\.sortIndex).min() ?? 0) - 1,
             isActive: true
         )
@@ -19,9 +21,9 @@ enum WorkspaceActionService {
     }
 
     static func rename(_ workspace: Workspace?, to name: String) {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, let workspace, workspace.name != trimmed else { return }
-        workspace.name = trimmed
+        let normalizedName = WorkspaceNamePolicy.normalized(name)
+        guard let workspace, workspace.name != normalizedName else { return }
+        workspace.name = normalizedName
         workspace.updatedAt = Date()
     }
 

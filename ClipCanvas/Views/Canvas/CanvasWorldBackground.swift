@@ -86,9 +86,21 @@ struct EmptyCanvasHint: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 18)
         .background {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(Color(uiColor: .systemBackground).opacity(0.58))
-                .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 24, style: .continuous))
+            Circle()
+                .fill(
+                    RadialGradient(
+                        colors: [
+                            Color(uiColor: .systemBackground).opacity(0.92),
+                            Color(uiColor: .systemBackground).opacity(0.60),
+                            Color(uiColor: .systemBackground).opacity(0.00),
+                        ],
+                        center: .center,
+                        startRadius: 18,
+                        endRadius: 148
+                    )
+                )
+                .frame(width: 300, height: 220)
+                .blur(radius: 8)
         }
         .allowsHitTesting(false)
     }
