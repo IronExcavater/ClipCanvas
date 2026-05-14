@@ -7,6 +7,7 @@ struct CanvasContainerView: View {
     let onToggleSidebar: () -> Void
 
     @Environment(\.modelContext) private var context
+    @Environment(\.undoManager) private var undoManager
     @State private var mode: CanvasMode = .pan
     @State private var feedback: String?
     @State private var feedbackToken = UUID()
@@ -63,6 +64,12 @@ struct CanvasContainerView: View {
                 Spacer()
 
                 HStack {
+                    CanvasUndoControls(
+                        onUndo: { undoManager?.undo() },
+                        onRedo: { undoManager?.redo() }
+                    )
+                    .padding(.leading, 14)
+                    .padding(.bottom, 12)
                     Spacer()
                     CanvasZoomControls(
                         scale: visibleScale,
@@ -119,6 +126,7 @@ struct CanvasContainerView: View {
         }
         .animation(.spring(response: 0.24, dampingFraction: 0.86), value: feedback)
         .animation(.spring(response: 0.25, dampingFraction: 0.82), value: selectedObjectIDs)
+        .onAppear { context.undoManager = undoManager }
         .onChange(of: mode) { _, newMode in
             if newMode != .edit { editingObjectID = nil }
         }

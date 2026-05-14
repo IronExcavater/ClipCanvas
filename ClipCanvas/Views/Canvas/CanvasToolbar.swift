@@ -165,6 +165,46 @@ struct CanvasToolbar: View {
     }
 }
 
+struct CanvasUndoControls: View {
+    let onUndo: () -> Void
+    let onRedo: () -> Void
+
+    var body: some View {
+        HStack(spacing: 0) {
+            undoButton("arrow.uturn.backward", action: onUndo)
+            undoButton("arrow.uturn.forward", action: onRedo)
+        }
+        .font(.system(size: 16, weight: .semibold))
+        .foregroundStyle(.primary)
+        .buttonStyle(.plain)
+        .frame(width: 88)
+        .padding(.vertical, 5)
+        .background { undoBackground }
+        .shadow(color: .black.opacity(0.14), radius: 12, y: 5)
+        .ignoresSafeArea(.container, edges: .bottom)
+        .ignoresSafeArea(.keyboard, edges: .bottom)
+    }
+
+    private func undoButton(_ icon: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Image(systemName: icon)
+                .frame(width: 40, height: 40)
+                .contentShape(Circle())
+        }
+    }
+
+    @ViewBuilder
+    private var undoBackground: some View {
+        if #available(iOS 26, *) {
+            RoundedRectangle(cornerRadius: 22, style: .continuous)
+                .fill(Color.clear)
+                .glassEffect(.regular, in: .rect(cornerRadius: 22))
+        } else {
+            Capsule().fill(.regularMaterial)
+        }
+    }
+}
+
 struct CanvasZoomControls: View {
     let scale: CGFloat
     let onZoomIn: () -> Void
