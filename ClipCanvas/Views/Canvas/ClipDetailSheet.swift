@@ -9,29 +9,27 @@ struct ClipDetailSheet: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
+                    ClipDetailActionToolbar(
+                        isPinned: clip.isPinned,
+                        canOpenLink: ClipActionService.openableURL(for: clip) != nil,
+                        canTransform: clip.type != .image,
+                        isTransforming: isTransforming,
+                        onCopy: { ClipActionService.copy(clip) },
+                        onOpen: { ClipActionService.openURL(for: clip) },
+                        onPin: { ClipActionService.togglePin(clip) },
+                        onTransform: applyTransform,
+                        onDelete: {
+                            ClipActionService.softDelete(clip)
+                            dismiss()
+                        }
+                    )
+
                     ClipDetailSection("Info") {
                         ClipInfoPanel(clip: clip)
                     }
 
-                    ClipDetailSection("Actions") {
-                        ClipDetailActionToolbar(
-                            isPinned: clip.isPinned,
-                            canOpenLink: ClipActionService.openableURL(for: clip) != nil,
-                            canTransform: clip.type != .image,
-                            isTransforming: isTransforming,
-                            onCopy: { ClipActionService.copy(clip) },
-                            onOpen: { ClipActionService.openURL(for: clip) },
-                            onPin: { ClipActionService.togglePin(clip) },
-                            onTransform: applyTransform,
-                            onDelete: {
-                                ClipActionService.softDelete(clip)
-                                dismiss()
-                            }
-                        )
-                    }
-
                     ClipDetailSection("Tags") {
-                        ClipTagEditor(clips: [clip])
+                        ClipTagEditor(clips: [clip], composerShowsShadow: true)
                     }
                 }
                 .padding(.horizontal, 16)
@@ -82,7 +80,7 @@ private struct ClipInfoPanel: View {
             ClipUpdatedRow(date: clip.updatedAt)
             ClipInfoRow("Created", value: clip.createdAt.formatted(date: .abbreviated, time: .shortened), icon: "calendar")
         }
-        .padding(12)
+        .padding(16)
         .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .shadow(color: .black.opacity(0.06), radius: 8, y: 3)
     }
@@ -107,7 +105,7 @@ private struct ClipInfoRow: View {
             Label(title, systemImage: icon)
                 .foregroundStyle(.primary.opacity(0.68))
         }
-        .font(.subheadline)
+        .font(.body)
     }
 }
 
@@ -122,7 +120,7 @@ private struct ClipUpdatedRow: View {
             Label("Last Updated", systemImage: "clock")
                 .foregroundStyle(.primary.opacity(0.68))
         }
-        .font(.subheadline)
+        .font(.body)
     }
 }
 
@@ -138,7 +136,7 @@ private struct ClipDetailActionToolbar: View {
     let onDelete: () -> Void
 
     var body: some View {
-        HStack(spacing: 8) {
+        HStack(spacing: 10) {
             action("Copy", icon: "doc.on.doc", action: onCopy)
             if canOpenLink {
                 action("Open", icon: "safari", action: onOpen)
@@ -147,14 +145,14 @@ private struct ClipDetailActionToolbar: View {
             action(isPinned ? "Unpin" : "Pin", icon: isPinned ? "pin.slash" : "pin", action: onPin)
             action("Delete", icon: "trash", destructive: true, action: onDelete)
         }
-        .padding(7)
+        .padding(8)
         .background {
             if #available(iOS 26, *) {
                 RoundedRectangle(cornerRadius: 24, style: .continuous)
                     .fill(Color.clear)
-                    .glassEffect(.regular, in: .rect(cornerRadius: 24))
+                    .glassEffect(.regular, in: .rect(cornerRadius: 26))
             } else {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: 26, style: .continuous)
                     .fill(.regularMaterial)
             }
         }
@@ -202,8 +200,8 @@ private struct ClipDetailActionToolbar: View {
                     .minimumScaleFactor(0.8)
             }
             .foregroundStyle(destructive ? .red : .primary)
-            .frame(maxWidth: .infinity, minHeight: 58)
-            .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground).opacity(0.72), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .frame(maxWidth: .infinity, minHeight: 64)
+            .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground).opacity(0.86), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
         }
         .buttonStyle(.plain)
     }

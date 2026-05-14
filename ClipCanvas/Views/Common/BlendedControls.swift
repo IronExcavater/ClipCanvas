@@ -95,14 +95,26 @@ struct AppTagChip: View {
     let color: Color
     var icon: String?
     var isSelected: Bool
+    var size: AppTagPillSize = .regular
     var action: () -> Void
 
     var body: some View {
         Button(action: action) {
-            AppTagPill(title: title, color: color, icon: icon, isSelected: isSelected)
+            AppTagPill(title: title, color: color, icon: icon, isSelected: isSelected, size: size)
         }
         .buttonStyle(.plain)
     }
+}
+
+enum AppTagPillSize {
+    case compact
+    case regular
+
+    var circle: CGFloat { self == .compact ? 16 : 22 }
+    var icon: CGFloat { self == .compact ? 7 : 10 }
+    var horizontalPadding: CGFloat { self == .compact ? 8 : 12 }
+    var verticalPadding: CGFloat { self == .compact ? 5 : 8 }
+    var font: Font { self == .compact ? .caption2.weight(.semibold) : .caption.weight(.semibold) }
 }
 
 struct AppTagPill: View {
@@ -110,6 +122,7 @@ struct AppTagPill: View {
     let color: Color
     var icon: String?
     var isSelected: Bool
+    var size: AppTagPillSize = .regular
 
     var body: some View {
         HStack(spacing: 6) {
@@ -118,24 +131,24 @@ struct AppTagPill: View {
                     .fill(color)
                 if let icon {
                     Image(systemName: icon)
-                        .font(.system(size: 8, weight: .bold))
+                        .font(.system(size: size.icon, weight: .bold))
                         .foregroundStyle(.white)
                 }
             }
-            .frame(width: 17, height: 17)
+            .frame(width: size.circle, height: size.circle)
             Text(title)
-                .font(.caption.weight(.semibold))
+                .font(size.font)
                 .lineLimit(1)
         }
-        .padding(.horizontal, 11)
-        .padding(.vertical, 7)
+        .padding(.horizontal, size.horizontalPadding)
+        .padding(.vertical, size.verticalPadding)
         .foregroundStyle(.primary)
         .background(background, in: Capsule())
         .shadow(color: color.opacity(isSelected ? 0.18 : 0), radius: isSelected ? 6 : 0, y: 2)
     }
 
     private var background: Color {
-        isSelected ? color.opacity(0.34) : color.opacity(0.13)
+        isSelected ? color.opacity(0.30) : color.opacity(0.17)
     }
 }
 

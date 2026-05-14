@@ -10,6 +10,7 @@ struct ClipTagEditor: View {
     let clips: [Clip]
     var showsClipTypes = false
     var layout: ClipTagEditorLayout = .twoColumns
+    var composerShowsShadow = false
 
     @Environment(\.modelContext) private var context
     @Query(sort: \ClipTag.sortIndex) private var tags: [ClipTag]
@@ -36,6 +37,7 @@ struct ClipTagEditor: View {
                 name: $newTagName,
                 selectedColor: $selectedColor,
                 presets: presets,
+                showsShadow: composerShowsShadow,
                 onCreate: createTag
             )
         }

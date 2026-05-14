@@ -14,21 +14,6 @@ struct CanvasColorPanel: View {
             Spacer()
 
             VStack(alignment: .leading, spacing: 12) {
-                HStack {
-                    Text(objects.count == 1 ? "Color" : "Color \(objects.count)")
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(.primary)
-
-                    Spacer()
-
-                    Button(action: onDismiss) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .bold))
-                    }
-                    .buttonStyle(BlendedIconButtonStyle(size: 34))
-                    .accessibilityLabel("Close colors")
-                }
-
                 LazyVGrid(
                     columns: [GridItem(.adaptive(minimum: 42), spacing: 10)],
                     alignment: .leading,
@@ -55,6 +40,7 @@ struct CanvasColorPanel: View {
             .shadow(color: .black.opacity(0.16), radius: 22, y: 10)
             .padding(.horizontal, 18)
             .padding(.bottom, 92)
+            .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
         }
         .ignoresSafeArea(.container, edges: .bottom)
     }
@@ -74,6 +60,7 @@ struct CanvasColorPanel: View {
             object.style = style
             object.markUpdated()
         }
+        onDismiss()
     }
 }
 

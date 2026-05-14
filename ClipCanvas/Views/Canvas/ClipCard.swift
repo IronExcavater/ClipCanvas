@@ -121,13 +121,13 @@ struct CanvasNoteTagFooter: View {
     var body: some View {
         HStack(spacing: 5) {
             ForEach(tags) { tag in
-                Text(tag.name)
-                    .font(.system(size: 9, weight: .semibold))
-                    .lineLimit(1)
-                    .padding(.horizontal, 7)
-                    .padding(.vertical, 4)
-                    .foregroundStyle(.primary.opacity(0.78))
-                    .background((Color(hex: tag.colorHex) ?? .accentColor).opacity(0.18), in: Capsule())
+                AppTagPill(
+                    title: tag.name,
+                    color: tag.color,
+                    icon: "tag",
+                    isSelected: false,
+                    size: .compact
+                )
             }
         }
     }

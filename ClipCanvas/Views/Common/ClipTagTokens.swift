@@ -223,6 +223,7 @@ struct NewTagComposer: View {
     @Binding var selectedColor: String
 
     let presets: [String]
+    var showsShadow = false
     let onCreate: () -> Void
 
     private var canCreate: Bool {
@@ -261,7 +262,7 @@ struct NewTagComposer: View {
         .padding(.trailing, 6)
         .padding(.vertical, 4)
         .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground), in: Capsule())
-        .padding(.bottom, 8)
+        .shadow(color: .black.opacity(showsShadow ? 0.12 : 0), radius: showsShadow ? 12 : 0, y: showsShadow ? 5 : 0)
     }
 }
 

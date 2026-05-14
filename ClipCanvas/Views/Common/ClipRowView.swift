@@ -118,6 +118,21 @@ struct ClipRowView: View {
                     .font(.caption2)
             }
             .foregroundStyle(.primary.opacity(0.66))
+
+            if !clip.tags.isEmpty {
+                HStack(spacing: 5) {
+                    ForEach(Array(clip.tags.sorted { $0.sortIndex < $1.sortIndex }.prefix(3))) { tag in
+                        AppTagPill(
+                            title: tag.name,
+                            color: tag.color,
+                            icon: "tag",
+                            isSelected: false,
+                            size: compact ? .compact : .regular
+                        )
+                    }
+                }
+                .padding(.top, 4)
+            }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .layoutPriority(1)

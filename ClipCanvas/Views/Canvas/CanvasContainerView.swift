@@ -346,16 +346,26 @@ struct CanvasContainerView: View {
     private func showSelectedTags() {
         let clips = selectedClips
         guard !clips.isEmpty else { return }
+        if tagEditSelection != nil {
+            tagEditSelection = nil
+            return
+        }
+        colorEditSelection = nil
         tagEditSelection = ClipTagEditSelection(clips: clips)
     }
 
     private func showSelectedColors() {
         let objects = orderedCanvasObjects(matching: selectedObjectIDs)
             .filter { $0.kind != .image && $0.kind != .drawing && $0.kind != .group && $0.kind != .connector }
+        if colorEditSelection != nil {
+            colorEditSelection = nil
+            return
+        }
         guard !objects.isEmpty else {
             showFeedback("Select a note to color")
             return
         }
+        tagEditSelection = nil
         colorEditSelection = CanvasObjectColorSelection(objects: objects)
     }
 

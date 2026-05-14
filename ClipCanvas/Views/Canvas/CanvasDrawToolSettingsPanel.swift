@@ -17,25 +17,11 @@ struct CanvasDrawToolSettingsPanel: View {
         }
     }
 
-    private var title: String {
-        switch tool {
-        case .pen: "Pen"
-        case .highlighter: "Highlighter"
-        case .eraser: "Eraser"
-        case .lasso: "Lasso"
-        }
-    }
-
     var body: some View {
         VStack {
             Spacer()
 
-            HStack(spacing: 14) {
-                Text(title)
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .frame(width: 82, alignment: .leading)
-
+            VStack(alignment: .leading, spacing: 10) {
                 if color != nil {
                     HStack(spacing: 8) {
                         ForEach(colorPresets, id: \.self) { preset in
@@ -58,29 +44,28 @@ struct CanvasDrawToolSettingsPanel: View {
                     }
                 }
 
-                Slider(
-                    value: Binding(
-                        get: { Double(width) },
-                        set: { onChangeWidth(CGFloat($0)) }
-                    ),
-                    in: widthRange
-                )
-                .frame(minWidth: 110)
+                HStack(spacing: 10) {
+                    Image(systemName: tool.systemImage)
+                        .font(.system(size: 14, weight: .semibold))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 24)
 
-                Button(action: onDismiss) {
-                    Image(systemName: "xmark")
-                        .font(.system(size: 13, weight: .bold))
-                        .foregroundStyle(.primary)
-                        .frame(width: 34, height: 34)
-                        .background(.thinMaterial, in: Circle())
+                    Slider(
+                        value: Binding(
+                            get: { Double(width) },
+                            set: { onChangeWidth(CGFloat($0)) }
+                        ),
+                        in: widthRange
+                    )
                 }
-                .buttonStyle(.plain)
             }
-            .padding(.horizontal, 16)
+            .padding(.horizontal, 14)
             .padding(.vertical, 12)
             .background { panelBackground }
             .padding(.horizontal, 18)
             .padding(.bottom, 118)
+            .frame(maxWidth: 360)
+            .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
         }
         .ignoresSafeArea(.container, edges: .bottom)
         .ignoresSafeArea(.keyboard, edges: .bottom)

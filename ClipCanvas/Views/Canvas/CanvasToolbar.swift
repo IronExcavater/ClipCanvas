@@ -40,6 +40,8 @@ struct CanvasToolbar: View {
             .background { toolbarBackground }
             .shadow(color: .black.opacity(0.18), radius: 20, y: 8)
             .frame(maxWidth: min(configuration.preferredWidth, 560))
+            .contentShape(RoundedRectangle(cornerRadius: 36, style: .continuous))
+            .onTapGesture {}
             Spacer(minLength: 0)
         }
         .padding(.horizontal, 20)

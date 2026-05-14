@@ -8,26 +8,13 @@ struct CanvasTagPanel: View {
         VStack {
             Spacer()
             VStack(alignment: .leading, spacing: 10) {
-                HStack {
-                    Text(clips.count == 1 ? "Tags" : "Tags for \(clips.count)")
-                        .font(.headline.weight(.semibold))
-                    Spacer()
-                    Button(action: onDismiss) {
-                        Image(systemName: "xmark")
-                            .font(.system(size: 14, weight: .bold))
-                    }
-                    .buttonStyle(BlendedIconButtonStyle(size: 34))
-                    .accessibilityLabel("Close tags")
-                }
-
                 ScrollView {
                     ClipTagEditor(clips: clips, layout: .twoColumns)
                         .padding(.horizontal, 6)
                         .padding(.vertical, 4)
-                        .padding(.bottom, 6)
                 }
                 .scrollClipDisabled()
-                .frame(maxHeight: 250)
+                .frame(maxHeight: 220)
                 .appScrollDismissesKeyboardInteractively()
             }
             .padding(12)
@@ -44,6 +31,7 @@ struct CanvasTagPanel: View {
             .shadow(color: .black.opacity(0.16), radius: 22, y: 10)
             .padding(.horizontal, 18)
             .padding(.bottom, 92)
+            .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
         }
         .ignoresSafeArea(.container, edges: .bottom)
     }
