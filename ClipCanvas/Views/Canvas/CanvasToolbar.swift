@@ -19,7 +19,6 @@ struct CanvasToolbar: View {
     var onDrawEraser: () -> Void = {}
     var onDrawLasso: () -> Void = {}
     var onDrawConvert: () -> Void = {}
-    var onDrawSave: () -> Void = {}
     var onDrawClear: () -> Void = {}
 
     private var configuration: CanvasToolbarConfiguration {
@@ -88,8 +87,6 @@ struct CanvasToolbar: View {
             toolButton("lasso", action: onDrawLasso)
         case .drawConvert:
             toolButton("wand.and.sparkles", action: onDrawConvert)
-        case .drawSave:
-            toolButton("arrow.down.circle", action: onDrawSave)
         case .drawClear:
             toolButton("xmark.circle", action: onDrawClear)
         }

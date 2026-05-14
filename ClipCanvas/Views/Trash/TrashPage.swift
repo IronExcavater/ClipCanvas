@@ -115,9 +115,10 @@ struct TrashPage: View {
                             confirmingDeleteAll = true
                         }
                     } label: {
-                        AppMenuIconLabel()
+                        AppCircleIconLabel(systemImage: AppSymbol.options)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(BlendedIconButtonStyle())
+                    .accessibilityLabel("Recently deleted options")
                 }
             }
         }

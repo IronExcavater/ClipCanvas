@@ -96,10 +96,9 @@ struct CanvasContainerView: View {
                     onDelete: deleteSelected,
                     onDrawPen: { drawingTool = PKInkingTool(.pen, color: .label, width: 3) },
                     onDrawHighlighter: { drawingTool = PKInkingTool(.marker, color: .systemYellow.withAlphaComponent(0.5), width: 20) },
-                    onDrawEraser: { drawingTool = PKEraserTool(.vector) },
+                    onDrawEraser: { drawingTool = PKEraserTool(.fixedWidthBitmap, width: 34) },
                     onDrawLasso: { drawingTool = PKLassoTool() },
                     onDrawConvert: convertDrawing,
-                    onDrawSave: saveDrawing,
                     onDrawClear: { activeDrawing = PKDrawing() }
                 )
             }
@@ -261,28 +260,6 @@ struct CanvasContainerView: View {
     }
 
     // MARK: - Drawing
-
-    private func saveDrawing() {
-        guard !activeDrawing.strokes.isEmpty else { return }
-        let data = activeDrawing.dataRepresentation()
-        let bounds = activeDrawing.bounds
-        let size = CanvasPlacementSizing.softSnapSize(CGSize(
-            width: max(bounds.width, CanvasPlacementSizing.defaultSize.width),
-            height: max(bounds.height, CanvasPlacementSizing.defaultSize.height)
-        ))
-        let object = CanvasObject(
-            kind: .drawing,
-            workspace: workspace,
-            x: visibleViewportCenter.x - size.width / 2,
-            y: visibleViewportCenter.y - size.height / 2,
-            width: size.width,
-            height: size.height
-        )
-        object.drawingData = data
-        context.insert(object)
-        activeDrawing = PKDrawing()
-        showFeedback("Drawing saved")
-    }
 
     private func convertDrawing() {
         guard !activeDrawing.strokes.isEmpty else { return }

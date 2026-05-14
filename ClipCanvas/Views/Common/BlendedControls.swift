@@ -37,18 +37,6 @@ private struct BlendedIconButtonBackground: ViewModifier {
     }
 }
 
-struct AppMenuIconLabel: View {
-    var body: some View {
-        Image(systemName: AppSymbol.options)
-            .font(.system(size: 22, weight: .semibold))
-            .foregroundStyle(.primary)
-            .frame(width: 46, height: 46)
-            .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: Circle())
-            .shadow(color: .black.opacity(0.14), radius: 10, y: 5)
-            .contentShape(Circle())
-    }
-}
-
 struct AppCircleIconLabel: View {
     let systemImage: String
     var size: CGFloat = 46

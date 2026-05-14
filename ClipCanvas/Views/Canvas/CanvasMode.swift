@@ -42,7 +42,6 @@ nonisolated enum CanvasToolbarItem: Equatable {
     case drawEraser
     case drawLasso
     case drawConvert
-    case drawSave
     case drawClear
 }
 

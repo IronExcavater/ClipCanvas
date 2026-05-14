@@ -52,9 +52,10 @@ struct CanvasTopBar: View {
                     confirmingClear = true
                 }
             } label: {
-                AppMenuIconLabel()
+                AppCircleIconLabel(systemImage: AppSymbol.options)
             }
-            .buttonStyle(.plain)
+            .buttonStyle(BlendedIconButtonStyle())
+            .accessibilityLabel("Workspace options")
         }
         .padding(.horizontal, 16)
         .padding(.top, 4)
