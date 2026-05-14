@@ -40,24 +40,16 @@ struct AIChatDetailSheet: View {
     }
 
     private var chatHeader: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            Picker("Mode", selection: Binding(get: { chat.mode }, set: setMode)) {
-                Text("Quick").tag(AIChatMode.quick)
-                Text("Thinking").tag(AIChatMode.thinking)
-            }
-            .pickerStyle(.segmented)
-
-            HStack(spacing: 8) {
-                Label(chat.workspace?.name ?? "No workspace", systemImage: "rectangle.3.group")
-                Spacer()
-                Text(AIModelPresetService.preset(for: chat.mode).model)
-                    .monospaced()
-            }
-            .font(.caption)
-            .foregroundStyle(.secondary)
+        HStack(spacing: 8) {
+            Label(chat.workspace?.name ?? "No workspace", systemImage: "rectangle.3.group")
+            Spacer()
+            Text(AIModelPresetService.preset(for: chat.mode).model)
+                .monospaced()
         }
+        .font(.caption)
+        .foregroundStyle(.secondary)
         .padding(.horizontal, 16)
-        .padding(.vertical, 12)
+        .padding(.vertical, 10)
     }
 
     private var messageList: some View {
@@ -98,6 +90,22 @@ struct AIChatDetailSheet: View {
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
                 .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+
+            Menu {
+                Button { setMode(.quick) } label: {
+                    Label("Quick", systemImage: "bolt.fill")
+                }
+                Button { setMode(.thinking) } label: {
+                    Label("Thinking", systemImage: "brain")
+                }
+            } label: {
+                Image(systemName: chat.mode == .quick ? "bolt.fill" : "brain")
+                    .font(.system(size: 15, weight: .medium))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 36, height: 36)
+                    .background(Color.secondary.opacity(0.10), in: Circle())
+            }
+            .buttonStyle(.plain)
 
             Button(action: send) {
                 Image(systemName: "arrow.up")
