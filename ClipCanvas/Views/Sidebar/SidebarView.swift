@@ -113,10 +113,23 @@ struct SidebarView: View {
                     onCommitRename: { commitWorkspaceRename() },
                     onDelete: { WorkspaceActionService.softDelete(ws, among: workspaces) }
                 )
+                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                    Button(role: .destructive) {
+                        WorkspaceActionService.softDelete(ws, among: workspaces)
+                    } label: {
+                        Label("Delete", systemImage: "trash")
+                    }
+                }
+                .swipeActions(edge: .leading, allowsFullSwipe: false) {
+                    Button { beginWorkspaceRename(ws) } label: {
+                        Label("Rename", systemImage: "pencil")
+                    }
+                    .tint(.accentColor)
+                }
                 .appListItemRowInsets(vertical: 3)
             }
         } header: {
-            sectionHeader("Workspaces", destination: WorkspacesPage())
+            workspacesHeader
         }
     }
 
@@ -163,7 +176,14 @@ struct SidebarView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
                     .onTapGesture { onOpenAIChat?(chat) }
-                    .appListCard(tint: .secondary, opacity: 0.08)
+                    .appListCard(tint: .secondary, opacity: 0.06)
+                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+                        Button(role: .destructive) {
+                            context.delete(chat)
+                        } label: {
+                            Label("Delete", systemImage: "trash")
+                        }
+                    }
                     .contextMenu {
                         Button("Rename", systemImage: "pencil") {
                             beginChatRename(chat)
@@ -178,6 +198,37 @@ struct SidebarView: View {
         } header: {
             aiChatsHeader
         }
+    }
+
+    private var workspacesHeader: some View {
+        HStack(spacing: 8) {
+            NavigationLink(destination: WorkspacesPage()) {
+                HStack(spacing: 8) {
+                    Text("Workspaces")
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    HStack(spacing: 4) {
+                        Text("View all")
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.bold))
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.accentColor)
+                }
+            }
+            .buttonStyle(.plain)
+
+            Button(action: createWorkspace) {
+                Image(systemName: "plus")
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(width: 34, height: 34)
+            }
+            .buttonStyle(BlendedIconButtonStyle(size: 34))
+            .accessibilityLabel("New Workspace")
+        }
+        .textCase(nil)
+        .padding(.vertical, 4)
     }
 
     private func sectionHeader<Destination: View>(_ title: String, destination: Destination) -> some View {
@@ -308,6 +359,12 @@ struct SidebarView: View {
         }
         renamingChat = nil
         renameChatText = ""
+    }
+
+    private func createWorkspace() {
+        let ws = WorkspaceActionService.create(in: context, existing: workspaces)
+        activateWorkspace(ws)
+        beginWorkspaceRename(ws)
     }
 
     private func createChat() {

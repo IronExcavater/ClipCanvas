@@ -14,7 +14,7 @@ struct WorkspaceRowView: View {
     @FocusState private var focused: Bool
 
     var body: some View {
-        AppListItemButton(tint: .secondary, opacity: workspace.isActive ? 0.16 : 0.12, action: onActivate) {
+        AppListItemButton(tint: .secondary, opacity: workspace.isActive ? 0.12 : 0.07, action: onActivate) {
             rowContent
                 .frame(minHeight: 48)
         }
