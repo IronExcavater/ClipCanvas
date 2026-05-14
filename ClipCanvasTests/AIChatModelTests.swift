@@ -66,6 +66,20 @@ import Testing
         #expect(event.message?.id == message.id)
     }
 
+    @Test func sortedToolEventsUseCreationDate() {
+        let message = ChatMessage(role: .assistant, content: "")
+        let newer = AIToolEvent(toolName: "canvas_move_objects", status: .completed, summary: "Moved")
+        newer.createdAt = Date(timeIntervalSince1970: 20)
+        let older = AIToolEvent(toolName: "canvas_create_sticky_note", status: .completed, summary: "Created")
+        older.createdAt = Date(timeIntervalSince1970: 10)
+        message.toolEvents = [newer, older]
+
+        #expect(message.sortedToolEvents.map(\.toolName) == [
+            "canvas_create_sticky_note",
+            "canvas_move_objects",
+        ])
+    }
+
     @Test func attachmentStatesStillReflectClipLifecycle() {
         let clip = Clip(content: "Attached", origin: .clipboard)
         let attachment = ChatAttachment(clip: clip)

@@ -103,6 +103,15 @@ final class ChatMessage {
         get { ChatMessageStatus(rawValue: statusRaw) ?? .completed }
         set { statusRaw = newValue.rawValue }
     }
+
+    var sortedToolEvents: [AIToolEvent] {
+        toolEvents.sorted { lhs, rhs in
+            if lhs.createdAt == rhs.createdAt {
+                return lhs.id.uuidString < rhs.id.uuidString
+            }
+            return lhs.createdAt < rhs.createdAt
+        }
+    }
 }
 
 @Model

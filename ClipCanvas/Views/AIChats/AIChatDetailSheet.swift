@@ -148,18 +148,110 @@ private struct AIChatMessageBubble: View {
     let message: ChatMessage
 
     private var isUser: Bool { message.role == .user }
+    private var hasVisibleContent: Bool {
+        !message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || message.sortedToolEvents.isEmpty
+    }
 
     var body: some View {
-        HStack {
-            if isUser { Spacer(minLength: 44) }
-            Text(message.content)
-                .font(.body)
-                .foregroundStyle(isUser ? .white : .primary)
-                .textSelection(.enabled)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(isUser ? Color.accentColor : Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-            if !isUser { Spacer(minLength: 44) }
+        VStack(alignment: isUser ? .trailing : .leading, spacing: 6) {
+            if hasVisibleContent {
+                HStack {
+                    if isUser { Spacer(minLength: 44) }
+                    Text(message.content)
+                        .font(.body)
+                        .foregroundStyle(isUser ? .white : .primary)
+                        .textSelection(.enabled)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 10)
+                        .background(
+                            isUser ? Color.accentColor : Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground),
+                            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                        )
+                    if !isUser { Spacer(minLength: 44) }
+                }
+            }
+
+            ForEach(message.sortedToolEvents) { event in
+                HStack {
+                    if isUser { Spacer(minLength: 44) }
+                    AIChatToolEventRow(event: event)
+                    if !isUser { Spacer(minLength: 44) }
+                }
+            }
         }
+    }
+}
+
+private struct AIChatToolEventRow: View {
+    let event: AIToolEvent
+
+    var body: some View {
+        HStack(spacing: 8) {
+            if event.status == .running || event.status == .queued {
+                ProgressView()
+                    .controlSize(.mini)
+                    .frame(width: 18, height: 18)
+            } else {
+                Image(systemName: event.status.symbolName)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundStyle(event.status.tint)
+                    .frame(width: 18, height: 18)
+            }
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(event.summary)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(2)
+                Text(event.toolName.displayToolName)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground).opacity(0.86), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(event.status.tint.opacity(0.20), lineWidth: 1)
+        }
+    }
+}
+
+private extension AIToolEventStatus {
+    var symbolName: String {
+        switch self {
+        case .queued:
+            return "clock"
+        case .running:
+            return "arrow.triangle.2.circlepath"
+        case .needsConfirmation:
+            return "exclamationmark.shield.fill"
+        case .completed:
+            return "checkmark.circle.fill"
+        case .failed:
+            return "xmark.octagon.fill"
+        }
+    }
+
+    var tint: Color {
+        switch self {
+        case .queued, .running:
+            return .secondary
+        case .needsConfirmation:
+            return .orange
+        case .completed:
+            return .green
+        case .failed:
+            return .red
+        }
+    }
+}
+
+private extension String {
+    var displayToolName: String {
+        replacingOccurrences(of: "_", with: " ")
+            .replacingOccurrences(of: ".", with: " ")
     }
 }
