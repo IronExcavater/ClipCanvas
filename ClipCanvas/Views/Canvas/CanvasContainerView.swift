@@ -70,13 +70,17 @@ struct CanvasContainerView: View {
                 CanvasToolbar(
                     mode: $mode,
                     selectedCount: selectedObjectIDs.count,
+                    isEditing: editingObjectID != nil,
                     onPaste: paste,
-                    onCopy: copySelected,
+                    onAskAI: askAIAboutSelection,
                     onDetails: showSelectedDetails,
                     onEditContent: editSelectedContent,
-                    onDelete: deleteSelected,
+                    onManageTags: showSelectedTags,
                     onArrangeSelection: { zoomCommand = .arrangeSelection },
-                    onManageTags: showSelectedTags
+                    onBullet: { /* wired in commit 4 with UITextView editor */ },
+                    onColor: { /* wired in commit 5 */ },
+                    onDone: exitEditing,
+                    onDelete: deleteSelected
                 )
             }
             .ignoresSafeArea(.container, edges: .bottom)
@@ -188,6 +192,10 @@ struct CanvasContainerView: View {
     private func editSelectedContent() {
         guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first else { return }
         editingObjectID = id
+    }
+
+    private func exitEditing() {
+        editingObjectID = nil
     }
 
     private func deleteSelected() {

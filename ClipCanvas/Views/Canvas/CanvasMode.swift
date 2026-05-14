@@ -1,19 +1,17 @@
 nonisolated enum CanvasMode: Equatable, CaseIterable {
-    case pan    // default: drag pans canvas, tap object selects it
-    case edit   // text and sticky-note editing become primary
-    case draw   // PencilKit layer (Phase 2 - mode exists but no drawing yet)
+    case pan    // drag pans, tap selects
+    case edit   // tap opens inline editing
+    case draw   // PencilKit layer
 
     var systemImage: String {
         switch self {
-        case .pan: "hand.point.up.left"
+        case .pan:  "hand.point.up.left"
         case .edit: "text.cursor"
         case .draw: "pencil.tip"
         }
     }
 
-    var allowsCanvasPan: Bool {
-        self == .pan
-    }
+    var allowsCanvasPan: Bool { self == .pan }
 }
 
 enum ZoomCommand: Equatable {
@@ -26,51 +24,78 @@ enum ZoomCommand: Equatable {
 
 nonisolated enum CanvasToolbarItem: Equatable {
     case paste
-    case copy
+    case askAI
     case details
     case editContent
     case manageTags
     case arrangeSelection
+    case bullet
+    case color
+    case done
     case delete
     case divider
     case mode(CanvasMode)
+    case drawPen
+    case drawHighlighter
+    case drawEraser
+    case drawLasso
+    case drawConvert
+    case drawSave
+    case drawClear
 }
 
 nonisolated struct CanvasToolbarConfiguration: Equatable {
     var items: [CanvasToolbarItem]
 
-    static func make(selectedCount: Int, mode: CanvasMode) -> CanvasToolbarConfiguration {
-        if selectedCount > 0 {
-            switch mode {
-            case .pan:
-                return CanvasToolbarConfiguration(items: [
-                    .copy,
-                    .divider,
-                    .details,
-                    .arrangeSelection
-                ])
-            case .edit:
+    static func make(selectedCount: Int, mode: CanvasMode, isEditing: Bool = false) -> CanvasToolbarConfiguration {
+        switch mode {
+        case .draw:
+            return CanvasToolbarConfiguration(items: [
+                .drawPen, .drawHighlighter, .drawEraser, .drawLasso,
+                .divider,
+                .drawConvert, .drawSave, .drawClear
+            ])
+
+        case .edit:
+            if selectedCount > 0 {
+                if isEditing {
+                    return CanvasToolbarConfiguration(items: [
+                        .editContent,
+                        .divider,
+                        .bullet, .color,
+                        .divider,
+                        .done
+                    ])
+                }
                 return CanvasToolbarConfiguration(items: [
                     .editContent,
                     .divider,
-                    .manageTags,
-                    .delete
-                ])
-            case .draw:
-                return CanvasToolbarConfiguration(items: [
-                    .details,
+                    .color, .manageTags,
                     .divider,
                     .delete
                 ])
             }
-        }
+            return CanvasToolbarConfiguration(items: [
+                .paste,
+                .divider,
+                .mode(.pan), .mode(.edit), .mode(.draw)
+            ])
 
-        return CanvasToolbarConfiguration(items: [
-            .paste,
-            .divider,
-            .mode(.pan),
-            .mode(.edit),
-            .mode(.draw)
-        ])
+        case .pan:
+            if selectedCount > 0 {
+                return CanvasToolbarConfiguration(items: [
+                    .askAI,
+                    .divider,
+                    .arrangeSelection, .details,
+                    .divider,
+                    .delete
+                ])
+            }
+            return CanvasToolbarConfiguration(items: [
+                .paste,
+                .divider,
+                .mode(.pan), .mode(.edit), .mode(.draw)
+            ])
+        }
     }
 }

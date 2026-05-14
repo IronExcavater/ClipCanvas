@@ -3,17 +3,27 @@ import SwiftUI
 struct CanvasToolbar: View {
     @Binding var mode: CanvasMode
     let selectedCount: Int
+    var isEditing: Bool = false
     let onPaste: () -> Void
-    let onCopy: () -> Void
+    let onAskAI: () -> Void
     let onDetails: () -> Void
     let onEditContent: () -> Void
-    let onDelete: () -> Void
-    let onArrangeSelection: () -> Void
     let onManageTags: () -> Void
+    let onArrangeSelection: () -> Void
+    let onBullet: () -> Void
+    let onColor: () -> Void
+    let onDone: () -> Void
+    let onDelete: () -> Void
+    var onDrawPen: () -> Void = {}
+    var onDrawHighlighter: () -> Void = {}
+    var onDrawEraser: () -> Void = {}
+    var onDrawLasso: () -> Void = {}
+    var onDrawConvert: () -> Void = {}
+    var onDrawSave: () -> Void = {}
+    var onDrawClear: () -> Void = {}
 
-    private var hasSelection: Bool { selectedCount > 0 }
     private var configuration: CanvasToolbarConfiguration {
-        CanvasToolbarConfiguration.make(selectedCount: selectedCount, mode: mode)
+        CanvasToolbarConfiguration.make(selectedCount: selectedCount, mode: mode, isEditing: isEditing)
     }
     private let buttonSize: CGFloat = 52
     private let iconSize: CGFloat = 19
@@ -26,16 +36,15 @@ struct CanvasToolbar: View {
         }
         .padding(.horizontal, 12)
         .padding(.vertical, 7)
-        .background {
-            toolbarBackground
-        }
+        .background { toolbarBackground }
         .shadow(color: .black.opacity(0.18), radius: 20, y: 8)
         .padding(.horizontal, 20)
         .padding(.bottom, 24)
-        .frame(maxWidth: hasSelection ? 420 : 300)
+        .frame(maxWidth: selectedCount > 0 ? 420 : 300)
         .frame(maxWidth: .infinity)
         .ignoresSafeArea(.container, edges: .bottom)
         .ignoresSafeArea(.keyboard, edges: .bottom)
+        .animation(.spring(response: 0.24, dampingFraction: 0.82), value: configuration)
     }
 
     @ViewBuilder
@@ -43,26 +52,44 @@ struct CanvasToolbar: View {
         switch item {
         case .paste:
             toolButton("doc.on.clipboard", action: onPaste)
-        case .copy:
-            toolButton("doc.on.doc", action: onCopy)
+        case .askAI:
+            toolButton("sparkles", action: onAskAI)
         case .details:
             toolButton("info.circle", action: onDetails)
                 .disabled(selectedCount != 1)
                 .opacity(selectedCount == 1 ? 1 : 0.42)
         case .editContent:
-            toolButton("square.and.pencil", action: onEditContent)
-                .disabled(selectedCount != 1)
-                .opacity(selectedCount == 1 ? 1 : 0.42)
+            toolButton("text.cursor", action: onEditContent)
         case .manageTags:
             toolButton("tag", action: onManageTags)
         case .arrangeSelection:
             toolButton("square.grid.2x2", action: onArrangeSelection)
+        case .bullet:
+            toolButton("list.bullet", action: onBullet)
+        case .color:
+            toolButton("paintpalette", action: onColor)
+        case .done:
+            doneButton()
         case .delete:
             destructiveButton("trash", action: onDelete)
         case .divider:
             AppDivider()
         case .mode(let canvasMode):
             modeButton(canvasMode.systemImage, for: canvasMode)
+        case .drawPen:
+            toolButton("pencil.tip", action: onDrawPen)
+        case .drawHighlighter:
+            toolButton("highlighter", action: onDrawHighlighter)
+        case .drawEraser:
+            toolButton("eraser", action: onDrawEraser)
+        case .drawLasso:
+            toolButton("lasso", action: onDrawLasso)
+        case .drawConvert:
+            toolButton("wand.and.sparkles", action: onDrawConvert)
+        case .drawSave:
+            toolButton("arrow.down.circle", action: onDrawSave)
+        case .drawClear:
+            toolButton("xmark.circle", action: onDrawClear)
         }
     }
 
@@ -70,8 +97,7 @@ struct CanvasToolbar: View {
         Button { mode = target } label: {
             let selected = mode == target
             ZStack {
-                Circle()
-                    .fill(selected ? Color.accentColor : Color.clear)
+                Circle().fill(selected ? Color.accentColor : Color.clear)
                 Image(systemName: icon)
                     .font(.system(size: iconSize, weight: .semibold))
                     .foregroundStyle(selected ? .white : .primary)
@@ -103,6 +129,17 @@ struct CanvasToolbar: View {
         .buttonStyle(.plain)
     }
 
+    private func doneButton() -> some View {
+        Button(action: onDone) {
+            Text("Done")
+                .font(.subheadline.weight(.semibold))
+                .foregroundStyle(Color.accentColor)
+                .padding(.horizontal, 14)
+                .frame(height: buttonSize)
+        }
+        .buttonStyle(.plain)
+    }
+
     private func destructiveButton(_ icon: String, action: @escaping () -> Void) -> some View {
         Button(role: .destructive, action: action) {
             ZStack {
@@ -123,8 +160,7 @@ struct CanvasToolbar: View {
                 .fill(Color.clear)
                 .glassEffect(.regular, in: .rect(cornerRadius: 36))
         } else {
-            Capsule()
-                .fill(.regularMaterial)
+            Capsule().fill(.regularMaterial)
         }
     }
 }
@@ -135,25 +171,22 @@ struct CanvasZoomControls: View {
     let onZoomOut: () -> Void
 
     var body: some View {
-        VStack(spacing: 5) {
-            zoomButton("plus", action: onZoomIn)
+        ZStack {
+            VStack(spacing: 0) {
+                zoomButton("plus", action: onZoomIn)
+                zoomButton("minus", action: onZoomOut)
+            }
             Text("\(Int((scale * 100).rounded()))%")
-                .font(.caption2.weight(.semibold))
-                .monospacedDigit()
+                .font(.system(size: 9, weight: .semibold).monospacedDigit())
                 .foregroundStyle(.secondary)
-                .lineLimit(1)
-                .minimumScaleFactor(0.75)
-                .frame(width: 38, height: 18)
-            zoomButton("minus", action: onZoomOut)
+                .allowsHitTesting(false)
         }
         .font(.system(size: 16, weight: .semibold))
         .foregroundStyle(.primary)
         .buttonStyle(.plain)
         .frame(width: 44)
         .padding(.vertical, 5)
-        .background {
-            zoomBackground
-        }
+        .background { zoomBackground }
         .shadow(color: .black.opacity(0.14), radius: 12, y: 5)
         .ignoresSafeArea(.container, edges: .bottom)
         .ignoresSafeArea(.keyboard, edges: .bottom)
@@ -174,8 +207,7 @@ struct CanvasZoomControls: View {
                 .fill(Color.clear)
                 .glassEffect(.regular, in: .rect(cornerRadius: 22))
         } else {
-            Capsule()
-                .fill(.regularMaterial)
+            Capsule().fill(.regularMaterial)
         }
     }
 }
