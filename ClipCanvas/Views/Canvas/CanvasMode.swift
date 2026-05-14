@@ -33,6 +33,9 @@ nonisolated enum CanvasToolbarItem: Equatable {
     case manageTags
     case arrangeSelection
     case color
+    case formatBold
+    case formatBullet
+    case formatHighlight
     case done
     case delete
     case divider
@@ -83,9 +86,9 @@ nonisolated struct CanvasToolbarConfiguration: Equatable {
                 if isEditing {
                     return CanvasToolbarConfiguration(items: [
                         .closeMode,
-                        .editContent,
-                        .color,
-                        .done
+                        .formatBold,
+                        .formatBullet,
+                        .formatHighlight
                     ])
                 }
                 return CanvasToolbarConfiguration(items: [
@@ -97,7 +100,7 @@ nonisolated struct CanvasToolbarConfiguration: Equatable {
             }
             return CanvasToolbarConfiguration(items: [
                 .closeMode,
-                .newNote, .askAI,
+                .newNote, .color,
             ])
 
         case .pan:

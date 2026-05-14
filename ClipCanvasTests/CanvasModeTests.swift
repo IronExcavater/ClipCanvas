@@ -26,7 +26,7 @@ import Testing
         #expect(configuration.items == [
             .closeMode,
             .newNote,
-            .askAI
+            .color
         ])
     }
 
@@ -36,6 +36,17 @@ import Testing
         #expect(configuration.items == [
             .askAI,
             .arrangeSelection, .details
+        ])
+    }
+
+    @Test func editTextToolbarShowsFormattingActions() {
+        let configuration = CanvasToolbarConfiguration.make(selectedCount: 1, mode: .edit, isEditing: true)
+
+        #expect(configuration.items == [
+            .closeMode,
+            .formatBold,
+            .formatBullet,
+            .formatHighlight
         ])
     }
 

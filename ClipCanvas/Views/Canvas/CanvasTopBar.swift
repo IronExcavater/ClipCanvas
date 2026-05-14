@@ -32,11 +32,6 @@ struct CanvasTopBar: View {
             Spacer()
 
             title
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background {
-                    WorkspaceTitleBackdrop()
-                }
                 .animation(.spring(response: 0.24, dampingFraction: 0.86), value: isRenaming)
                 .animation(.spring(response: 0.24, dampingFraction: 0.86), value: workspaceName)
 
@@ -98,13 +93,21 @@ struct CanvasTopBar: View {
                     if isRenaming { onCommitRename() }
                 }
                 .frame(width: titleWidth(for: renameText))
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background { WorkspaceTitleBackdrop() }
         } else {
             Menu {
                 ForEach(workspaces) { workspace in
                     Button {
                         onSelectWorkspace(workspace)
                     } label: {
-                        Label(workspace.name, systemImage: workspace.id == activeWorkspaceID ? "checkmark" : "square")
+                        HStack {
+                            Text(workspace.name)
+                            if workspace.id == activeWorkspaceID {
+                                Image(systemName: "checkmark")
+                            }
+                        }
                     }
                 }
                 Divider()
@@ -115,6 +118,9 @@ struct CanvasTopBar: View {
                     .foregroundStyle(.primary)
                     .lineLimit(1)
                     .frame(width: titleWidth(for: workspaceName))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background { WorkspaceTitleBackdrop() }
             }
             .buttonStyle(.plain)
             .simultaneousGesture(LongPressGesture(minimumDuration: 0.45).onEnded { _ in onBeginRename() })
@@ -124,7 +130,7 @@ struct CanvasTopBar: View {
     private func titleWidth(for text: String) -> CGFloat {
         let visibleCharacters = min(max(text.count, 6), WorkspaceNamePolicy.maximumLength)
         let estimated = CGFloat(visibleCharacters) * 12 + 18
-        return min(max(estimated, 82), 236)
+        return min(max(estimated, 82), 176)
     }
 }
 

@@ -23,6 +23,7 @@ struct CanvasContainerView: View {
     @State private var selectedObjectIDs: Set<UUID> = []
     @State private var visibleObjectIDs: Set<UUID> = []
     @State private var editingObjectID: UUID?
+    @State private var noteTextCommand: NoteTextCommand?
     @State private var detailClip: Clip?
     @State private var activeAIChat: AIChat?
     @State private var tagEditSelection: ClipTagEditSelection?
@@ -53,6 +54,7 @@ struct CanvasContainerView: View {
                 visibleViewportCenter: $visibleViewportCenter,
                 visibleObjectIDs: $visibleObjectIDs,
                 activeDrawing: $activeDrawing,
+                noteTextCommand: $noteTextCommand,
                 drawingTool: pencilTool
             )
             .ignoresSafeArea()
@@ -108,12 +110,15 @@ struct CanvasContainerView: View {
                     onManageTags: showSelectedTags,
                     onArrangeSelection: { zoomCommand = .arrangeSelection },
                     onColor: showSelectedColors,
+                    onFormatBold: { noteTextCommand = NoteTextCommand(kind: .bold) },
+                    onFormatBullet: { noteTextCommand = NoteTextCommand(kind: .bullet) },
+                    onFormatHighlight: { noteTextCommand = NoteTextCommand(kind: .highlight) },
                     onDone: exitEditing,
                     onDelete: deleteSelected,
                     activeDrawTool: activeDrawTool,
-                    onCloseMode: leaveMode,
+                    onCloseMode: closeToolbarMode,
                     onDrawTool: selectDrawTool,
-                    onDrawToolSettings: { drawToolSettings = $0 }
+                    onDrawToolSettings: toggleDrawToolSettings
                 )
             }
             .ignoresSafeArea(.container, edges: .bottom)
@@ -192,7 +197,6 @@ struct CanvasContainerView: View {
         .sheet(item: $activeAIChat) { chat in
             AIChatDetailSheet(chat: chat)
         }
-        .ignoresSafeArea(.keyboard, edges: .bottom)
     }
 
     private var pencilTool: PKTool {
@@ -216,9 +220,23 @@ struct CanvasContainerView: View {
         }
     }
 
+    private func closeToolbarMode() {
+        if editingObjectID == nil {
+            leaveMode()
+        } else {
+            exitEditing()
+        }
+    }
+
     private func selectDrawTool(_ tool: CanvasDrawTool) {
         activeDrawTool = tool
-        drawToolSettings = nil
+        if drawToolSettings != nil {
+            drawToolSettings = tool.supportsSettings ? tool : nil
+        }
+    }
+
+    private func toggleDrawToolSettings(_ tool: CanvasDrawTool) {
+        drawToolSettings = drawToolSettings == tool ? nil : tool
     }
 
     private func drawColor(for tool: CanvasDrawTool) -> PlatformColor? {

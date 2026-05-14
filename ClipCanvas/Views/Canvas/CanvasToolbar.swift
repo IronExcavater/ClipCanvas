@@ -12,6 +12,9 @@ struct CanvasToolbar: View {
     let onManageTags: () -> Void
     let onArrangeSelection: () -> Void
     let onColor: () -> Void
+    let onFormatBold: () -> Void
+    let onFormatBullet: () -> Void
+    let onFormatHighlight: () -> Void
     let onDone: () -> Void
     let onDelete: () -> Void
     var activeDrawTool: CanvasDrawTool = .pen
@@ -47,7 +50,6 @@ struct CanvasToolbar: View {
         .padding(.horizontal, 20)
         .padding(.bottom, 24)
         .ignoresSafeArea(.container, edges: .bottom)
-        .ignoresSafeArea(.keyboard, edges: .bottom)
         .animation(.spring(response: 0.24, dampingFraction: 0.82), value: configuration)
     }
 
@@ -72,6 +74,12 @@ struct CanvasToolbar: View {
             toolButton("square.grid.2x2", action: onArrangeSelection)
         case .color:
             toolButton("paintpalette", action: onColor)
+        case .formatBold:
+            toolButton("bold", action: onFormatBold)
+        case .formatBullet:
+            toolButton("list.bullet", action: onFormatBullet)
+        case .formatHighlight:
+            toolButton("highlighter", action: onFormatHighlight)
         case .done:
             doneButton()
         case .delete:

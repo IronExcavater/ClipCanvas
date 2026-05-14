@@ -8,6 +8,7 @@ struct CanvasObjectView: View {
     let onDoubleTap: () -> Void
     var isEditing = false
     var editingText = ""
+    var textCommand: NoteTextCommand?
     let onCommitEditing: (String) -> Void
     var onExitEditing: () -> Void = {}
     var onEditorSizeChange: (CGSize) -> Void = { _ in }
@@ -31,11 +32,13 @@ struct CanvasObjectView: View {
                     .padding(.trailing, 42)
             }
 
-            CanvasResizeHandle(
-                onResize: onResize,
-                onResizeEnded: onResizeEnded,
-                onToggleExpandedSize: onToggleExpandedSize
-            )
+            if !isEditing {
+                CanvasResizeHandle(
+                    onResize: onResize,
+                    onResizeEnded: onResizeEnded,
+                    onToggleExpandedSize: onToggleExpandedSize
+                )
+            }
         }
         .background {
             if usesStickySurface {
@@ -61,17 +64,21 @@ struct CanvasObjectView: View {
         }
         .shadow(color: .black.opacity(isSelected ? 0.16 : 0.08), radius: isSelected ? 10 : 5, y: isSelected ? 4 : 2)
         .contentShape(Rectangle())
-        .onTapGesture(count: 2, perform: onDoubleTap)
-        .onTapGesture(perform: onTap)
-        .gesture(
-            isEditing ? DragGesture(minimumDistance: 20)
-                .onEnded { value in
-                    if value.translation.height > 40 && abs(value.translation.width) < 80 {
-                        onExitEditing()
-                    }
-                } : nil
-        )
+        .gesture(tapGesture)
         .animation(.spring(response: 0.18, dampingFraction: 0.8), value: isSelected)
+    }
+
+    private var tapGesture: some Gesture {
+        TapGesture(count: 2)
+            .exclusively(before: TapGesture())
+            .onEnded { value in
+                switch value {
+                case .first:
+                    onDoubleTap()
+                case .second:
+                    onTap()
+                }
+            }
     }
 
     private var noteFontSize: CGFloat {
@@ -86,6 +93,7 @@ struct CanvasObjectView: View {
             NoteTextEditor(
                 initialText: editingText,
                 fontSize: noteFontSize,
+                command: textCommand,
                 onCommit: onCommitEditing,
                 onExitEditing: onExitEditing,
                 onSizeChange: onEditorSizeChange

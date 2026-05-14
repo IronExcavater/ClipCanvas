@@ -18,9 +18,8 @@ struct CanvasDrawToolSettingsPanel: View {
     }
 
     var body: some View {
-        VStack {
-            Spacer()
-
+        ZStack(alignment: .bottom) {
+            Color.clear.allowsHitTesting(false)
             VStack(alignment: .leading, spacing: 10) {
                 if color != nil {
                     HStack(spacing: 8) {

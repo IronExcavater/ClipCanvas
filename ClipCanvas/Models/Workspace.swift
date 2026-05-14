@@ -98,8 +98,8 @@ final class CanvasPlacement: Identifiable {
     var clip: Clip?           // nullify on clip delete — placement disappears naturally
     var x: Double
     var y: Double
-    var width: Double = 220
-    var height: Double = 150
+    var width: Double = Double(CanvasPlacementSizing.defaultSize.width)
+    var height: Double = Double(CanvasPlacementSizing.defaultSize.height)
     var createdAt: Date = Date()
 
     init(clip: Clip?, x: Double, y: Double) {

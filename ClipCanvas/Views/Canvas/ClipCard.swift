@@ -1,4 +1,7 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct ClipCard: View {
     let clip: Clip
@@ -9,6 +12,8 @@ struct ClipCard: View {
     let onDoubleTap: () -> Void
     var isEditing = false
     var editingText = ""
+    var fontSize: CGFloat = 15
+    var textCommand: NoteTextCommand?
     let onCommitEditing: (String) -> Void
     var onExitEditing: () -> Void = {}
     var onEditorSizeChange: (CGSize) -> Void = { _ in }
@@ -32,7 +37,9 @@ struct ClipCard: View {
                     .padding(.trailing, 42)
             }
 
-            resizeHandle
+            if !isEditing {
+                resizeHandle
+            }
         }
         .background {
             cardSurface
@@ -45,17 +52,21 @@ struct ClipCard: View {
         )
         .shadow(color: .black.opacity(isSelected ? 0.16 : 0.09), radius: isSelected ? 10 : 6, y: isSelected ? 4 : 2)
         .contentShape(StickyNoteShape())
-        .onTapGesture(count: 2, perform: onDoubleTap)
-        .onTapGesture(perform: onTap)
-        .gesture(
-            isEditing ? DragGesture(minimumDistance: 20)
-                .onEnded { value in
-                    if value.translation.height > 40 && abs(value.translation.width) < 80 {
-                        onExitEditing()
-                    }
-                } : nil
-        )
+        .gesture(tapGesture)
         .animation(.spring(response: 0.18, dampingFraction: 0.8), value: isSelected)
+    }
+
+    private var tapGesture: some Gesture {
+        TapGesture(count: 2)
+            .exclusively(before: TapGesture())
+            .onEnded { value in
+                switch value {
+                case .first:
+                    onDoubleTap()
+                case .second:
+                    onTap()
+                }
+            }
     }
 
     private var content: some View {
@@ -65,6 +76,8 @@ struct ClipCard: View {
             } else if isEditing, clip.type != .image {
                 NoteTextEditor(
                     initialText: editingText,
+                    fontSize: fontSize,
+                    command: textCommand,
                     onCommit: onCommitEditing,
                     onExitEditing: onExitEditing,
                     onSizeChange: onEditorSizeChange
@@ -73,7 +86,7 @@ struct ClipCard: View {
                 platformImage(image)
             } else {
                 Text(clip.preview.isEmpty ? " " : clip.preview)
-                    .font(.system(size: 15))
+                    .font(.system(size: fontSize))
                     .lineLimit(nil)
                     .foregroundStyle(.primary)
             }
@@ -157,23 +170,182 @@ struct StickyNoteShape: InsettableShape {
     }
 }
 
-struct NoteTextEditor: View {
+#if canImport(UIKit)
+struct NoteTextEditor: UIViewRepresentable {
     let initialText: String
     var fontSize: CGFloat = 15
+    var command: NoteTextCommand?
     let onCommit: (String) -> Void
     var onExitEditing: () -> Void = {}
     var onSizeChange: (CGSize) -> Void = { _ in }
-    @State private var text: String
 
     init(
         initialText: String,
         fontSize: CGFloat = 15,
+        command: NoteTextCommand? = nil,
         onCommit: @escaping (String) -> Void,
         onExitEditing: @escaping () -> Void = {},
         onSizeChange: @escaping (CGSize) -> Void = { _ in }
     ) {
         self.initialText = initialText
         self.fontSize = fontSize
+        self.command = command
+        self.onCommit = onCommit
+        self.onExitEditing = onExitEditing
+        self.onSizeChange = onSizeChange
+    }
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(
+            text: initialText,
+            onCommit: onCommit,
+            onExitEditing: onExitEditing,
+            onSizeChange: onSizeChange
+        )
+    }
+
+    func makeUIView(context: Context) -> UITextView {
+        let tv = UITextView()
+        tv.delegate = context.coordinator
+        context.coordinator.textView = tv
+        tv.backgroundColor = .clear
+        tv.font = .systemFont(ofSize: fontSize)
+        tv.textColor = .label
+        tv.isScrollEnabled = true
+        tv.text = initialText
+        tv.textContainerInset = .zero
+        tv.textContainer.lineFragmentPadding = 0
+        DispatchQueue.main.async { tv.becomeFirstResponder() }
+        let coordinator = context.coordinator
+        DispatchQueue.main.async { coordinator.reportSize(tv) }
+        return tv
+    }
+
+    func updateUIView(_ uiView: UITextView, context: Context) {
+        uiView.font = .systemFont(ofSize: fontSize)
+        if let command {
+            context.coordinator.apply(command, to: uiView)
+        }
+        let coordinator = context.coordinator
+        DispatchQueue.main.async {
+            coordinator.reportSize(uiView)
+        }
+    }
+
+    final class Coordinator: NSObject, UITextViewDelegate {
+        var text: String
+        let onCommit: (String) -> Void
+        let onExitEditing: () -> Void
+        let onSizeChange: (CGSize) -> Void
+        weak var textView: UITextView?
+        private var hasExited = false
+        private var lastCommandID: UUID?
+
+        init(
+            text: String,
+            onCommit: @escaping (String) -> Void,
+            onExitEditing: @escaping () -> Void,
+            onSizeChange: @escaping (CGSize) -> Void
+        ) {
+            self.text = text
+            self.onCommit = onCommit
+            self.onExitEditing = onExitEditing
+            self.onSizeChange = onSizeChange
+        }
+
+        func textViewDidChange(_ textView: UITextView) {
+            text = textView.text ?? ""
+            onCommit(text)
+            reportSize(textView)
+        }
+
+        func textViewDidEndEditing(_ textView: UITextView) {
+            textView.contentOffset = .zero
+            onCommit(text)
+            guard !hasExited else { return }
+            hasExited = true
+            onExitEditing()
+        }
+
+        func apply(_ command: NoteTextCommand, to textView: UITextView) {
+            guard lastCommandID != command.id else { return }
+            lastCommandID = command.id
+
+            switch command.kind {
+            case .bold:
+                wrapSelection(in: textView, prefix: "**", suffix: "**", placeholder: "bold")
+            case .highlight:
+                wrapSelection(in: textView, prefix: "==", suffix: "==", placeholder: "highlight")
+            case .bullet:
+                applyBullet(in: textView)
+            }
+
+            text = textView.text ?? ""
+            onCommit(text)
+            reportSize(textView)
+        }
+
+        private func wrapSelection(
+            in textView: UITextView,
+            prefix: String,
+            suffix: String,
+            placeholder: String
+        ) {
+            let range = textView.selectedRange
+            let source = textView.text ?? ""
+            let ns = source as NSString
+            let selected = range.length > 0 ? ns.substring(with: range) : placeholder
+            let replacement = "\(prefix)\(selected)\(suffix)"
+            textView.text = ns.replacingCharacters(in: range, with: replacement)
+            let cursorOffset = range.length > 0 ? replacement.count : prefix.count + selected.count
+            textView.selectedRange = NSRange(location: range.location + cursorOffset, length: 0)
+        }
+
+        private func applyBullet(in textView: UITextView) {
+            let source = textView.text ?? ""
+            let ns = source as NSString
+            let range = ns.lineRange(for: textView.selectedRange)
+            let selectedLines = ns.substring(with: range)
+            let replacement = selectedLines
+                .components(separatedBy: .newlines)
+                .map { line in
+                    guard !line.isEmpty else { return line }
+                    return line.hasPrefix("- ") ? String(line.dropFirst(2)) : "- \(line)"
+                }
+                .joined(separator: "\n")
+            textView.text = ns.replacingCharacters(in: range, with: replacement)
+            textView.selectedRange = NSRange(location: range.location + replacement.count, length: 0)
+        }
+
+        func reportSize(_ textView: UITextView) {
+            let size = textView.sizeThatFits(CGSize(width: textView.bounds.width, height: .greatestFiniteMagnitude))
+            onSizeChange(size)
+        }
+    }
+}
+#else
+struct NoteTextEditor: View {
+    let initialText: String
+    var fontSize: CGFloat = 15
+    var command: NoteTextCommand?
+    let onCommit: (String) -> Void
+    var onExitEditing: () -> Void = {}
+    var onSizeChange: (CGSize) -> Void = { _ in }
+
+    @State private var text: String
+    @State private var lastCommandID: UUID?
+
+    init(
+        initialText: String,
+        fontSize: CGFloat = 15,
+        command: NoteTextCommand? = nil,
+        onCommit: @escaping (String) -> Void,
+        onExitEditing: @escaping () -> Void = {},
+        onSizeChange: @escaping (CGSize) -> Void = { _ in }
+    ) {
+        self.initialText = initialText
+        self.fontSize = fontSize
+        self.command = command
         self.onCommit = onCommit
         self.onExitEditing = onExitEditing
         self.onSizeChange = onSizeChange
@@ -189,12 +361,39 @@ struct NoteTextEditor: View {
                 onCommit(newValue)
                 reportSize(for: newValue)
             }
+            .onChange(of: command?.id) { _, _ in
+                applyCommandIfNeeded()
+            }
             .onAppear {
                 reportSize(for: text)
+                applyCommandIfNeeded()
             }
             .onDisappear {
                 onCommit(text)
             }
+    }
+
+    private func applyCommandIfNeeded() {
+        guard let command, lastCommandID != command.id else { return }
+        lastCommandID = command.id
+
+        switch command.kind {
+        case .bold:
+            text = text.isEmpty ? "**bold**" : "**\(text)**"
+        case .highlight:
+            text = text.isEmpty ? "==highlight==" : "==\(text)=="
+        case .bullet:
+            text = text
+                .components(separatedBy: .newlines)
+                .map { line in
+                    guard !line.isEmpty else { return line }
+                    return line.hasPrefix("- ") ? String(line.dropFirst(2)) : "- \(line)"
+                }
+                .joined(separator: "\n")
+        }
+
+        onCommit(text)
+        reportSize(for: text)
     }
 
     private func reportSize(for value: String) {
@@ -205,6 +404,7 @@ struct NoteTextEditor: View {
         onSizeChange(CGSize(width: 220, height: CGFloat(lines) * fontSize * 1.28))
     }
 }
+#endif
 
 struct ResizeHandle: View {
     var body: some View {
