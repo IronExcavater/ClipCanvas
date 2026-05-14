@@ -8,6 +8,10 @@ struct CanvasTopBar: View {
     let onToggleSidebar: () -> Void
     let onBeginRename: () -> Void
     let onCommitRename: () -> Void
+    let selectedCount: Int
+    let visibleCount: Int
+    let onAskAISelection: () -> Void
+    let onAskAIVisible: () -> Void
     let onClearAll: () -> Void
     let onArrangeAll: () -> Void
     let onFitContent: () -> Void
@@ -42,6 +46,10 @@ struct CanvasTopBar: View {
             }
             .buttonStyle(.plain)
             .confirmationDialog("Workspace", isPresented: $showingWorkspaceActions, titleVisibility: .visible) {
+                Button("Ask AI About Selection", systemImage: "sparkles", action: onAskAISelection)
+                    .disabled(selectedCount == 0)
+                Button("Ask AI About View", systemImage: "rectangle.dashed", action: onAskAIVisible)
+                    .disabled(visibleCount == 0)
                 Button("Rename", systemImage: "pencil", action: onBeginRename)
                 Button("Fit to Cards", systemImage: "arrow.up.left.and.arrow.down.right", action: onFitContent)
                 Button("Arrange Grid", systemImage: "square.grid.2x2", action: onArrangeAll)

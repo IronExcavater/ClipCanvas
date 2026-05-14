@@ -9,6 +9,7 @@ struct CanvasView: View {
     @Binding var editingObjectID: UUID?
     @Binding var visibleScale: CGFloat
     @Binding var visibleViewportCenter: CGPoint
+    @Binding var visibleObjectIDs: Set<UUID>
 
     @Query private var allClips: [Clip]
     @State private var viewportOrigin: CGPoint = .zero
@@ -77,13 +78,19 @@ struct CanvasView: View {
             .onChange(of: canvasScale) { _, newValue in
                 visibleScale = newValue
                 visibleViewportCenter = viewportCenter(in: geo)
+                updateVisibleObjectIDs(in: geo)
             }
             .onChange(of: viewportOrigin) { _, _ in
                 visibleViewportCenter = viewportCenter(in: geo)
+                updateVisibleObjectIDs(in: geo)
+            }
+            .onChange(of: canvasObjects.count) { _, _ in
+                updateVisibleObjectIDs(in: geo)
             }
             .onAppear {
                 visibleScale = canvasScale
                 visibleViewportCenter = viewportCenter(in: geo)
+                updateVisibleObjectIDs(in: geo)
                 clampAllObjects(in: geo)
             }
         }
@@ -235,6 +242,7 @@ struct CanvasView: View {
                 clampObject(object, in: geo)
                 object.markUpdated()
                 activeDrag = nil
+                updateVisibleObjectIDs(in: geo)
             }
     }
 
@@ -431,6 +439,7 @@ struct CanvasView: View {
         }
 
         if fitAfter { fitContent(in: geo) }
+        updateVisibleObjectIDs(in: geo)
     }
 
     private func toggleSelection(for object: CanvasObject) {
@@ -490,6 +499,16 @@ struct CanvasView: View {
 
     private func clampAllObjects(in geo: GeometryProxy) {
         canvasObjects.forEach { clampObject($0, in: geo) }
+    }
+
+    private func updateVisibleObjectIDs(in geo: GeometryProxy) {
+        let viewport = CGRect(
+            x: viewportOrigin.x,
+            y: viewportOrigin.y,
+            width: geo.size.width / canvasScale,
+            height: geo.size.height / canvasScale
+        ).insetBy(dx: -80, dy: -80)
+        visibleObjectIDs = Set(canvasObjects.filter { viewport.intersects($0.frame) }.map(\.id))
     }
 }
 

@@ -104,6 +104,15 @@ final class ChatMessage {
         set { statusRaw = newValue.rawValue }
     }
 
+    var sortedAttachments: [ChatAttachment] {
+        attachments.sorted { lhs, rhs in
+            if lhs.createdAt == rhs.createdAt {
+                return lhs.id.uuidString < rhs.id.uuidString
+            }
+            return lhs.createdAt < rhs.createdAt
+        }
+    }
+
     var sortedToolEvents: [AIToolEvent] {
         toolEvents.sorted { lhs, rhs in
             if lhs.createdAt == rhs.createdAt {
@@ -118,6 +127,7 @@ final class ChatMessage {
 final class ChatAttachment {
     var id: UUID = UUID()
     var message: ChatMessage?
+    var canvasObject: CanvasObject?
     var clip: Clip?   // nullified on hard delete
     var createdAt: Date = Date()
 
@@ -125,7 +135,19 @@ final class ChatAttachment {
         self.clip = clip
     }
 
+    init(object: CanvasObject) {
+        self.canvasObject = object
+        self.clip = object.clip
+    }
+
     var state: AttachmentState {
+        if let canvasObject {
+            guard canvasObject.deletedAt == nil else { return .softDeleted }
+            if let clip = canvasObject.clip {
+                return clip.deletedAt != nil ? .softDeleted : .live
+            }
+            return .live
+        }
         guard let clip else { return .hardDeleted }
         return clip.deletedAt != nil ? .softDeleted : .live
     }

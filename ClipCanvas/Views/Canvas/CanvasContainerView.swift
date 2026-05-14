@@ -13,8 +13,10 @@ struct CanvasContainerView: View {
     @State private var visibleScale: CGFloat = 1
     @State private var visibleViewportCenter: CGPoint = .zero
     @State private var selectedObjectIDs: Set<UUID> = []
+    @State private var visibleObjectIDs: Set<UUID> = []
     @State private var editingObjectID: UUID?
     @State private var detailClip: Clip?
+    @State private var activeAIChat: AIChat?
     @State private var tagEditSelection: ClipTagEditSelection?
     @State private var isRenaming = false
     @State private var renameText = ""
@@ -29,7 +31,8 @@ struct CanvasContainerView: View {
                 selectedObjectIDs: $selectedObjectIDs,
                 editingObjectID: $editingObjectID,
                 visibleScale: $visibleScale,
-                visibleViewportCenter: $visibleViewportCenter
+                visibleViewportCenter: $visibleViewportCenter,
+                visibleObjectIDs: $visibleObjectIDs
             )
             .ignoresSafeArea()
 
@@ -42,6 +45,10 @@ struct CanvasContainerView: View {
                     onToggleSidebar: toggleSidebar,
                     onBeginRename: beginRename,
                     onCommitRename: commitRename,
+                    selectedCount: selectedObjectIDs.count,
+                    visibleCount: visibleObjectIDs.count,
+                    onAskAISelection: askAIAboutSelection,
+                    onAskAIVisible: askAIAboutVisibleCards,
                     onClearAll: clearAll,
                     onArrangeAll: { zoomCommand = .arrangeAll },
                     onFitContent: { zoomCommand = .fitContent }
@@ -100,6 +107,9 @@ struct CanvasContainerView: View {
         }
         .sheet(item: $detailClip) { clip in
             ClipDetailSheet(clip: clip)
+        }
+        .sheet(item: $activeAIChat) { chat in
+            AIChatDetailSheet(chat: chat)
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
     }
@@ -183,10 +193,41 @@ struct CanvasContainerView: View {
         showFeedback(selected.count == 1 ? "Deleted 1 card" : "Deleted \(selected.count) cards")
     }
 
+    private func askAIAboutSelection() {
+        let objects = orderedCanvasObjects(matching: selectedObjectIDs)
+        openAIChat(attaching: objects)
+    }
+
+    private func askAIAboutVisibleCards() {
+        let objects = orderedCanvasObjects(matching: visibleObjectIDs)
+        openAIChat(attaching: objects)
+    }
+
+    private func openAIChat(attaching objects: [CanvasObject]) {
+        guard !objects.isEmpty else {
+            showFeedback("No cards to attach")
+            return
+        }
+
+        let chat = AIChatService.createChat(in: context, workspace: workspace)
+        AIChatService.attachObjects(objects, to: chat, in: context)
+        activeAIChat = chat
+        showFeedback(objects.count == 1 ? "Attached 1 card" : "Attached \(objects.count) cards")
+    }
+
     private var selectedClips: [Clip] {
         workspace.canvasObjects
             .filter { selectedObjectIDs.contains($0.id) }
             .compactMap(\.clip)
+    }
+
+    private func orderedCanvasObjects(matching ids: Set<UUID>) -> [CanvasObject] {
+        workspace.canvasObjects
+            .filter { ids.contains($0.id) && $0.isVisible }
+            .sorted { lhs, rhs in
+                if lhs.zIndex == rhs.zIndex { return lhs.createdAt < rhs.createdAt }
+                return lhs.zIndex < rhs.zIndex
+            }
     }
 
     // MARK: - Feedback

@@ -80,6 +80,17 @@ import Testing
         ])
     }
 
+    @Test func sortedAttachmentsUseCreationDate() {
+        let message = ChatMessage(role: .user, content: "Attached")
+        let newer = ChatAttachment(clip: Clip(content: "Second", origin: .clipboard))
+        newer.createdAt = Date(timeIntervalSince1970: 20)
+        let older = ChatAttachment(clip: Clip(content: "First", origin: .clipboard))
+        older.createdAt = Date(timeIntervalSince1970: 10)
+        message.attachments = [newer, older]
+
+        #expect(message.sortedAttachments.map { $0.clip?.content } == ["First", "Second"])
+    }
+
     @Test func attachmentStatesStillReflectClipLifecycle() {
         let clip = Clip(content: "Attached", origin: .clipboard)
         let attachment = ChatAttachment(clip: clip)
@@ -91,6 +102,22 @@ import Testing
 
         attachment.clip = nil
         #expect(attachment.state == .hardDeleted)
+    }
+
+    @Test func objectAttachmentStateReflectsObjectAndClipLifecycle() {
+        let workspace = Workspace(name: "Board")
+        let clip = Clip(content: "Attached", origin: .clipboard)
+        let object = CanvasObject(kind: .clipNote, workspace: workspace, clip: clip, x: 0, y: 0, width: 220, height: 140)
+        let attachment = ChatAttachment(object: object)
+
+        #expect(attachment.state == .live)
+
+        clip.softDelete()
+        #expect(attachment.state == .softDeleted)
+
+        clip.restore()
+        object.softDelete()
+        #expect(attachment.state == .softDeleted)
     }
 
     @Test func chatServiceCreatesChatForActiveWorkspace() throws {
@@ -106,6 +133,28 @@ import Testing
         #expect(chat.workspace?.id == active.id)
         #expect(active.chats.contains { $0.id == chat.id })
         #expect((try context.fetch(FetchDescriptor<AIChat>())).count == 1)
+    }
+
+    @Test func chatServiceAttachesCanvasObjectsToMessage() throws {
+        let context = try makeContext()
+        let workspace = Workspace(name: "Board")
+        let clip = Clip(content: "Clip note", origin: .clipboard)
+        let clipObject = CanvasObject(kind: .clipNote, workspace: workspace, clip: clip, x: 0, y: 0, width: 220, height: 140)
+        let stickyObject = CanvasObject(kind: .stickyNote, workspace: workspace, x: 260, y: 0, width: 220, height: 140, text: "Sticky note")
+        workspace.canvasObjects = [clipObject, stickyObject]
+        context.insert(workspace)
+        context.insert(clip)
+        context.insert(clipObject)
+        context.insert(stickyObject)
+        let chat = AIChatService.createChat(in: context, workspace: workspace)
+
+        let message = AIChatService.attachObjects([clipObject, stickyObject, clipObject], to: chat, in: context)
+
+        #expect(message?.attachments.count == 2)
+        #expect(message?.sortedAttachments.compactMap(\.canvasObject?.id) == [clipObject.id, stickyObject.id])
+        #expect(message?.sortedAttachments.first?.clip?.id == clip.id)
+        #expect(chat.title == "2 Canvas Cards")
+        #expect(chat.messages.count == 1)
     }
 
     private func makeContext() throws -> ModelContext {

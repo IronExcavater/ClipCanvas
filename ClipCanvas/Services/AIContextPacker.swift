@@ -70,8 +70,16 @@ enum AIContextPacker {
         var privateOmittedClipIDs = Set<UUID>()
 
         for attachment in attachments(from: chat) {
-            guard let clip = attachment.clip else { continue }
-            let item = item(for: clip, source: .attachment)
+            let item: AIContextItem?
+            if let object = attachment.canvasObject {
+                guard object.isVisible else { continue }
+                item = self.item(for: object, source: .attachment)
+            } else if let clip = attachment.clip {
+                item = self.item(for: clip, source: .attachment)
+            } else {
+                item = nil
+            }
+            guard let item else { continue }
             append(item, to: &items, seenKeys: &seenKeys, privateOmittedClipIDs: &privateOmittedClipIDs)
         }
 
@@ -115,7 +123,7 @@ enum AIContextPacker {
 private extension AIContextPacker {
     static func attachments(from chat: AIChat) -> [ChatAttachment] {
         chat.sortedMessages.flatMap { message in
-            message.attachments.sorted { $0.createdAt < $1.createdAt }
+            message.sortedAttachments
         }
     }
 

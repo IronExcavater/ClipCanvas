@@ -171,6 +171,14 @@ private struct AIChatMessageBubble: View {
                 }
             }
 
+            ForEach(message.sortedAttachments) { attachment in
+                HStack {
+                    if isUser { Spacer(minLength: 44) }
+                    AIChatAttachmentRow(attachment: attachment)
+                    if !isUser { Spacer(minLength: 44) }
+                }
+            }
+
             ForEach(message.sortedToolEvents) { event in
                 HStack {
                     if isUser { Spacer(minLength: 44) }
@@ -179,6 +187,33 @@ private struct AIChatMessageBubble: View {
                 }
             }
         }
+    }
+}
+
+private struct AIChatAttachmentRow: View {
+    let attachment: ChatAttachment
+
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: attachment.state == .live ? "paperclip" : "exclamationmark.triangle.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundStyle(attachment.state == .live ? Color.accentColor : .orange)
+                .frame(width: 18, height: 18)
+
+            VStack(alignment: .leading, spacing: 2) {
+                Text(attachment.title)
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                Text(attachment.subtitle)
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.accentColor.opacity(0.11), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 
@@ -215,6 +250,27 @@ private struct AIChatToolEventRow: View {
         .overlay {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(event.status.tint.opacity(0.20), lineWidth: 1)
+        }
+    }
+}
+
+private extension ChatAttachment {
+    var title: String {
+        let text = canvasObject?.displayText ?? clip?.content ?? "Deleted attachment"
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return "Canvas attachment" }
+        return String(trimmed.prefix(64))
+    }
+
+    var subtitle: String {
+        switch state {
+        case .live:
+            if canvasObject != nil { return "Attached canvas card" }
+            return "Attached clipboard item"
+        case .softDeleted:
+            return "Attachment is in Recently Deleted"
+        case .hardDeleted:
+            return "Attachment is no longer available"
         }
     }
 }

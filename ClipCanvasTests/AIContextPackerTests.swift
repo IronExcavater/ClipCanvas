@@ -30,6 +30,53 @@ import Testing
         #expect(snapshot.items.map(\.content) == ["Attached source", "Selected card", "Visible card"])
     }
 
+    @Test func attachedCanvasObjectsArePackedAsObjects() {
+        let workspace = Workspace(name: "Research")
+        let stickyObject = CanvasObject(kind: .stickyNote, workspace: workspace, x: 0, y: 0, width: 220, height: 140, text: "Sticky idea")
+        workspace.canvasObjects = [stickyObject]
+        let message = ChatMessage(role: .user, content: "Use this note")
+        message.attachments = [ChatAttachment(object: stickyObject)]
+        let chat = AIChat(title: "Chat")
+        chat.messages = [message]
+
+        let snapshot = AIContextPacker.pack(
+            chat: chat,
+            workspace: workspace,
+            mode: .quick,
+            selectedObjectIDs: [],
+            visibleObjectIDs: [],
+            recentClips: []
+        )
+
+        #expect(snapshot.items.count == 1)
+        #expect(snapshot.items.first?.source == .attachment)
+        #expect(snapshot.items.first?.objectID == stickyObject.id)
+        #expect(snapshot.items.first?.content == "Sticky idea")
+    }
+
+    @Test func deletedAttachedCanvasObjectsAreOmitted() {
+        let workspace = Workspace(name: "Research")
+        let clip = Clip(content: "Source should not leak", origin: .clipboard)
+        let object = CanvasObject(kind: .clipNote, workspace: workspace, clip: clip, x: 0, y: 0, width: 220, height: 140)
+        object.softDelete()
+        workspace.canvasObjects = [object]
+        let message = ChatMessage(role: .user, content: "Use this note")
+        message.attachments = [ChatAttachment(object: object)]
+        let chat = AIChat(title: "Chat")
+        chat.messages = [message]
+
+        let snapshot = AIContextPacker.pack(
+            chat: chat,
+            workspace: workspace,
+            mode: .quick,
+            selectedObjectIDs: [],
+            visibleObjectIDs: [],
+            recentClips: []
+        )
+
+        #expect(snapshot.items.isEmpty)
+    }
+
     @Test func quickModeLimitsObjectsMoreAggressivelyThanThinkingMode() {
         let workspace = Workspace(name: "Big")
         let objects = (0..<40).map { index in
