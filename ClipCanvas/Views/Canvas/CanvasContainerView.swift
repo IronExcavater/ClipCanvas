@@ -1,3 +1,4 @@
+import PencilKit
 import SwiftUI
 import SwiftData
 
@@ -20,6 +21,8 @@ struct CanvasContainerView: View {
     @State private var tagEditSelection: ClipTagEditSelection?
     @State private var isRenaming = false
     @State private var renameText = ""
+    @State private var activeDrawing: PKDrawing = PKDrawing()
+    @State private var drawingTool: PKTool = PKInkingTool(.pen, color: .label, width: 3)
     @FocusState private var renameFocused: Bool
 
     var body: some View {
@@ -32,7 +35,9 @@ struct CanvasContainerView: View {
                 editingObjectID: $editingObjectID,
                 visibleScale: $visibleScale,
                 visibleViewportCenter: $visibleViewportCenter,
-                visibleObjectIDs: $visibleObjectIDs
+                visibleObjectIDs: $visibleObjectIDs,
+                activeDrawing: $activeDrawing,
+                drawingTool: drawingTool
             )
             .ignoresSafeArea()
 
@@ -77,10 +82,17 @@ struct CanvasContainerView: View {
                     onEditContent: editSelectedContent,
                     onManageTags: showSelectedTags,
                     onArrangeSelection: { zoomCommand = .arrangeSelection },
-                    onBullet: { /* wired in commit 4 with UITextView editor */ },
-                    onColor: { /* wired in commit 5 */ },
+                    onBullet: {},
+                    onColor: {},
                     onDone: exitEditing,
-                    onDelete: deleteSelected
+                    onDelete: deleteSelected,
+                    onDrawPen: { drawingTool = PKInkingTool(.pen, color: .label, width: 3) },
+                    onDrawHighlighter: { drawingTool = PKInkingTool(.marker, color: .systemYellow.withAlphaComponent(0.5), width: 20) },
+                    onDrawEraser: { drawingTool = PKEraserTool(.vector) },
+                    onDrawLasso: { drawingTool = PKLassoTool() },
+                    onDrawConvert: convertDrawing,
+                    onDrawSave: saveDrawing,
+                    onDrawClear: { activeDrawing = PKDrawing() }
                 )
             }
             .ignoresSafeArea(.container, edges: .bottom)
@@ -228,6 +240,61 @@ struct CanvasContainerView: View {
         AIChatService.attachObjects(objects, to: chat, in: context)
         activeAIChat = chat
         showFeedback(objects.count == 1 ? "Attached 1 card" : "Attached \(objects.count) cards")
+    }
+
+    // MARK: - Drawing
+
+    private func saveDrawing() {
+        guard !activeDrawing.strokes.isEmpty,
+              let data = try? activeDrawing.dataRepresentation() else { return }
+        let bounds = activeDrawing.bounds
+        let size = CanvasPlacementSizing.softSnapSize(CGSize(
+            width: max(bounds.width, CanvasPlacementSizing.defaultSize.width),
+            height: max(bounds.height, CanvasPlacementSizing.defaultSize.height)
+        ))
+        let object = CanvasObject(
+            kind: .drawing,
+            workspace: workspace,
+            x: visibleViewportCenter.x - size.width / 2,
+            y: visibleViewportCenter.y - size.height / 2,
+            width: size.width,
+            height: size.height
+        )
+        object.drawingData = data
+        context.insert(object)
+        activeDrawing = PKDrawing()
+        showFeedback("Drawing saved")
+    }
+
+    private func convertDrawing() {
+        guard !activeDrawing.strokes.isEmpty else { return }
+        let drawing = activeDrawing
+        let bounds = drawing.bounds
+        let size = CGSize(width: max(bounds.maxX, 100), height: max(bounds.maxY, 100))
+        Task {
+            let texts = await DrawingConversionService.recognizeText(in: drawing, size: size)
+            await MainActor.run {
+                guard !texts.isEmpty else {
+                    showFeedback("No text recognized")
+                    return
+                }
+                for (index, text) in texts.enumerated() {
+                    let offset = Double(index) * 24
+                    let note = CanvasObject(
+                        kind: .stickyNote,
+                        workspace: workspace,
+                        x: visibleViewportCenter.x - 110 + offset,
+                        y: visibleViewportCenter.y - 75 + offset,
+                        width: CanvasPlacementSizing.defaultSize.width,
+                        height: CanvasPlacementSizing.defaultSize.height,
+                        text: text
+                    )
+                    context.insert(note)
+                }
+                activeDrawing = PKDrawing()
+                showFeedback(texts.count == 1 ? "Converted to 1 note" : "Converted to \(texts.count) notes")
+            }
+        }
     }
 
     private var selectedClips: [Clip] {

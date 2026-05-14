@@ -1,3 +1,4 @@
+import PencilKit
 import SwiftUI
 import SwiftData
 
@@ -10,6 +11,8 @@ struct CanvasView: View {
     @Binding var visibleScale: CGFloat
     @Binding var visibleViewportCenter: CGPoint
     @Binding var visibleObjectIDs: Set<UUID>
+    @Binding var activeDrawing: PKDrawing
+    var drawingTool: PKTool
 
     @Query private var allClips: [Clip]
     @State private var viewportOrigin: CGPoint = .zero
@@ -66,6 +69,13 @@ struct CanvasView: View {
                         )
                         .allowsHitTesting(false)
                         .zIndex(1)
+                }
+
+                if mode == .draw {
+                    CanvasDrawingLayer(drawing: $activeDrawing, activeTool: drawingTool)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .allowsHitTesting(true)
+                        .zIndex(50_000)
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height)
