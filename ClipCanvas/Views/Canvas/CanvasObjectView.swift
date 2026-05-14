@@ -61,33 +61,48 @@ struct CanvasObjectView: View {
         .animation(.spring(response: 0.18, dampingFraction: 0.8), value: isSelected)
     }
 
+    private var noteFontSize: CGFloat {
+        CanvasPlacementSizing.fontSizeForWidth(object.width)
+    }
+
     @ViewBuilder
     private var content: some View {
         if !showsContent {
             Color.clear
         } else if isEditing, usesEditableText {
-            NoteTextEditor(initialText: editingText, onCommit: onCommitEditing, onExitEditing: onExitEditing)
+            NoteTextEditor(
+                initialText: editingText,
+                fontSize: noteFontSize,
+                onCommit: onCommitEditing,
+                onExitEditing: onExitEditing
+            )
         } else {
             switch object.kind {
             case .image:
                 Label(object.text.isEmpty ? "Image" : object.text, systemImage: "photo")
                     .font(.headline)
                     .foregroundStyle(textColor)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             case .shape:
                 shapeContent
             case .drawing:
                 Label("Drawing", systemImage: "pencil.tip")
                     .font(.headline)
                     .foregroundStyle(textColor)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             case .group:
                 Label(object.text.isEmpty ? "Group" : object.text, systemImage: "rectangle.3.group")
                     .font(.headline)
                     .foregroundStyle(textColor)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             default:
                 Text(object.displayText.isEmpty ? " " : object.displayText)
-                    .font(.system(size: object.style.fontSize))
+                    .font(.system(size: usesStickySurface ? noteFontSize : object.style.fontSize))
                     .foregroundStyle(textColor)
                     .lineLimit(nil)
+                    .multilineTextAlignment(.leading)
+                    .frame(maxWidth: .infinity, maxHeight: usesStickySurface ? .infinity : nil,
+                           alignment: usesStickySurface ? .center : .topLeading)
             }
         }
     }

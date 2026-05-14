@@ -340,7 +340,7 @@ struct CanvasView: View {
     }
 
     private func commitResize(for object: CanvasObject, in geo: GeometryProxy) {
-        let size = CanvasPlacementSizing.snappedSize(displaySize(for: object), for: object.clip)
+        let size = CanvasPlacementSizing.softSnapSize(displaySize(for: object))
         object.width = size.width
         object.height = size.height
         clampObject(object, in: geo)
@@ -355,7 +355,7 @@ struct CanvasView: View {
               let translation = activeResize?.translation else {
             return CGSize(width: object.width, height: object.height)
         }
-        return CanvasPlacementSizing.fluidSize(CGSize(
+        return CanvasPlacementSizing.fluidSize(dragging: CGSize(
             width: start.width + translation.width / canvasScale,
             height: start.height + translation.height / canvasScale
         ))
