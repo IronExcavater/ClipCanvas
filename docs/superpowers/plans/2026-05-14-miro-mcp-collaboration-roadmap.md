@@ -168,7 +168,7 @@ Real-time collaboration comes after the action log is proven.
 - [ ] Show a throbber while waiting.
 - [x] Render tool events inline.
 - [ ] Add Quick/Thinking mode persistence.
-- [ ] Add attach selected/visible object actions.
+- [x] Add attach selected/visible object actions.
 
 ### Task 5: Add Local MCP Adapter
 
