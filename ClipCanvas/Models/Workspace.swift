@@ -52,6 +52,23 @@ final class Workspace: SoftDeletable, Identifiable {
     }
 
     @discardableResult
+    func createNote(centeredAt center: CGPoint, size: CGSize, text: String = "") -> CanvasObject {
+        let object = CanvasObject(
+            kind: .stickyNote,
+            workspace: self,
+            x: center.x - size.width / 2,
+            y: center.y - size.height / 2,
+            width: size.width,
+            height: size.height,
+            text: text
+        )
+        object.zIndex = Double(canvasObjects.count)
+        canvasObjects.append(object)
+        updatedAt = Date()
+        return object
+    }
+
+    @discardableResult
     func place(clip: Clip, at position: CGPoint? = nil) -> CanvasPlacement {
         let pos = position ?? nextPosition()
         let p = CanvasPlacement(clip: clip, x: pos.x, y: pos.y)

@@ -21,6 +21,19 @@ import Testing
         ])
     }
 
+    @Test func editEmptyToolbarAddsVisibleNewNoteAction() {
+        let configuration = CanvasToolbarConfiguration.make(selectedCount: 0, mode: .edit)
+
+        #expect(configuration.items == [
+            .newNote,
+            .paste,
+            .divider,
+            .mode(.pan),
+            .mode(.edit),
+            .mode(.draw)
+        ])
+    }
+
     @Test func panSelectionToolbarShowsCopyInfoAndArrange() {
         let configuration = CanvasToolbarConfiguration.make(selectedCount: 1, mode: .pan)
 
@@ -54,5 +67,6 @@ import Testing
         #expect(!configuration.items.contains(.mode(.draw)))
         #expect(configuration.items.contains(.drawPen))
         #expect(configuration.items.contains(.drawClear))
+        #expect(!configuration.items.contains(.paste))
     }
 }

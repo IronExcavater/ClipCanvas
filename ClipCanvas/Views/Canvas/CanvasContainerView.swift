@@ -84,12 +84,12 @@ struct CanvasContainerView: View {
                     selectedCount: selectedObjectIDs.count,
                     isEditing: editingObjectID != nil,
                     onPaste: paste,
+                    onCreateNote: createNoteAtViewCenter,
                     onAskAI: askAIAboutCurrentContext,
                     onDetails: showSelectedDetails,
                     onEditContent: editSelectedContent,
                     onManageTags: showSelectedTags,
                     onArrangeSelection: { zoomCommand = .arrangeSelection },
-                    onBullet: {},
                     onColor: showSelectedColors,
                     onDone: exitEditing,
                     onDelete: deleteSelected,
@@ -97,7 +97,6 @@ struct CanvasContainerView: View {
                     onDrawHighlighter: { drawingTool = PKInkingTool(.marker, color: .systemYellow.withAlphaComponent(0.5), width: 20) },
                     onDrawEraser: { drawingTool = PKEraserTool(.fixedWidthBitmap, width: 34) },
                     onDrawLasso: { drawingTool = PKLassoTool() },
-                    onDrawConvert: convertDrawing,
                     onDrawClear: { activeDrawing = PKDrawing() }
                 )
             }
@@ -200,13 +199,6 @@ struct CanvasContainerView: View {
         showFeedback(objects.count + placements.count == 0 ? "Canvas is already empty" : "Canvas cleared")
     }
 
-    private func copySelected() {
-        let clips = selectedClips
-        guard !clips.isEmpty else { return }
-        ClipActionService.copy(clips)
-        showFeedback(clips.count == 1 ? "Copied 1 clip" : "Copied \(clips.count) clips")
-    }
-
     private func showSelectedDetails() {
         detailClip = selectedClips.first
     }
@@ -246,6 +238,14 @@ struct CanvasContainerView: View {
         showFeedback(selected.count == 1 ? "Deleted 1 card" : "Deleted \(selected.count) cards")
     }
 
+    private func createNoteAtViewCenter() {
+        let note = workspace.createNote(centeredAt: visibleViewportCenter, size: CanvasPlacementSizing.defaultSize)
+        context.insert(note)
+        selectedObjectIDs = [note.id]
+        editingObjectID = note.id
+        showFeedback("New note")
+    }
+
     private func askAIAboutCurrentContext() {
         if selectedObjectIDs.isEmpty {
             askAIAboutVisibleCards()
@@ -273,39 +273,6 @@ struct CanvasContainerView: View {
         AIChatService.attachObjects(objects, to: chat, in: context)
         activeAIChat = chat
         showFeedback(objects.count == 1 ? "Attached 1 card" : "Attached \(objects.count) cards")
-    }
-
-    // MARK: - Drawing
-
-    private func convertDrawing() {
-        guard !activeDrawing.strokes.isEmpty else { return }
-        let drawing = activeDrawing
-        let bounds = drawing.bounds
-        let size = CGSize(width: max(bounds.maxX, 100), height: max(bounds.maxY, 100))
-        Task {
-            let texts = await DrawingConversionService.recognizeText(in: drawing, size: size)
-            await MainActor.run {
-                guard !texts.isEmpty else {
-                    showFeedback("No text recognized")
-                    return
-                }
-                for (index, text) in texts.enumerated() {
-                    let offset = Double(index) * 24
-                    let note = CanvasObject(
-                        kind: .stickyNote,
-                        workspace: workspace,
-                        x: visibleViewportCenter.x - 110 + offset,
-                        y: visibleViewportCenter.y - 75 + offset,
-                        width: CanvasPlacementSizing.defaultSize.width,
-                        height: CanvasPlacementSizing.defaultSize.height,
-                        text: text
-                    )
-                    context.insert(note)
-                }
-                activeDrawing = PKDrawing()
-                showFeedback(texts.count == 1 ? "Converted to 1 note" : "Converted to \(texts.count) notes")
-            }
-        }
     }
 
     private var selectedClips: [Clip] {

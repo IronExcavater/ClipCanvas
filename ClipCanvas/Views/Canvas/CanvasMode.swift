@@ -26,12 +26,12 @@ enum ZoomCommand: Equatable {
 
 nonisolated enum CanvasToolbarItem: Equatable {
     case paste
+    case newNote
     case askAI
     case details
     case editContent
     case manageTags
     case arrangeSelection
-    case bullet
     case color
     case done
     case delete
@@ -42,7 +42,6 @@ nonisolated enum CanvasToolbarItem: Equatable {
     case drawHighlighter
     case drawEraser
     case drawLasso
-    case drawConvert
     case drawClear
 }
 
@@ -56,7 +55,7 @@ nonisolated struct CanvasToolbarConfiguration: Equatable {
                 .closeDraw,
                 .drawPen, .drawHighlighter, .drawEraser, .drawLasso,
                 .divider,
-                .drawConvert, .drawClear
+                .drawClear
             ])
 
         case .edit:
@@ -65,7 +64,7 @@ nonisolated struct CanvasToolbarConfiguration: Equatable {
                     return CanvasToolbarConfiguration(items: [
                         .editContent,
                         .divider,
-                        .bullet, .color,
+                        .color,
                         .divider,
                         .done
                     ])
@@ -79,7 +78,7 @@ nonisolated struct CanvasToolbarConfiguration: Equatable {
                 ])
             }
             return CanvasToolbarConfiguration(items: [
-                .paste,
+                .newNote, .paste,
                 .divider,
                 .mode(.pan), .mode(.edit), .mode(.draw)
             ])

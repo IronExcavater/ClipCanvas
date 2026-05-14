@@ -5,12 +5,12 @@ struct CanvasToolbar: View {
     let selectedCount: Int
     var isEditing: Bool = false
     let onPaste: () -> Void
+    let onCreateNote: () -> Void
     let onAskAI: () -> Void
     let onDetails: () -> Void
     let onEditContent: () -> Void
     let onManageTags: () -> Void
     let onArrangeSelection: () -> Void
-    let onBullet: () -> Void
     let onColor: () -> Void
     let onDone: () -> Void
     let onDelete: () -> Void
@@ -18,7 +18,6 @@ struct CanvasToolbar: View {
     var onDrawHighlighter: () -> Void = {}
     var onDrawEraser: () -> Void = {}
     var onDrawLasso: () -> Void = {}
-    var onDrawConvert: () -> Void = {}
     var onDrawClear: () -> Void = {}
 
     private var configuration: CanvasToolbarConfiguration {
@@ -53,6 +52,8 @@ struct CanvasToolbar: View {
         switch item {
         case .paste:
             toolButton("doc.on.clipboard", action: onPaste)
+        case .newNote:
+            toolButton("square.and.pencil", action: onCreateNote)
         case .askAI:
             toolButton("sparkles", action: onAskAI)
         case .details:
@@ -65,8 +66,6 @@ struct CanvasToolbar: View {
             toolButton("tag", action: onManageTags)
         case .arrangeSelection:
             toolButton("square.grid.2x2", action: onArrangeSelection)
-        case .bullet:
-            toolButton("list.bullet", action: onBullet)
         case .color:
             toolButton("paintpalette", action: onColor)
         case .done:
@@ -87,8 +86,6 @@ struct CanvasToolbar: View {
             toolButton("eraser", action: onDrawEraser)
         case .drawLasso:
             toolButton("lasso", action: onDrawLasso)
-        case .drawConvert:
-            toolButton("wand.and.sparkles", action: onDrawConvert)
         case .drawClear:
             toolButton("xmark.circle", action: onDrawClear)
         }

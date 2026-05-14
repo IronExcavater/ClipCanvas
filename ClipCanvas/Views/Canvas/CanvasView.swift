@@ -584,16 +584,7 @@ struct CanvasView: View {
     // MARK: - Actions
 
     private func createNote(at center: CGPoint, in geo: GeometryProxy, beginEditing shouldBeginEditing: Bool) {
-        let size = CanvasPlacementSizing.defaultSize
-        let note = CanvasObject(
-            kind: .stickyNote,
-            workspace: workspace,
-            x: center.x - size.width / 2,
-            y: center.y - size.height / 2,
-            width: size.width,
-            height: size.height,
-            text: ""
-        )
+        let note = workspace.createNote(centeredAt: center, size: CanvasPlacementSizing.defaultSize)
         context.insert(note)
         clampObject(note, in: geo)
         selectedObjectIDs = [note.id]
