@@ -1,4 +1,5 @@
 import CoreGraphics
+import Foundation
 import Testing
 @testable import ClipCanvas
 
@@ -17,13 +18,39 @@ import Testing
 
     @Test func textResizeSnapsToCharacterAndLineSteps() {
         let size = CanvasPlacementSizing.snappedSize(
-            CGSize(width: 219, height: 151),
+            CGSize(width: 229, height: 163),
             for: Clip(content: "Note", origin: .typed)
         )
 
+        #expect((CanvasPlacementSizing.defaultSize.width - CanvasPlacementSizing.contentChrome.width)
+            .truncatingRemainder(dividingBy: CanvasPlacementSizing.estimatedCharacterWidth) == 0)
+        #expect((CanvasPlacementSizing.defaultSize.height - CanvasPlacementSizing.contentChrome.height)
+            .truncatingRemainder(dividingBy: CanvasPlacementSizing.estimatedLineHeight) == 0)
         #expect((size.width - CanvasPlacementSizing.contentChrome.width)
             .truncatingRemainder(dividingBy: CanvasPlacementSizing.estimatedCharacterWidth) == 0)
         #expect((size.height - CanvasPlacementSizing.contentChrome.height)
+            .truncatingRemainder(dividingBy: CanvasPlacementSizing.estimatedLineHeight) == 0)
+    }
+
+    @Test func resizePreviewIsFluidButCommitSnapsToTextGrid() {
+        let session = CanvasResizeSession(
+            objectID: UUID(),
+            startSize: CanvasPlacementSizing.defaultSize,
+            translation: CGSize(width: 13, height: 17)
+        )
+        let clip = Clip(content: "Note", origin: .typed)
+
+        let preview = CanvasPlacementSizing.previewSize(for: session, scale: 1)
+        let committed = CanvasPlacementSizing.committedSize(for: session, scale: 1, clip: clip)
+
+        #expect(preview == CGSize(
+            width: CanvasPlacementSizing.defaultSize.width + 13,
+            height: CanvasPlacementSizing.defaultSize.height + 17
+        ))
+        #expect(committed != preview)
+        #expect((committed.width - CanvasPlacementSizing.contentChrome.width)
+            .truncatingRemainder(dividingBy: CanvasPlacementSizing.estimatedCharacterWidth) == 0)
+        #expect((committed.height - CanvasPlacementSizing.contentChrome.height)
             .truncatingRemainder(dividingBy: CanvasPlacementSizing.estimatedLineHeight) == 0)
     }
 

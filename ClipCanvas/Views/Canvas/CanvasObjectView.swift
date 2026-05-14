@@ -21,13 +21,11 @@ struct CanvasObjectView: View {
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .padding(14)
 
-            ResizeHandle()
-                .onTapGesture(count: 2, perform: onToggleExpandedSize)
-                .highPriorityGesture(
-                    DragGesture(minimumDistance: 0, coordinateSpace: .global)
-                        .onChanged { onResize($0.translation) }
-                        .onEnded { _ in onResizeEnded() }
-                )
+            CanvasResizeHandle(
+                onResize: onResize,
+                onResizeEnded: onResizeEnded,
+                onToggleExpandedSize: onToggleExpandedSize
+            )
         }
         .background {
             if usesStickySurface {

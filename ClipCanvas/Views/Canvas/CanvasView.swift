@@ -20,7 +20,7 @@ struct CanvasView: View {
     @State private var viewportOrigin: CGPoint = .zero
     @State private var canvasScale: CGFloat = 1.0
     @State private var activeDrag: (id: UUID, offset: CGSize)?
-    @State private var activeResize: (id: UUID, start: CGSize, translation: CGSize)?
+    @State private var activeResize: CanvasResizeSession?
     @State private var editingSnapshot: EditingFrameSnapshot?
     @State private var zOrder: [UUID: Double] = [:]
     @State private var nextZOrder: Double = 1
@@ -257,14 +257,12 @@ struct CanvasView: View {
     private func objectDragGesture(for object: CanvasObject, in geo: GeometryProxy) -> some Gesture {
         DragGesture(minimumDistance: 4, coordinateSpace: .global)
             .onChanged { value in
-                guard activeResize?.id != object.id else { return }
+                guard activeResize?.objectID != object.id else { return }
                 bringToFront(object.id)
                 activeDrag = (object.id, value.translation)
             }
             .onEnded { value in
-                guard activeResize?.id != object.id else { return }
-                // If the dragged card is selected, move all selected cards together.
-                // Otherwise only move the one card that was touched.
+                guard activeResize?.objectID != object.id else { return }
                 let objectsToMove: [CanvasObject] = selectedObjectIDs.contains(object.id)
                     ? canvasObjects.filter { selectedObjectIDs.contains($0.id) }
                     : [object]
@@ -352,33 +350,31 @@ struct CanvasView: View {
     }
 
     private func updateResizePreview(for object: CanvasObject, translation: CGSize) {
-        let start = activeResize?.id == object.id
-            ? activeResize?.start ?? CGSize(width: object.width, height: object.height)
+        let start = activeResize?.objectID == object.id
+            ? activeResize?.startSize ?? CGSize(width: object.width, height: object.height)
             : CGSize(width: object.width, height: object.height)
-        activeResize = (object.id, start, translation)
+        activeResize = CanvasResizeSession(objectID: object.id, startSize: start, translation: translation)
         bringToFront(object.id)
     }
 
     private func commitResize(for object: CanvasObject, in geo: GeometryProxy) {
-        let size = CanvasPlacementSizing.snappedSize(displaySize(for: object), for: object.clip)
-        object.width = size.width
-        object.height = size.height
-        clampObject(object, in: geo)
+        guard let session = activeResize, session.objectID == object.id else { return }
+        let size = CanvasPlacementSizing.committedSize(for: session, scale: canvasScale, clip: object.clip)
+        withAnimation(.spring(response: 0.22, dampingFraction: 0.82)) {
+            object.width = size.width
+            object.height = size.height
+            clampObject(object, in: geo)
+            activeResize = nil
+            activeDrag = nil
+        }
         object.markUpdated()
-        activeResize = nil
-        activeDrag = nil
     }
 
     private func displaySize(for object: CanvasObject) -> CGSize {
-        guard activeResize?.id == object.id,
-              let start = activeResize?.start,
-              let translation = activeResize?.translation else {
+        guard let session = activeResize, session.objectID == object.id else {
             return CGSize(width: object.width, height: object.height)
         }
-        return CanvasPlacementSizing.fluidSize(dragging: CGSize(
-            width: start.width + translation.width / canvasScale,
-            height: start.height + translation.height / canvasScale
-        ))
+        return CanvasPlacementSizing.previewSize(for: session, scale: canvasScale)
     }
 
     private func toggleExpandedSize(for object: CanvasObject, in geo: GeometryProxy) {
