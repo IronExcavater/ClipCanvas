@@ -47,7 +47,7 @@ struct SidebarView: View {
             .scrollContentBackground(.hidden)
             .contentMargins(.top, 0, for: .scrollContent)
             .contentMargins(.bottom, 8, for: .scrollContent)
-            .listSectionSpacing(.compact)
+            .appListSectionSpacingCompact()
             .listSectionSeparator(.hidden)
             .mask(VerticalEdgeFadeMask(top: 10, bottom: 24))
 
@@ -57,7 +57,7 @@ struct SidebarView: View {
             sidebarBackground
                 .ignoresSafeArea()
         }
-        .toolbar(.hidden, for: .navigationBar)
+        .appHideNavigationBarIfAvailable()
         .ignoresSafeArea(.container, edges: .bottom)
         .ignoresSafeArea(.keyboard, edges: .bottom)
     }

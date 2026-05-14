@@ -8,6 +8,7 @@ struct CanvasContainerView: View {
 
     @Environment(\.modelContext) private var context
     @Environment(\.undoManager) private var undoManager
+    @Environment(\.scenePhase) private var scenePhase
     @Query(
         filter: #Predicate<Workspace> { $0.deletedAt == nil },
         sort: \Workspace.sortIndex
@@ -31,11 +32,13 @@ struct CanvasContainerView: View {
     @State private var activeDrawing: PKDrawing = PKDrawing()
     @State private var activeDrawTool: CanvasDrawTool = .pen
     @State private var drawToolSettings: CanvasDrawTool?
-    @State private var penColor: UIColor = .label
+    @State private var penColor: PlatformColor = .label
     @State private var penWidth: CGFloat = 3
-    @State private var highlighterColor: UIColor = .systemYellow.withAlphaComponent(0.5)
+    @State private var highlighterColor: PlatformColor = .systemYellow.withAlphaComponent(0.5)
     @State private var highlighterWidth: CGFloat = 20
     @State private var eraserWidth: CGFloat = 34
+    @State private var clipboardWatcherTask: Task<Void, Never>?
+    @State private var lastClipboardFingerprint: String?
     @FocusState private var renameFocused: Bool
 
     var body: some View {
@@ -158,10 +161,23 @@ struct CanvasContainerView: View {
         }
         .animation(.spring(response: 0.24, dampingFraction: 0.86), value: feedback)
         .animation(.spring(response: 0.25, dampingFraction: 0.82), value: selectedObjectIDs)
-        .onAppear { context.undoManager = undoManager }
+        .onAppear {
+            context.undoManager = undoManager
+            startClipboardListening()
+        }
+        .onDisappear {
+            stopClipboardListening()
+        }
         .onChange(of: mode) { _, newMode in
             if newMode != .edit { editingObjectID = nil }
             if newMode != .draw { drawToolSettings = nil }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active {
+                startClipboardListening()
+            } else {
+                stopClipboardListening()
+            }
         }
         // Tapping the canvas background deselects everything — also exit inline editing
         // so the keyboard dismisses instead of staying up with no selected card.
@@ -205,7 +221,7 @@ struct CanvasContainerView: View {
         drawToolSettings = nil
     }
 
-    private func drawColor(for tool: CanvasDrawTool) -> UIColor? {
+    private func drawColor(for tool: CanvasDrawTool) -> PlatformColor? {
         switch tool {
         case .pen:
             return penColor
@@ -229,7 +245,7 @@ struct CanvasContainerView: View {
         }
     }
 
-    private func setDrawColor(_ color: UIColor, for tool: CanvasDrawTool) {
+    private func setDrawColor(_ color: PlatformColor, for tool: CanvasDrawTool) {
         switch tool {
         case .pen:
             penColor = color
@@ -264,6 +280,32 @@ struct CanvasContainerView: View {
         if isNew { context.insert(clip) }
         workspace.place(clip: clip, at: workspace.nextPosition(around: visibleViewportCenter))
         showFeedback("Pasted")
+    }
+
+    private func startClipboardListening() {
+        guard clipboardWatcherTask == nil else { return }
+        lastClipboardFingerprint = ClipboardService.readContent()?.fingerprint
+        clipboardWatcherTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1.0))
+                guard !Task.isCancelled, let content = ClipboardService.readContent() else { continue }
+                guard content.fingerprint != lastClipboardFingerprint else { continue }
+                lastClipboardFingerprint = content.fingerprint
+                guard !ClipboardService.wasRecentlyImported(content) else { continue }
+                captureClipboardContent(content)
+            }
+        }
+    }
+
+    private func stopClipboardListening() {
+        clipboardWatcherTask?.cancel()
+        clipboardWatcherTask = nil
+    }
+
+    private func captureClipboardContent(_ content: ClipboardContent) {
+        let (clip, isNew) = Clip.findOrMake(from: content, origin: .clipboard, in: context)
+        if isNew { context.insert(clip) }
+        showFeedback(isNew ? "Captured from clipboard" : "Clipboard already saved")
     }
 
     // MARK: - Rename

@@ -2,6 +2,24 @@ import Foundation
 import SwiftUI
 #if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
+
+#if canImport(UIKit)
+typealias PlatformColor = UIColor
+typealias PlatformImage = UIImage
+#elseif canImport(AppKit)
+typealias PlatformColor = NSColor
+typealias PlatformImage = NSImage
+#endif
+
+#if canImport(AppKit)
+extension NSColor {
+    static var secondarySystemBackground: NSColor { .controlBackgroundColor }
+    static var systemBackground: NSColor { .windowBackgroundColor }
+    static var label: NSColor { .labelColor }
+}
 #endif
 
 // MARK: - Comparable
@@ -33,13 +51,30 @@ extension View {
     }
 }
 
-// MARK: - Color (UIKit platforms)
+// MARK: - Color
 
 #if canImport(UIKit)
 extension Color {
     /// Creates a color that adapts between light and dark mode.
-    static func adaptive(light: UIColor, dark: UIColor) -> Color {
+    static func adaptive(light: PlatformColor, dark: PlatformColor) -> Color {
         Color(UIColor(dynamicProvider: { $0.userInterfaceStyle == .dark ? dark : light }))
     }
+
+    static var platformSystemBackground: Color { Color(uiColor: .systemBackground) }
+    static var platformSecondarySystemBackground: Color { Color(uiColor: .secondarySystemBackground) }
+    init(platformColor: PlatformColor) { self.init(uiColor: platformColor) }
+}
+#elseif canImport(AppKit)
+extension Color {
+    static func adaptive(light: PlatformColor, dark: PlatformColor) -> Color {
+        Color(nsColor: NSColor(name: nil) { appearance in
+            let best = appearance.bestMatch(from: [.darkAqua, .aqua])
+            return best == .darkAqua ? dark : light
+        })
+    }
+
+    static var platformSystemBackground: Color { Color(nsColor: .windowBackgroundColor) }
+    static var platformSecondarySystemBackground: Color { Color(nsColor: .controlBackgroundColor) }
+    init(platformColor: PlatformColor) { self.init(nsColor: platformColor) }
 }
 #endif

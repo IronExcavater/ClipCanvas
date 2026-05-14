@@ -19,7 +19,7 @@ struct CanvasView: View {
     @Query private var allClips: [Clip]
     @State private var viewportOrigin: CGPoint = .zero
     @State private var canvasScale: CGFloat = 1.0
-    @State private var activeDrag: (id: UUID, offset: CGSize)?
+    @State private var activeDrag: CanvasDragSession?
     @State private var activeResize: CanvasResizeSession?
     @State private var editingSnapshot: EditingFrameSnapshot?
     @State private var zOrder: [UUID: Double] = [:]
@@ -124,14 +124,14 @@ struct CanvasView: View {
         return canvasObjects.filter { object in
             selectedObjectIDs.contains(object.id)
             || editingObjectID == object.id
-            || activeDrag?.id == object.id
+            || activeDrag?.objectIDs.contains(object.id) == true
             || activeResize?.objectID == object.id
             || viewport.intersects(object.frame)
         }
     }
 
     private func positionedClipObject(_ object: CanvasObject, clip: Clip, in geo: GeometryProxy) -> some View {
-        let isDragging = isObjectDragging(object)
+        let isDragging = activeDrag?.objectIDs.contains(object.id) == true
         let isSelected = selectedObjectIDs.contains(object.id)
         let size = displaySize(for: object)
 
@@ -156,7 +156,7 @@ struct CanvasView: View {
             viewportOrigin: viewportOrigin,
             canvasScale: canvasScale,
             size: size,
-            dragOffset: dragOffset(for: object),
+            dragOffset: isDragging ? activeDrag?.translation ?? .zero : .zero,
             isDragging: isDragging
         ))
         .gesture(objectDragGesture(for: object, in: geo))
@@ -164,7 +164,7 @@ struct CanvasView: View {
     }
 
     private func positionedCardObject(_ object: CanvasObject, in geo: GeometryProxy) -> some View {
-        let isDragging = isObjectDragging(object)
+        let isDragging = activeDrag?.objectIDs.contains(object.id) == true
         let isSelected = selectedObjectIDs.contains(object.id)
         let size = displaySize(for: object)
 
@@ -188,7 +188,7 @@ struct CanvasView: View {
             viewportOrigin: viewportOrigin,
             canvasScale: canvasScale,
             size: size,
-            dragOffset: dragOffset(for: object),
+            dragOffset: isDragging ? activeDrag?.translation ?? .zero : .zero,
             isDragging: isDragging
         ))
         .gesture(objectDragGesture(for: object, in: geo))
@@ -269,42 +269,22 @@ struct CanvasView: View {
         DragGesture(minimumDistance: 4, coordinateSpace: .global)
             .onChanged { value in
                 guard activeResize?.objectID != object.id else { return }
-                bringToFront(object.id)
-                activeDrag = (object.id, value.translation)
+                let ids = dragObjectIDs(startingFrom: object)
+                ids.forEach(bringToFront)
+                activeDrag = CanvasDragSession(anchorID: object.id, objectIDs: ids, translation: value.translation)
             }
             .onEnded { value in
                 guard activeResize?.objectID != object.id else { return }
-                let objectsToMove: [CanvasObject] = selectedObjectIDs.contains(object.id)
-                    ? canvasObjects.filter { selectedObjectIDs.contains($0.id) }
-                    : [object]
-                for obj in objectsToMove {
-                    obj.x += value.translation.width / canvasScale
-                    obj.y += value.translation.height / canvasScale
-                    clampObject(obj, in: geo)
-                    obj.markUpdated()
+                let ids = activeDrag?.objectIDs ?? dragObjectIDs(startingFrom: object)
+                for movedObject in canvasObjects where ids.contains(movedObject.id) {
+                    movedObject.x += value.translation.width / canvasScale
+                    movedObject.y += value.translation.height / canvasScale
+                    clampObject(movedObject, in: geo)
+                    movedObject.markUpdated()
                 }
                 activeDrag = nil
                 updateVisibleObjectIDs(in: geo)
             }
-    }
-
-    // Returns the live drag offset for a card — all selected cards share the same
-    // offset when a selected card is being dragged (group drag preview).
-    private func dragOffset(for object: CanvasObject) -> CGSize {
-        guard let drag = activeDrag else { return .zero }
-        if selectedObjectIDs.contains(drag.id) {
-            return selectedObjectIDs.contains(object.id) ? drag.offset : .zero
-        }
-        return drag.id == object.id ? drag.offset : .zero
-    }
-
-    // True when this card should show the drag visual (scale-up + shadow).
-    private func isObjectDragging(_ object: CanvasObject) -> Bool {
-        guard let drag = activeDrag else { return false }
-        if selectedObjectIDs.contains(drag.id) {
-            return selectedObjectIDs.contains(object.id)
-        }
-        return drag.id == object.id
     }
 
     // MARK: - Zoom
@@ -452,31 +432,19 @@ struct CanvasView: View {
             editingSnapshot = EditingFrameSnapshot(id: object.id, frame: object.frame)
         }
 
-        let visibleWidth = geo.size.width / canvasScale
-        let visibleHeight = geo.size.height / canvasScale
-        let targetWidth = min(max(visibleWidth - 42, CanvasPlacementSizing.defaultSize.width), 720)
-        let ratio = CGFloat(object.height / max(object.width, 1))
-            .clamped(to: 0.48...1.6)
-        let maxHeight = max(visibleHeight - 180, CanvasPlacementSizing.defaultSize.height)
-        let targetHeight = min(max(targetWidth * ratio, CanvasPlacementSizing.defaultSize.height), maxHeight)
-        let bounds = canvasBounds(viewportSize: geo.size)
-        let targetFrame = CanvasViewportFitting.frame(
-            expanding: object.frame,
-            to: CGSize(width: targetWidth, height: targetHeight),
-            bounds: bounds
-        )
-        let targetOrigin = CanvasViewportFitting.origin(
-            revealing: targetFrame,
-            currentOrigin: viewportOrigin,
+        let targetSize = CanvasPlacementSizing.editingSize(
+            for: object,
             viewportSize: geo.size,
-            scale: canvasScale,
-            bounds: bounds,
-            margin: 42
+            scale: canvasScale
+        )
+        let targetFrame = CanvasPlacementSizing.frameForEditing(
+            object.frame,
+            targetSize: targetSize,
+            viewport: viewportRect(in: geo)
         )
 
         withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
             object.frame = targetFrame
-            viewportOrigin = targetOrigin
             clampObject(object, in: geo)
         }
     }
@@ -605,6 +573,10 @@ struct CanvasView: View {
         }
     }
 
+    private func dragObjectIDs(startingFrom object: CanvasObject) -> Set<UUID> {
+        selectedObjectIDs.contains(object.id) ? selectedObjectIDs : [object.id]
+    }
+
     private func toggleSelection(for object: CanvasObject) {
         bringToFront(object.id)
         if selectedObjectIDs.contains(object.id) {
@@ -712,6 +684,12 @@ struct CanvasView: View {
 private struct EditingFrameSnapshot {
     let id: UUID
     let frame: CGRect
+}
+
+private struct CanvasDragSession {
+    let anchorID: UUID
+    let objectIDs: Set<UUID>
+    let translation: CGSize
 }
 
 private struct CanvasObjectPositionModifier: ViewModifier {

@@ -260,7 +260,7 @@ struct NewTagComposer: View {
         .padding(.leading, 9)
         .padding(.trailing, 6)
         .padding(.vertical, 4)
-        .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: Capsule())
+        .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground), in: Capsule())
         .padding(.bottom, 8)
     }
 }
@@ -328,7 +328,7 @@ private struct TagDeleteButton: View {
                 .font(.system(size: 10, weight: .bold))
                 .foregroundStyle(.primary.opacity(0.62))
                 .frame(width: 32, height: 32)
-                .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: Circle())
+                .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground), in: Circle())
                 .shadow(color: .black.opacity(0.08), radius: 5, y: 2)
         }
         .buttonStyle(.plain)

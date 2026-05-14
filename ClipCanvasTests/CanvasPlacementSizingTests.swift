@@ -34,6 +34,29 @@ import Testing
             .truncatingRemainder(dividingBy: CanvasPlacementSizing.estimatedCharacterWidth) == 0)
     }
 
+    @Test func editingSizeUsesFinalWidthForLineHeight() {
+        let text = String(repeating: "word ", count: 80)
+        let object = CanvasObject(
+            kind: .stickyNote,
+            x: 0,
+            y: 0,
+            width: CanvasPlacementSizing.defaultSize.width,
+            height: CanvasPlacementSizing.defaultSize.height,
+            text: text
+        )
+
+        let size = CanvasPlacementSizing.editingSize(
+            for: object,
+            viewportSize: CGSize(width: 390, height: 740),
+            scale: 1
+        )
+
+        #expect(size.width <= 390)
+        #expect(size.height < size.width)
+        #expect((size.height - CanvasPlacementSizing.contentChrome.height)
+            .truncatingRemainder(dividingBy: CanvasPlacementSizing.estimatedLineHeight) == 0)
+    }
+
     @Test func textResizeSnapsToCharacterAndLineSteps() {
         let size = CanvasPlacementSizing.snappedSize(
             CGSize(width: 229, height: 163),

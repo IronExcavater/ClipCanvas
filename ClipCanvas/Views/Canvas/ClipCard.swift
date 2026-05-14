@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 struct ClipCard: View {
     let clip: Clip
@@ -70,11 +69,8 @@ struct ClipCard: View {
                     onExitEditing: onExitEditing,
                     onSizeChange: onEditorSizeChange
                 )
-            } else if clip.type == .image, let data = clip.imageData, let uiImage = UIImage(data: data) {
-                Image(uiImage: uiImage)
-                    .resizable()
-                    .scaledToFill()
-                    .clipped()
+            } else if clip.type == .image, let data = clip.imageData, let image = PlatformImage(data: data) {
+                platformImage(image)
             } else {
                 Text(clip.preview.isEmpty ? " " : clip.preview)
                     .font(.system(size: 15))
@@ -82,6 +78,21 @@ struct ClipCard: View {
                     .foregroundStyle(.primary)
             }
         }
+    }
+
+    @ViewBuilder
+    private func platformImage(_ image: PlatformImage) -> some View {
+        #if canImport(UIKit)
+        Image(uiImage: image)
+            .resizable()
+            .scaledToFill()
+            .clipped()
+        #elseif canImport(AppKit)
+        Image(nsImage: image)
+            .resizable()
+            .scaledToFill()
+            .clipped()
+        #endif
     }
 
     private var resizeHandle: some View {
@@ -94,7 +105,7 @@ struct ClipCard: View {
 
     private var cardSurface: some View {
         ZStack {
-            Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground)
+            Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground)
             (fillColor ?? primaryColor).opacity(0.20)
         }
     }
@@ -146,85 +157,52 @@ struct StickyNoteShape: InsettableShape {
     }
 }
 
-struct NoteTextEditor: UIViewRepresentable {
+struct NoteTextEditor: View {
     let initialText: String
     var fontSize: CGFloat = 15
     let onCommit: (String) -> Void
     var onExitEditing: () -> Void = {}
     var onSizeChange: (CGSize) -> Void = { _ in }
+    @State private var text: String
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator(
-            text: initialText,
-            onCommit: onCommit,
-            onExitEditing: onExitEditing,
-            onSizeChange: onSizeChange
-        )
+    init(
+        initialText: String,
+        fontSize: CGFloat = 15,
+        onCommit: @escaping (String) -> Void,
+        onExitEditing: @escaping () -> Void = {},
+        onSizeChange: @escaping (CGSize) -> Void = { _ in }
+    ) {
+        self.initialText = initialText
+        self.fontSize = fontSize
+        self.onCommit = onCommit
+        self.onExitEditing = onExitEditing
+        self.onSizeChange = onSizeChange
+        _text = State(initialValue: initialText)
     }
 
-    func makeUIView(context: Context) -> UITextView {
-        let tv = UITextView()
-        tv.delegate = context.coordinator
-        context.coordinator.textView = tv
-        tv.backgroundColor = .clear
-        tv.font = .systemFont(ofSize: fontSize)
-        tv.textColor = .label
-        tv.isScrollEnabled = false
-        tv.text = initialText
-        tv.textContainerInset = .zero
-        tv.textContainer.lineFragmentPadding = 0
-        DispatchQueue.main.async { tv.becomeFirstResponder() }
-        let coordinator = context.coordinator
-        DispatchQueue.main.async { coordinator.reportSize(tv) }
-        return tv
+    var body: some View {
+        TextEditor(text: $text)
+            .font(.system(size: fontSize))
+            .scrollContentBackground(.hidden)
+            .background(Color.clear)
+            .onChange(of: text) { _, newValue in
+                onCommit(newValue)
+                reportSize(for: newValue)
+            }
+            .onAppear {
+                reportSize(for: text)
+            }
+            .onDisappear {
+                onCommit(text)
+            }
     }
 
-    func updateUIView(_ uiView: UITextView, context: Context) {
-        uiView.font = .systemFont(ofSize: fontSize)
-        let coordinator = context.coordinator
-        DispatchQueue.main.async {
-            coordinator.reportSize(uiView)
+    private func reportSize(for value: String) {
+        let columns = max(Int((220 / max(fontSize * 0.58, 1)).rounded(.down)), 1)
+        let lines = value.components(separatedBy: .newlines).reduce(0) { count, line in
+            count + max(Int((Double(max(line.count, 1)) / Double(columns)).rounded(.up)), 1)
         }
-    }
-
-    final class Coordinator: NSObject, UITextViewDelegate {
-        var text: String
-        let onCommit: (String) -> Void
-        let onExitEditing: () -> Void
-        let onSizeChange: (CGSize) -> Void
-        weak var textView: UITextView?
-        private var hasExited = false
-
-        init(
-            text: String,
-            onCommit: @escaping (String) -> Void,
-            onExitEditing: @escaping () -> Void,
-            onSizeChange: @escaping (CGSize) -> Void
-        ) {
-            self.text = text
-            self.onCommit = onCommit
-            self.onExitEditing = onExitEditing
-            self.onSizeChange = onSizeChange
-        }
-
-        func textViewDidChange(_ textView: UITextView) {
-            text = textView.text ?? ""
-            onCommit(text)
-            reportSize(textView)
-        }
-
-        func textViewDidEndEditing(_ textView: UITextView) {
-            textView.contentOffset = .zero
-            onCommit(text)
-            guard !hasExited else { return }
-            hasExited = true
-            onExitEditing()
-        }
-
-        func reportSize(_ textView: UITextView) {
-            let size = textView.sizeThatFits(CGSize(width: textView.bounds.width, height: .greatestFiniteMagnitude))
-            onSizeChange(size)
-        }
+        onSizeChange(CGSize(width: 220, height: CGFloat(lines) * fontSize * 1.28))
     }
 }
 
@@ -251,13 +229,13 @@ struct ResizeHandle: View {
 extension CardColor {
     var background: Color {
         switch self {
-        case .cloud:    return .adaptive(light: UIColor(red: 0.96, green: 0.96, blue: 0.94, alpha: 1), dark: UIColor(red: 0.22, green: 0.22, blue: 0.21, alpha: 1))
-        case .banana:   return .adaptive(light: UIColor(red: 1.00, green: 0.95, blue: 0.46, alpha: 1), dark: UIColor(red: 0.42, green: 0.38, blue: 0.03, alpha: 1))
-        case .flamingo: return .adaptive(light: UIColor(red: 1.00, green: 0.67, blue: 0.67, alpha: 1), dark: UIColor(red: 0.50, green: 0.17, blue: 0.17, alpha: 1))
-        case .sage:     return .adaptive(light: UIColor(red: 0.71, green: 0.92, blue: 0.84, alpha: 1), dark: UIColor(red: 0.10, green: 0.36, blue: 0.26, alpha: 1))
-        case .sky:      return .adaptive(light: UIColor(red: 0.68, green: 0.84, blue: 0.95, alpha: 1), dark: UIColor(red: 0.10, green: 0.29, blue: 0.44, alpha: 1))
-        case .lavender: return .adaptive(light: UIColor(red: 0.84, green: 0.74, blue: 0.89, alpha: 1), dark: UIColor(red: 0.30, green: 0.18, blue: 0.40, alpha: 1))
-        case .peach:    return .adaptive(light: UIColor(red: 1.00, green: 0.85, blue: 0.76, alpha: 1), dark: UIColor(red: 0.45, green: 0.20, blue: 0.10, alpha: 1))
+        case .cloud:    return .adaptive(light: PlatformColor(red: 0.96, green: 0.96, blue: 0.94, alpha: 1), dark: PlatformColor(red: 0.22, green: 0.22, blue: 0.21, alpha: 1))
+        case .banana:   return .adaptive(light: PlatformColor(red: 1.00, green: 0.95, blue: 0.46, alpha: 1), dark: PlatformColor(red: 0.42, green: 0.38, blue: 0.03, alpha: 1))
+        case .flamingo: return .adaptive(light: PlatformColor(red: 1.00, green: 0.67, blue: 0.67, alpha: 1), dark: PlatformColor(red: 0.50, green: 0.17, blue: 0.17, alpha: 1))
+        case .sage:     return .adaptive(light: PlatformColor(red: 0.71, green: 0.92, blue: 0.84, alpha: 1), dark: PlatformColor(red: 0.10, green: 0.36, blue: 0.26, alpha: 1))
+        case .sky:      return .adaptive(light: PlatformColor(red: 0.68, green: 0.84, blue: 0.95, alpha: 1), dark: PlatformColor(red: 0.10, green: 0.29, blue: 0.44, alpha: 1))
+        case .lavender: return .adaptive(light: PlatformColor(red: 0.84, green: 0.74, blue: 0.89, alpha: 1), dark: PlatformColor(red: 0.30, green: 0.18, blue: 0.40, alpha: 1))
+        case .peach:    return .adaptive(light: PlatformColor(red: 1.00, green: 0.85, blue: 0.76, alpha: 1), dark: PlatformColor(red: 0.45, green: 0.20, blue: 0.10, alpha: 1))
         }
     }
 }

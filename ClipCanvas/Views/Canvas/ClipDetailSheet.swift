@@ -1,9 +1,9 @@
 import SwiftUI
-import UIKit
 
 struct ClipDetailSheet: View {
     let clip: Clip
     @Environment(\.dismiss) private var dismiss
+    @State private var isTransforming = false
 
     var body: some View {
         NavigationStack {
@@ -17,9 +17,12 @@ struct ClipDetailSheet: View {
                         ClipDetailActionToolbar(
                             isPinned: clip.isPinned,
                             canOpenLink: ClipActionService.openableURL(for: clip) != nil,
+                            canTransform: clip.type != .image,
+                            isTransforming: isTransforming,
                             onCopy: { ClipActionService.copy(clip) },
                             onOpen: { ClipActionService.openURL(for: clip) },
                             onPin: { ClipActionService.togglePin(clip) },
+                            onTransform: applyTransform,
                             onDelete: {
                                 ClipActionService.softDelete(clip)
                                 dismiss()
@@ -36,7 +39,7 @@ struct ClipDetailSheet: View {
                 .padding(.bottom, 120)
             }
             .navigationTitle("Note Details")
-            .navigationBarTitleDisplayMode(.inline)
+            .appInlineNavigationTitleDisplayMode()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     AppToolbarCircleButton(systemImage: "xmark", size: 36, symbolSize: 14) {
@@ -45,7 +48,7 @@ struct ClipDetailSheet: View {
                     .accessibilityLabel("Close")
                 }
             }
-            .scrollDismissesKeyboard(.interactively)
+            .appScrollDismissesKeyboardInteractively()
         }
     }
 }
@@ -80,7 +83,7 @@ private struct ClipInfoPanel: View {
             ClipInfoRow("Created", value: clip.createdAt.formatted(date: .abbreviated, time: .shortened), icon: "calendar")
         }
         .padding(12)
-        .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .shadow(color: .black.opacity(0.06), radius: 8, y: 3)
     }
 }
@@ -126,9 +129,12 @@ private struct ClipUpdatedRow: View {
 private struct ClipDetailActionToolbar: View {
     let isPinned: Bool
     let canOpenLink: Bool
+    let canTransform: Bool
+    let isTransforming: Bool
     let onCopy: () -> Void
     let onOpen: () -> Void
     let onPin: () -> Void
+    let onTransform: (String) -> Void
     let onDelete: () -> Void
 
     var body: some View {
@@ -137,6 +143,7 @@ private struct ClipDetailActionToolbar: View {
             if canOpenLink {
                 action("Open", icon: "safari", action: onOpen)
             }
+            transformMenu
             action(isPinned ? "Unpin" : "Pin", icon: isPinned ? "pin.slash" : "pin", action: onPin)
             action("Delete", icon: "trash", destructive: true, action: onDelete)
         }
@@ -154,6 +161,36 @@ private struct ClipDetailActionToolbar: View {
         .frame(maxWidth: .infinity, alignment: .leading)
     }
 
+    @ViewBuilder
+    private var transformMenu: some View {
+        Menu {
+            Button("Clean Up") { onTransform("clip.cleanUp") }
+            Button("Distill") { onTransform("clip.distill") }
+            Button("Action Items") { onTransform("clip.actionItems") }
+            Button("Rewrite") { onTransform("clip.rewrite") }
+            Button("Title") { onTransform("clip.title") }
+        } label: {
+            VStack(spacing: 5) {
+                if isTransforming {
+                    ProgressView()
+                        .controlSize(.small)
+                } else {
+                    Image(systemName: "wand.and.sparkles")
+                        .font(.system(size: 17, weight: .semibold))
+                }
+                Text("Transform")
+                    .font(.caption2.weight(.semibold))
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.8)
+            }
+            .foregroundStyle(.primary)
+            .frame(maxWidth: .infinity, minHeight: 58)
+            .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground).opacity(0.72), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+        }
+        .buttonStyle(.plain)
+        .disabled(!canTransform || isTransforming)
+    }
+
     private func action(_ title: String, icon: String, destructive: Bool = false, action: @escaping () -> Void) -> some View {
         Button(role: destructive ? .destructive : nil, action: action) {
             VStack(spacing: 5) {
@@ -166,8 +203,34 @@ private struct ClipDetailActionToolbar: View {
             }
             .foregroundStyle(destructive ? .red : .primary)
             .frame(maxWidth: .infinity, minHeight: 58)
-            .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground).opacity(0.72), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground).opacity(0.72), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         }
         .buttonStyle(.plain)
+    }
+}
+
+private extension ClipDetailSheet {
+    func applyTransform(_ skillID: String) {
+        guard !isTransforming, clip.type != .image else { return }
+        let input = TransformSkillInput(
+            clipIDs: [clip.id],
+            text: clip.content
+        )
+        isTransforming = true
+        Task {
+            defer { isTransforming = false }
+            do {
+                let result = try await TransformSkillRegistry().run(skillID, input: input)
+                guard let text = result.text?.trimmingCharacters(in: .whitespacesAndNewlines),
+                      !text.isEmpty else { return }
+                let classification = ClipClassificationService.classifySensitivity(text)
+                clip.content = text
+                clip.type = Clip.detect(content: text, imageData: clip.imageData)
+                clip.updateSensitivity(classification.sensitivity, reason: classification.reason)
+                clip.updatedAt = Date()
+            } catch {
+                // Keep the existing clip unchanged when a transform fails.
+            }
+        }
     }
 }

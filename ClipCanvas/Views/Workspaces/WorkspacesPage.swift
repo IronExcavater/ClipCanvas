@@ -80,7 +80,7 @@ struct WorkspacesPage: View {
         .scrollContentBackground(.hidden)
         .contentMargins(.top, 0, for: .scrollContent)
         .appSearchAwareNavigationTitle("Workspaces", isSearching: searchPresented)
-        .searchable(text: searchBinding, isPresented: $searchPresented, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search workspaces")
+        .appSearchable(text: searchBinding, isPresented: $searchPresented, prompt: "Search workspaces")
         .animation(.easeInOut(duration: 0.18), value: search.isEmpty)
         .animation(.easeInOut(duration: 0.18), value: searchPresented)
         .toolbar {

@@ -61,7 +61,7 @@ struct AIChatsPage: View {
         .scrollContentBackground(.hidden)
         .contentMargins(.top, 0, for: .scrollContent)
         .appSearchAwareNavigationTitle("AI Chats", isSearching: searchPresented)
-        .searchable(text: $search, isPresented: $searchPresented, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search chats")
+        .appSearchable(text: $search, isPresented: $searchPresented, prompt: "Search chats")
         .animation(.easeInOut(duration: 0.18), value: searchPresented)
         .alert("Delete selected chats?", isPresented: $confirmingDelete) {
             Button("Cancel", role: .cancel) {}

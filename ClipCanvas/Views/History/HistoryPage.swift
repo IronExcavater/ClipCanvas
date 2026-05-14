@@ -63,9 +63,9 @@ struct HistoryPage: View {
         .listStyle(.plain)
         .scrollContentBackground(.hidden)
         .contentMargins(.top, 0, for: .scrollContent)
-        .listSectionSpacing(.compact)
+        .appListSectionSpacingCompact()
         .appSearchAwareNavigationTitle("History", isSearching: searchPresented)
-        .searchable(text: searchBinding, isPresented: $searchPresented, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search history")
+        .appSearchable(text: searchBinding, isPresented: $searchPresented, prompt: "Search history")
         .animation(.easeInOut(duration: 0.18), value: filter.search.isEmpty)
         .animation(.easeInOut(duration: 0.18), value: searchPresented)
         .animation(.easeInOut(duration: 0.18), value: expandedClipID)
@@ -91,11 +91,11 @@ struct HistoryPage: View {
                         .padding(.top, 12)
                         .padding(.bottom, 120)
                 }
-                .scrollDismissesKeyboard(.interactively)
+                .appScrollDismissesKeyboardInteractively()
                 .navigationTitle("Tags")
-                .navigationBarTitleDisplayMode(.inline)
+                .appInlineNavigationTitleDisplayMode()
             }
-            .presentationDetents([.medium, .large])
+            .appSheetPresentationDetents()
         }
     }
 

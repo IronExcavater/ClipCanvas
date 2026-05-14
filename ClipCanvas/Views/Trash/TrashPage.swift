@@ -99,7 +99,7 @@ struct TrashPage: View {
         .scrollContentBackground(.hidden)
         .contentMargins(.top, 0, for: .scrollContent)
         .appSearchAwareNavigationTitle("Recently Deleted", isSearching: searchPresented)
-        .searchable(text: $search, isPresented: $searchPresented, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search deleted")
+        .appSearchable(text: $search, isPresented: $searchPresented, prompt: "Search deleted")
         .animation(.easeInOut(duration: 0.18), value: searchPresented)
         .toolbar {
             if hasDeletedItems && !searchPresented {

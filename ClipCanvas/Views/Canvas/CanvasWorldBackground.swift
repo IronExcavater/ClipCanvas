@@ -55,7 +55,7 @@ struct CanvasDotGrid: View, Animatable {
                 }
             }
         }
-        .background(Color(uiColor: .systemBackground))
+        .background(Color.platformSystemBackground)
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
@@ -90,9 +90,9 @@ struct EmptyCanvasHint: View {
                 .fill(
                     RadialGradient(
                         colors: [
-                            Color(uiColor: .systemBackground).opacity(0.92),
-                            Color(uiColor: .systemBackground).opacity(0.60),
-                            Color(uiColor: .systemBackground).opacity(0.00),
+                            Color.platformSystemBackground.opacity(0.92),
+                            Color.platformSystemBackground.opacity(0.60),
+                            Color.platformSystemBackground.opacity(0.00),
                         ],
                         center: .center,
                         startRadius: 18,

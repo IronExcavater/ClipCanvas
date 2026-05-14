@@ -13,7 +13,7 @@ nonisolated enum CanvasMode: Equatable, CaseIterable {
         }
     }
 
-    var allowsCanvasPan: Bool { self == .pan }
+    var allowsCanvasPan: Bool { self != .draw }
 }
 
 enum ZoomCommand: Equatable {
@@ -97,7 +97,7 @@ nonisolated struct CanvasToolbarConfiguration: Equatable {
             }
             return CanvasToolbarConfiguration(items: [
                 .closeMode,
-                .newNote, .paste,
+                .newNote, .askAI,
             ])
 
         case .pan:

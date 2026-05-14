@@ -1,5 +1,4 @@
 import SwiftUI
-import UIKit
 
 enum AppSymbol {
     static let sidebar = "rectangle.leadinghalf.inset.filled"
@@ -32,7 +31,7 @@ private struct BlendedIconButtonBackground: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
         content
-            .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: Circle())
+            .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground), in: Circle())
             .shadow(color: .black.opacity(isPressed ? 0.08 : 0.14), radius: isPressed ? 5 : 10, y: isPressed ? 2 : 5)
     }
 }
@@ -61,7 +60,7 @@ struct AppToolbarCircleLabel: View {
             .font(.system(size: symbolSize, weight: .semibold))
             .foregroundStyle(.primary)
             .frame(width: size, height: size)
-            .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: Circle())
+            .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground), in: Circle())
             .shadow(color: .black.opacity(0.10), radius: 8, y: 3)
             .contentShape(Circle())
     }
@@ -242,11 +241,11 @@ private struct AppListItemBackground: View {
     var body: some View {
         ZStack {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground).opacity(0.88))
+                .fill(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground).opacity(0.88))
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .fill(tint.opacity(max(opacity, 0.14)))
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color(uiColor: .systemBackground).opacity(0.18))
+                .fill(Color.platformSystemBackground.opacity(0.18))
         }
     }
 }
@@ -313,6 +312,67 @@ private struct RelativeAgeTimelineEntries: Sequence, IteratorProtocol {
 }
 
 extension View {
+    @ViewBuilder
+    func appInlineNavigationTitleDisplayMode() -> some View {
+        #if canImport(UIKit)
+        self.navigationBarTitleDisplayMode(.inline)
+        #else
+        self
+        #endif
+    }
+
+    @ViewBuilder
+    func appScrollDismissesKeyboardInteractively() -> some View {
+        #if canImport(UIKit)
+        self.scrollDismissesKeyboard(.interactively)
+        #else
+        self
+        #endif
+    }
+
+    @ViewBuilder
+    func appSheetPresentationDetents() -> some View {
+        #if canImport(UIKit)
+        self
+            .presentationDetents([.medium, .large])
+            .presentationDragIndicator(.visible)
+        #else
+        self
+        #endif
+    }
+
+    @ViewBuilder
+    func appSearchable(text: Binding<String>, isPresented: Binding<Bool>, prompt: String) -> some View {
+        #if canImport(UIKit)
+        self.searchable(
+            text: text,
+            isPresented: isPresented,
+            placement: .navigationBarDrawer(displayMode: .always),
+            prompt: Text(prompt)
+        )
+        #else
+        self.searchable(text: text, prompt: Text(prompt))
+        #endif
+    }
+
+    @ViewBuilder
+    func appListSectionSpacingCompact() -> some View {
+        #if canImport(UIKit)
+        self.listSectionSpacing(.compact)
+        #else
+        self
+        #endif
+    }
+
+    @ViewBuilder
+    func appHideNavigationBarIfAvailable() -> some View {
+        #if canImport(UIKit)
+        self.toolbar(.hidden, for: .navigationBar)
+        #else
+        self
+        #endif
+    }
+
     func appListCard(tint: Color, opacity: Double = 0.10) -> some View {
         AppListItemContainer(tint: tint, opacity: opacity) {
             self
@@ -340,7 +400,7 @@ extension View {
             .foregroundStyle(.primary)
             .padding(.horizontal, 12)
             .frame(height: 36)
-            .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: Capsule())
+            .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground), in: Capsule())
             .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
     }
 
@@ -350,7 +410,7 @@ extension View {
             .buttonStyle(.plain)
             .foregroundStyle(.primary)
             .frame(width: 36, height: 36)
-            .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: Circle())
+            .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground), in: Circle())
             .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
     }
 }
@@ -359,7 +419,7 @@ extension View {
     func appSearchAwareNavigationTitle(_ title: String, isSearching: Bool) -> some View {
         self
             .navigationTitle("")
-            .navigationBarTitleDisplayMode(.inline)
+            .appInlineNavigationTitleDisplayMode()
             .toolbar {
                 ToolbarItem(placement: .principal) {
                     AppSearchAwareTitle(title: title, isSearching: isSearching)

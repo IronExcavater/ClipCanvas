@@ -7,7 +7,7 @@ enum CanvasPlacementSizing {
     static let contentChrome = CGSize(width: 28, height: 30)
 
     private static let minimumTextColumns: CGFloat = 24
-    private static let maximumTextColumns: CGFloat = 52
+    private static let maximumTextColumns: CGFloat = 84
     private static let minimumTextLines: CGFloat = 6
     private static let maximumTextLines: CGFloat = 26
 
@@ -45,17 +45,40 @@ enum CanvasPlacementSizing {
         }
 
         let content = clip?.content.isEmpty == false ? (clip?.content ?? "") : (fallbackText ?? "")
-        let count = max(content.count, 1)
-        let hardLines = content.components(separatedBy: .newlines).count
-        let wrappedLines = max(hardLines, Int((Double(count) / 28).rounded(.up)))
-        let width: CGFloat
+        let proposedWidth: CGFloat
         if let availableScreenWidth {
-            width = max(minimumSize.width, min(availableScreenWidth - 48, maximumSize.width))
+            proposedWidth = max(minimumSize.width, min(availableScreenWidth - 48, maximumSize.width))
         } else {
-            width = count > 160 ? 300 : 260
+            proposedWidth = content.count > 160 ? 356 : 260
         }
-        let height = CGFloat(wrappedLines) * lineHeight + contentChrome.height
-        return snappedSize(CGSize(width: width, height: height), for: clip)
+        let width = snappedWidth(proposedWidth)
+        return textSize(for: content, width: width)
+    }
+
+    static func editingSize(for object: CanvasObject, viewportSize: CGSize, scale: CGFloat) -> CGSize {
+        let visibleWidth = viewportSize.width / max(scale, 0.001)
+        let proposedWidth = min(max(visibleWidth - 56, minimumSize.width), maximumSize.width)
+        let width = snappedWidth(proposedWidth)
+        let content = object.clip?.content.isEmpty == false ? (object.clip?.content ?? "") : object.text
+        let measured = textSize(for: content, width: width)
+        let visibleHeight = viewportSize.height / max(scale, 0.001)
+        let maxHeight = max(min(visibleHeight - 160, maximumSize.height), minimumSize.height)
+        return snappedSize(
+            CGSize(width: width, height: min(max(measured.height, object.height), maxHeight)),
+            for: object.clip
+        )
+    }
+
+    static func frameForEditing(_ frame: CGRect, targetSize: CGSize, viewport: CGRect, margin: CGFloat = 42) -> CGRect {
+        let minY = viewport.minY + margin
+        let maxY = viewport.maxY - margin - targetSize.height
+        let y: CGFloat
+        if maxY < minY {
+            y = minY
+        } else {
+            y = frame.minY.clamped(to: minY...maxY)
+        }
+        return CGRect(x: frame.minX, y: y, width: targetSize.width, height: targetSize.height)
     }
 
     static func previewSize(for session: CanvasResizeSession, scale: CGFloat) -> CGSize {
@@ -86,6 +109,14 @@ enum CanvasPlacementSizing {
         ))
     }
 
+    static func textLineCount(for text: String, width: CGFloat) -> Int {
+        let columns = max(Int(((width - contentChrome.width) / characterWidth).rounded(.down)), 1)
+        let lines = text.isEmpty ? [""] : text.components(separatedBy: .newlines)
+        return lines.reduce(0) { partial, line in
+            partial + max(Int((Double(max(line.count, 1)) / Double(columns)).rounded(.up)), 1)
+        }
+    }
+
     static func fontSizeForWidth(_ width: CGFloat) -> CGFloat {
         (width / 18.0).clamped(to: 11...22)
     }
@@ -99,6 +130,16 @@ enum CanvasPlacementSizing {
             width: proposed.width.clamped(to: minimumSize.width...maximumSize.width),
             height: proposed.height.clamped(to: minimumSize.height...maximumSize.height)
         )
+    }
+
+    private static func textSize(for text: String, width: CGFloat) -> CGSize {
+        let lines = CGFloat(textLineCount(for: text, width: width))
+            .clamped(to: minimumTextLines...maximumTextLines)
+        return snappedSize(CGSize(width: width, height: contentChrome.height + lines * lineHeight), for: nil)
+    }
+
+    private static func snappedWidth(_ width: CGFloat) -> CGFloat {
+        clampedSize(CGSize(width: snapped(width, step: characterWidth, chrome: contentChrome.width), height: minimumSize.height)).width
     }
 
     private static func snap(

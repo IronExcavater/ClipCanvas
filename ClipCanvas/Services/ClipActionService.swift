@@ -1,5 +1,9 @@
 import Foundation
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 enum ClipActionService {
     static func copy(_ clip: Clip) {
@@ -32,7 +36,11 @@ enum ClipActionService {
     @MainActor
     static func openURL(for clip: Clip) {
         guard let url = openableURL(for: clip) else { return }
+        #if canImport(UIKit)
         UIApplication.shared.open(url)
+        #elseif canImport(AppKit)
+        NSWorkspace.shared.open(url)
+        #endif
     }
 
     static func openableURL(for clip: Clip) -> URL? {

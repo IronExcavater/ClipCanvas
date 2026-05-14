@@ -1,6 +1,7 @@
 import PencilKit
 import SwiftUI
 
+#if canImport(UIKit)
 struct CanvasDrawingLayer: UIViewRepresentable {
     @Binding var drawing: PKDrawing
     var activeTool: PKTool = PKInkingTool(.pen, color: .label, width: 3)
@@ -46,3 +47,13 @@ struct CanvasDrawingLayer: UIViewRepresentable {
         }
     }
 }
+#elseif canImport(AppKit)
+struct CanvasDrawingLayer: View {
+    @Binding var drawing: PKDrawing
+    var activeTool: PKTool = PKInkingTool(.pen, color: .label, width: 3)
+
+    var body: some View {
+        Color.clear
+    }
+}
+#endif

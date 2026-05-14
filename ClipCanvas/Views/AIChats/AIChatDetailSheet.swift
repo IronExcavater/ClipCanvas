@@ -1,6 +1,5 @@
 import SwiftData
 import SwiftUI
-import UIKit
 
 struct AIChatDetailSheet: View {
     @Bindable var chat: AIChat
@@ -24,7 +23,7 @@ struct AIChatDetailSheet: View {
                 inputBar
             }
             .navigationTitle(chat.title)
-            .navigationBarTitleDisplayMode(.inline)
+            .appInlineNavigationTitleDisplayMode()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     AppToolbarCircleButton(systemImage: "xmark", size: 36, symbolSize: 14) {
@@ -34,8 +33,7 @@ struct AIChatDetailSheet: View {
                 }
             }
         }
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
+        .appSheetPresentationDetents()
     }
 
     private var chatHeader: some View {
@@ -88,7 +86,7 @@ struct AIChatDetailSheet: View {
                 .textFieldStyle(.plain)
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
-                .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
 
             Menu {
                 Button { setMode(.quick) } label: {
@@ -171,7 +169,7 @@ private struct AIChatMessageBubble: View {
                         .padding(.horizontal, 12)
                         .padding(.vertical, 10)
                         .background(
-                            isUser ? Color.accentColor : Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground),
+                            isUser ? Color.accentColor : Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground),
                             in: RoundedRectangle(cornerRadius: 18, style: .continuous)
                         )
                     if !isUser { Spacer(minLength: 44) }
@@ -253,7 +251,7 @@ private struct AIChatToolEventRow: View {
         }
         .padding(.horizontal, 10)
         .padding(.vertical, 8)
-        .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground).opacity(0.86), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground).opacity(0.86), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
         .overlay {
             RoundedRectangle(cornerRadius: 14, style: .continuous)
                 .stroke(event.status.tint.opacity(0.20), lineWidth: 1)

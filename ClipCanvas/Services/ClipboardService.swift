@@ -1,5 +1,9 @@
 import SwiftData
+#if canImport(UIKit)
 import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 // A value representing what's on the clipboard right now
 enum ClipboardContent {
@@ -20,6 +24,7 @@ enum ClipboardService {
     private static var recentFingerprints: [String: Date] = [:]
 
     static func readContent() -> ClipboardContent? {
+        #if canImport(UIKit)
         let pb = UIPasteboard.general
         if let image = pb.image, let data = image.pngData() {
             return .image(data, uti: "public.png")
@@ -27,19 +32,44 @@ enum ClipboardService {
         if let text = pb.string, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return .text(text)
         }
+        #elseif canImport(AppKit)
+        let pb = NSPasteboard.general
+        if let data = pb.data(forType: .png) ?? pb.data(forType: .tiff) {
+            return .image(data, uti: pb.data(forType: .png) == nil ? "public.tiff" : "public.png")
+        }
+        if let text = pb.string(forType: .string), !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            return .text(text)
+        }
+        #endif
         return nil
     }
 
     static func write(clip: Clip) {
+        #if canImport(UIKit)
         if clip.type == .image, let data = clip.imageData, let image = UIImage(data: data) {
             UIPasteboard.general.image = image
         } else {
             UIPasteboard.general.string = clip.content
         }
+        #elseif canImport(AppKit)
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        if clip.type == .image, let data = clip.imageData {
+            pb.setData(data, forType: clip.imageUTI == "public.tiff" ? .tiff : .png)
+        } else {
+            pb.setString(clip.content, forType: .string)
+        }
+        #endif
     }
 
     static func writeString(_ string: String) {
+        #if canImport(UIKit)
         UIPasteboard.general.string = string
+        #elseif canImport(AppKit)
+        let pb = NSPasteboard.general
+        pb.clearContents()
+        pb.setString(string, forType: .string)
+        #endif
     }
 
     static func markImported(_ content: ClipboardContent, at date: Date = Date()) {

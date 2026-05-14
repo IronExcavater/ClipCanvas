@@ -28,7 +28,7 @@ struct CanvasTagPanel: View {
                 }
                 .scrollClipDisabled()
                 .frame(maxHeight: 250)
-                .scrollDismissesKeyboard(.interactively)
+                .appScrollDismissesKeyboardInteractively()
             }
             .padding(12)
             .background {

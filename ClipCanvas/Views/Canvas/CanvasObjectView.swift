@@ -41,7 +41,7 @@ struct CanvasObjectView: View {
             if usesStickySurface {
                 ZStack {
                     StickyNoteShape()
-                        .fill(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground))
+                        .fill(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground))
                     StickyNoteShape()
                         .fill(fillColor.opacity(0.20))
                 }
@@ -152,7 +152,7 @@ struct CanvasObjectView: View {
     }
 
     private var fillColor: Color {
-        Color(hex: object.style.fillHex) ?? Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground)
+        Color(hex: object.style.fillHex) ?? Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground)
     }
 
     private var strokeColor: Color {

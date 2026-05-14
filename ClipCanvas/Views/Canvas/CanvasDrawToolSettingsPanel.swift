@@ -1,11 +1,10 @@
 import SwiftUI
-import UIKit
 
 struct CanvasDrawToolSettingsPanel: View {
     let tool: CanvasDrawTool
-    let color: UIColor?
+    let color: PlatformColor?
     let width: CGFloat
-    let onChangeColor: (UIColor) -> Void
+    let onChangeColor: (PlatformColor) -> Void
     let onChangeWidth: (CGFloat) -> Void
     let onDismiss: () -> Void
 
@@ -99,9 +98,13 @@ struct CanvasDrawToolSettingsPanel: View {
         ]
     }
 
-    private func isSelected(_ preset: UIColor) -> Bool {
+    private func isSelected(_ preset: PlatformColor) -> Bool {
         guard let color else { return false }
+        #if canImport(UIKit)
         return color.resolvedColor(with: .current).cgColor.components == preset.resolvedColor(with: .current).cgColor.components
+        #elseif canImport(AppKit)
+        return color.usingColorSpace(.deviceRGB)?.cgColor.components == preset.usingColorSpace(.deviceRGB)?.cgColor.components
+        #endif
     }
 
     @ViewBuilder
@@ -117,14 +120,14 @@ struct CanvasDrawToolSettingsPanel: View {
 }
 
 private struct DrawColorPreset: Hashable {
-    let uiColor: UIColor
+    let uiColor: PlatformColor
 
-    init(_ uiColor: UIColor) {
+    init(_ uiColor: PlatformColor) {
         self.uiColor = uiColor
     }
 
     var color: Color {
-        Color(uiColor: uiColor)
+        Color(platformColor: uiColor)
     }
 
     func hash(into hasher: inout Hasher) {

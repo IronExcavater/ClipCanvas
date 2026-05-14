@@ -25,7 +25,7 @@ struct SettingsPage: View {
             }
         }
         .navigationTitle("Settings")
-        .navigationBarTitleDisplayMode(.inline)
+        .appInlineNavigationTitleDisplayMode()
         .buttonStyle(.plain)
     }
 }

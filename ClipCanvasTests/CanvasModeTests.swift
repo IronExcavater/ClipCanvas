@@ -5,7 +5,7 @@ import Testing
     @Test func canvasModesMatchWorkspacePlanOrder() {
         #expect(CanvasMode.allCases == [.pan, .edit, .draw])
         #expect(CanvasMode.pan.allowsCanvasPan)
-        #expect(!CanvasMode.edit.allowsCanvasPan)
+        #expect(CanvasMode.edit.allowsCanvasPan)
         #expect(!CanvasMode.draw.allowsCanvasPan)
     }
 
@@ -26,7 +26,7 @@ import Testing
         #expect(configuration.items == [
             .closeMode,
             .newNote,
-            .paste
+            .askAI
         ])
     }
 

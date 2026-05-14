@@ -154,8 +154,8 @@ private struct CanvasTopBarFade: View {
     private var topContrast: some View {
         LinearGradient(
             stops: [
-                .init(color: Color(uiColor: .systemBackground).opacity(0.32), location: 0.00),
-                .init(color: Color(uiColor: .systemBackground).opacity(0.18), location: 0.38),
+                .init(color: Color.platformSystemBackground.opacity(0.32), location: 0.00),
+                .init(color: Color.platformSystemBackground.opacity(0.18), location: 0.38),
                 .init(color: .clear, location: 1.00),
             ],
             startPoint: .top,
