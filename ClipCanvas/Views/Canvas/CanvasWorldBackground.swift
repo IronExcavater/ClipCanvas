@@ -74,15 +74,22 @@ struct EmptyCanvasHint: View {
         VStack(spacing: 12) {
             Image(systemName: "square.on.square.dashed")
                 .font(.system(size: 36))
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.secondary)
             Text("Nothing here yet")
                 .font(.headline)
-                .foregroundStyle(.secondary)
-            Text("Tap Paste to add your first clip")
+                .foregroundStyle(.primary)
+            Text("Paste or double tap in Edit")
                 .font(.caption)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.secondary)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .multilineTextAlignment(.center)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 18)
+        .background {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(.ultraThinMaterial)
+                .shadow(color: .black.opacity(0.10), radius: 16, y: 6)
+        }
         .allowsHitTesting(false)
     }
 }

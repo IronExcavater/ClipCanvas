@@ -8,6 +8,11 @@ struct CanvasContainerView: View {
 
     @Environment(\.modelContext) private var context
     @Environment(\.undoManager) private var undoManager
+    @Query(
+        filter: #Predicate<Workspace> { $0.deletedAt == nil },
+        sort: \Workspace.sortIndex
+    ) private var workspaces: [Workspace]
+
     @State private var mode: CanvasMode = .pan
     @State private var feedback: String?
     @State private var feedbackToken = UUID()
@@ -24,7 +29,13 @@ struct CanvasContainerView: View {
     @State private var isRenaming = false
     @State private var renameText = ""
     @State private var activeDrawing: PKDrawing = PKDrawing()
-    @State private var drawingTool: PKTool = PKInkingTool(.pen, color: .label, width: 3)
+    @State private var activeDrawTool: CanvasDrawTool = .pen
+    @State private var drawToolSettings: CanvasDrawTool?
+    @State private var penColor: UIColor = .label
+    @State private var penWidth: CGFloat = 3
+    @State private var highlighterColor: UIColor = .systemYellow.withAlphaComponent(0.5)
+    @State private var highlighterWidth: CGFloat = 20
+    @State private var eraserWidth: CGFloat = 34
     @FocusState private var renameFocused: Bool
 
     var body: some View {
@@ -39,19 +50,22 @@ struct CanvasContainerView: View {
                 visibleViewportCenter: $visibleViewportCenter,
                 visibleObjectIDs: $visibleObjectIDs,
                 activeDrawing: $activeDrawing,
-                drawingTool: drawingTool
+                drawingTool: pencilTool
             )
             .ignoresSafeArea()
 
             VStack(spacing: 0) {
                 CanvasTopBar(
                     workspaceName: workspace.name,
+                    workspaces: workspaces,
+                    activeWorkspaceID: workspace.id,
                     isRenaming: $isRenaming,
                     renameText: $renameText,
                     renameFocused: $renameFocused,
                     onToggleSidebar: toggleSidebar,
                     onBeginRename: beginRename,
                     onCommitRename: commitRename,
+                    onSelectWorkspace: { WorkspaceActionService.activate($0, among: workspaces) },
                     selectedCount: selectedObjectIDs.count,
                     visibleCount: visibleObjectIDs.count,
                     onAskAI: askAIAboutCurrentContext,
@@ -93,14 +107,26 @@ struct CanvasContainerView: View {
                     onColor: showSelectedColors,
                     onDone: exitEditing,
                     onDelete: deleteSelected,
-                    onDrawPen: { drawingTool = PKInkingTool(.pen, color: .label, width: 3) },
-                    onDrawHighlighter: { drawingTool = PKInkingTool(.marker, color: .systemYellow.withAlphaComponent(0.5), width: 20) },
-                    onDrawEraser: { drawingTool = PKEraserTool(.fixedWidthBitmap, width: 34) },
-                    onDrawLasso: { drawingTool = PKLassoTool() },
-                    onDrawClear: { activeDrawing = PKDrawing() }
+                    activeDrawTool: activeDrawTool,
+                    onCloseMode: leaveMode,
+                    onDrawTool: selectDrawTool,
+                    onDrawToolSettings: { drawToolSettings = $0 }
                 )
             }
             .ignoresSafeArea(.container, edges: .bottom)
+
+            if let tool = drawToolSettings {
+                CanvasDrawToolSettingsPanel(
+                    tool: tool,
+                    color: drawColor(for: tool),
+                    width: drawWidth(for: tool),
+                    onChangeColor: { setDrawColor($0, for: tool) },
+                    onChangeWidth: { setDrawWidth($0, for: tool) },
+                    onDismiss: { drawToolSettings = nil }
+                )
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .zIndex(7)
+            }
 
             if let selection = tagEditSelection {
                 CanvasTagPanel(
@@ -135,6 +161,7 @@ struct CanvasContainerView: View {
         .onAppear { context.undoManager = undoManager }
         .onChange(of: mode) { _, newMode in
             if newMode != .edit { editingObjectID = nil }
+            if newMode != .draw { drawToolSettings = nil }
         }
         // Tapping the canvas background deselects everything — also exit inline editing
         // so the keyboard dismisses instead of staying up with no selected card.
@@ -150,6 +177,80 @@ struct CanvasContainerView: View {
             AIChatDetailSheet(chat: chat)
         }
         .ignoresSafeArea(.keyboard, edges: .bottom)
+    }
+
+    private var pencilTool: PKTool {
+        switch activeDrawTool {
+        case .pen:
+            return PKInkingTool(.pen, color: penColor, width: penWidth)
+        case .highlighter:
+            return PKInkingTool(.marker, color: highlighterColor, width: highlighterWidth)
+        case .eraser:
+            return PKEraserTool(.fixedWidthBitmap, width: eraserWidth)
+        case .lasso:
+            return PKLassoTool()
+        }
+    }
+
+    private func leaveMode() {
+        withAnimation(.spring(response: 0.24, dampingFraction: 0.86)) {
+            mode = .pan
+            editingObjectID = nil
+            drawToolSettings = nil
+        }
+    }
+
+    private func selectDrawTool(_ tool: CanvasDrawTool) {
+        activeDrawTool = tool
+        drawToolSettings = nil
+    }
+
+    private func drawColor(for tool: CanvasDrawTool) -> UIColor? {
+        switch tool {
+        case .pen:
+            return penColor
+        case .highlighter:
+            return highlighterColor
+        case .eraser, .lasso:
+            return nil
+        }
+    }
+
+    private func drawWidth(for tool: CanvasDrawTool) -> CGFloat {
+        switch tool {
+        case .pen:
+            return penWidth
+        case .highlighter:
+            return highlighterWidth
+        case .eraser:
+            return eraserWidth
+        case .lasso:
+            return 0
+        }
+    }
+
+    private func setDrawColor(_ color: UIColor, for tool: CanvasDrawTool) {
+        switch tool {
+        case .pen:
+            penColor = color
+        case .highlighter:
+            highlighterColor = color.withAlphaComponent(0.5)
+        case .eraser, .lasso:
+            break
+        }
+    }
+
+    private func setDrawWidth(_ width: CGFloat, for tool: CanvasDrawTool) {
+        switch tool {
+        case .pen:
+            penWidth = width
+        case .highlighter:
+            highlighterWidth = width
+        case .eraser:
+            eraserWidth = width
+        case .lasso:
+            break
+        }
     }
 
     // MARK: - Clipboard

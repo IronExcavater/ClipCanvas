@@ -48,7 +48,12 @@ enum CanvasPlacementSizing {
         let count = max(content.count, 1)
         let hardLines = content.components(separatedBy: .newlines).count
         let wrappedLines = max(hardLines, Int((Double(count) / 28).rounded(.up)))
-        let width: CGFloat = count > 160 ? 300 : 260
+        let width: CGFloat
+        if let availableScreenWidth {
+            width = max(minimumSize.width, min(availableScreenWidth - 48, maximumSize.width))
+        } else {
+            width = count > 160 ? 300 : 260
+        }
         let height = CGFloat(wrappedLines) * lineHeight + contentChrome.height
         return snappedSize(CGSize(width: width, height: height), for: clip)
     }

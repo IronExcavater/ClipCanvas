@@ -14,11 +14,10 @@ struct CanvasToolbar: View {
     let onColor: () -> Void
     let onDone: () -> Void
     let onDelete: () -> Void
-    var onDrawPen: () -> Void = {}
-    var onDrawHighlighter: () -> Void = {}
-    var onDrawEraser: () -> Void = {}
-    var onDrawLasso: () -> Void = {}
-    var onDrawClear: () -> Void = {}
+    var activeDrawTool: CanvasDrawTool = .pen
+    var onCloseMode: () -> Void = {}
+    var onDrawTool: (CanvasDrawTool) -> Void = { _ in }
+    var onDrawToolSettings: (CanvasDrawTool) -> Void = { _ in }
 
     private var configuration: CanvasToolbarConfiguration {
         CanvasToolbarConfiguration.make(selectedCount: selectedCount, mode: mode, isEditing: isEditing)
@@ -76,18 +75,16 @@ struct CanvasToolbar: View {
             AppDivider()
         case .mode(let canvasMode):
             modeButton(canvasMode.systemImage, for: canvasMode)
-        case .closeDraw:
-            toolButton("xmark", action: { mode = .pan })
+        case .closeMode:
+            toolButton("xmark", action: onCloseMode)
         case .drawPen:
-            toolButton("pencil.tip", action: onDrawPen)
+            drawToolButton(.pen)
         case .drawHighlighter:
-            toolButton("highlighter", action: onDrawHighlighter)
+            drawToolButton(.highlighter)
         case .drawEraser:
-            toolButton("eraser", action: onDrawEraser)
+            drawToolButton(.eraser)
         case .drawLasso:
-            toolButton("lasso", action: onDrawLasso)
-        case .drawClear:
-            toolButton("xmark.circle", action: onDrawClear)
+            drawToolButton(.lasso)
         }
     }
 
@@ -125,6 +122,33 @@ struct CanvasToolbar: View {
             .contentShape(Circle())
         }
         .buttonStyle(.plain)
+    }
+
+    private func drawToolButton(_ tool: CanvasDrawTool) -> some View {
+        Button {
+            if activeDrawTool == tool, tool.supportsSettings {
+                onDrawToolSettings(tool)
+            } else {
+                onDrawTool(tool)
+            }
+        } label: {
+            let selected = activeDrawTool == tool
+            ZStack {
+                Circle().fill(selected ? Color.accentColor : Color.clear)
+                Image(systemName: tool.systemImage)
+                    .font(.system(size: iconSize, weight: .medium))
+                    .foregroundStyle(selected ? .white : .primary)
+            }
+            .frame(width: buttonSize, height: buttonSize)
+            .contentShape(Circle())
+            .shadow(
+                color: selected ? Color.accentColor.opacity(0.24) : .clear,
+                radius: selected ? 8 : 0,
+                y: selected ? 3 : 0
+            )
+        }
+        .buttonStyle(.plain)
+        .animation(.spring(response: 0.24, dampingFraction: 0.82), value: activeDrawTool == tool)
     }
 
     private func doneButton() -> some View {

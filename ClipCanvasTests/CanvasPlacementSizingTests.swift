@@ -16,6 +16,24 @@ import Testing
         #expect(second == CanvasPlacementSizing.defaultSize)
     }
 
+    @Test func doubleTapResizePrioritizesAvailableScreenWidth() {
+        let object = CanvasObject(
+            kind: .stickyNote,
+            x: 0,
+            y: 0,
+            width: CanvasPlacementSizing.defaultSize.width,
+            height: CanvasPlacementSizing.defaultSize.height,
+            text: "A short note"
+        )
+
+        let size = CanvasPlacementSizing.toggledSize(for: object, availableScreenWidth: 390)
+
+        #expect(size.width > CanvasPlacementSizing.defaultSize.width)
+        #expect(size.width <= 390)
+        #expect((size.width - CanvasPlacementSizing.contentChrome.width)
+            .truncatingRemainder(dividingBy: CanvasPlacementSizing.estimatedCharacterWidth) == 0)
+    }
+
     @Test func textResizeSnapsToCharacterAndLineSteps() {
         let size = CanvasPlacementSizing.snappedSize(
             CGSize(width: 229, height: 163),

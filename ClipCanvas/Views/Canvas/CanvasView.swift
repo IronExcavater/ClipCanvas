@@ -52,23 +52,24 @@ struct CanvasView: View {
                 .simultaneousGesture(mode.allowsCanvasPan ? canvasPanGesture(in: geo) : nil)
                 .zIndex(0)
 
-                ForEach(canvasObjects) { object in
+                if mode == .draw {
+                    CanvasDrawingLayer(drawing: $activeDrawing, activeTool: drawingTool)
+                        .frame(width: geo.size.width, height: geo.size.height)
+                        .allowsHitTesting(true)
+                        .zIndex(1)
+                }
+
+                ForEach(renderedCanvasObjects(in: geo)) { object in
                     positionedObject(object, in: geo)
                 }
 
                 if canvasObjects.isEmpty {
                     EmptyCanvasHint()
                         .frame(width: 260, height: 150)
-                        .position(x: geo.size.width / 2, y: geo.size.height / 2)
+                        .scaleEffect(canvasScale.clamped(to: 0.85...1.15))
+                        .position(originScreenPoint(in: geo))
                         .allowsHitTesting(false)
-                        .zIndex(1)
-                }
-
-                if mode == .draw {
-                    CanvasDrawingLayer(drawing: $activeDrawing, activeTool: drawingTool)
-                        .frame(width: geo.size.width, height: geo.size.height)
-                        .allowsHitTesting(true)
-                        .zIndex(50_000)
+                        .zIndex(2)
                 }
             }
             .frame(width: geo.size.width, height: geo.size.height)
@@ -116,6 +117,18 @@ struct CanvasView: View {
             positionedClipObject(object, clip: clip, in: geo)
         } else {
             positionedCardObject(object, in: geo)
+        }
+    }
+
+    private func renderedCanvasObjects(in geo: GeometryProxy) -> [CanvasObject] {
+        guard !canvasObjects.isEmpty else { return [] }
+        let viewport = viewportRect(in: geo).insetBy(dx: -240, dy: -240)
+        return canvasObjects.filter { object in
+            selectedObjectIDs.contains(object.id)
+            || editingObjectID == object.id
+            || activeDrag?.id == object.id
+            || activeResize?.objectID == object.id
+            || viewport.intersects(object.frame)
         }
     }
 
@@ -378,7 +391,7 @@ struct CanvasView: View {
     }
 
     private func toggleExpandedSize(for object: CanvasObject, in geo: GeometryProxy) {
-        let width = object.clip?.type == .image ? geo.size.width / canvasScale : nil
+        let width = geo.size.width / canvasScale
         let size = CanvasPlacementSizing.toggledSize(for: object, availableScreenWidth: width)
         withAnimation(.spring(response: 0.25, dampingFraction: 0.82)) {
             object.width = size.width
@@ -430,7 +443,10 @@ struct CanvasView: View {
         let visibleWidth = geo.size.width / canvasScale
         let visibleHeight = geo.size.height / canvasScale
         let targetWidth = min(max(visibleWidth - 42, CanvasPlacementSizing.defaultSize.width), 720)
-        let targetHeight = min(max(visibleHeight - 220, CanvasPlacementSizing.defaultSize.height), 560)
+        let ratio = CGFloat(object.height / max(object.width, 1))
+            .clamped(to: 0.48...1.6)
+        let maxHeight = max(visibleHeight - 180, CanvasPlacementSizing.defaultSize.height)
+        let targetHeight = min(max(targetWidth * ratio, CanvasPlacementSizing.defaultSize.height), maxHeight)
         let targetFrame = CGRect(
             x: viewportOrigin.x + (visibleWidth - targetWidth) / 2,
             y: viewportOrigin.y + max(84 / canvasScale, (visibleHeight - targetHeight) / 2),
@@ -495,6 +511,13 @@ struct CanvasView: View {
             forCenter: center,
             viewportSize: viewportSize,
             scale: canvasScale
+        )
+    }
+
+    private func originScreenPoint(in geo: GeometryProxy) -> CGPoint {
+        CGPoint(
+            x: -viewportOrigin.x * canvasScale,
+            y: -viewportOrigin.y * canvasScale
         )
     }
 
@@ -627,12 +650,7 @@ struct CanvasView: View {
     }
 
     private func updateVisibleObjectIDs(in geo: GeometryProxy) {
-        let viewport = CGRect(
-            x: viewportOrigin.x,
-            y: viewportOrigin.y,
-            width: geo.size.width / canvasScale,
-            height: geo.size.height / canvasScale
-        ).insetBy(dx: -80, dy: -80)
+        let viewport = viewportRect(in: geo).insetBy(dx: -80, dy: -80)
         let ids = Set(canvasObjects.filter { viewport.intersects($0.frame) }.map(\.id))
         guard ids != visibleObjectIDs else { return }
         DispatchQueue.main.async {
@@ -640,6 +658,15 @@ struct CanvasView: View {
                 visibleObjectIDs = ids
             }
         }
+    }
+
+    private func viewportRect(in geo: GeometryProxy) -> CGRect {
+        CGRect(
+            x: viewportOrigin.x,
+            y: viewportOrigin.y,
+            width: geo.size.width / canvasScale,
+            height: geo.size.height / canvasScale
+        )
     }
 }
 

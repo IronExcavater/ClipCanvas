@@ -37,12 +37,34 @@ nonisolated enum CanvasToolbarItem: Equatable {
     case delete
     case divider
     case mode(CanvasMode)
-    case closeDraw
+    case closeMode
     case drawPen
     case drawHighlighter
     case drawEraser
     case drawLasso
-    case drawClear
+}
+
+nonisolated enum CanvasDrawTool: Equatable {
+    case pen
+    case highlighter
+    case eraser
+    case lasso
+
+    var systemImage: String {
+        switch self {
+        case .pen: "pencil.tip"
+        case .highlighter: "highlighter"
+        case .eraser: "eraser"
+        case .lasso: "lasso"
+        }
+    }
+
+    var supportsSettings: Bool {
+        switch self {
+        case .pen, .highlighter, .eraser: true
+        case .lasso: false
+        }
+    }
 }
 
 nonisolated struct CanvasToolbarConfiguration: Equatable {
@@ -52,16 +74,17 @@ nonisolated struct CanvasToolbarConfiguration: Equatable {
         switch mode {
         case .draw:
             return CanvasToolbarConfiguration(items: [
-                .closeDraw,
-                .drawPen, .drawHighlighter, .drawEraser, .drawLasso,
+                .closeMode,
                 .divider,
-                .drawClear
+                .drawPen, .drawHighlighter, .drawEraser, .drawLasso
             ])
 
         case .edit:
             if selectedCount > 0 {
                 if isEditing {
                     return CanvasToolbarConfiguration(items: [
+                        .closeMode,
+                        .divider,
                         .editContent,
                         .divider,
                         .color,
@@ -70,6 +93,8 @@ nonisolated struct CanvasToolbarConfiguration: Equatable {
                     ])
                 }
                 return CanvasToolbarConfiguration(items: [
+                    .closeMode,
+                    .divider,
                     .editContent,
                     .divider,
                     .color, .manageTags,
@@ -78,9 +103,9 @@ nonisolated struct CanvasToolbarConfiguration: Equatable {
                 ])
             }
             return CanvasToolbarConfiguration(items: [
-                .newNote, .paste,
+                .closeMode,
                 .divider,
-                .mode(.pan), .mode(.edit), .mode(.draw)
+                .newNote, .paste,
             ])
 
         case .pan:
@@ -88,9 +113,7 @@ nonisolated struct CanvasToolbarConfiguration: Equatable {
                 return CanvasToolbarConfiguration(items: [
                     .askAI,
                     .divider,
-                    .arrangeSelection, .details,
-                    .divider,
-                    .delete
+                    .arrangeSelection, .details
                 ])
             }
             return CanvasToolbarConfiguration(items: [

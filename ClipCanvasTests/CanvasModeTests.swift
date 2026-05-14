@@ -25,24 +25,20 @@ import Testing
         let configuration = CanvasToolbarConfiguration.make(selectedCount: 0, mode: .edit)
 
         #expect(configuration.items == [
-            .newNote,
-            .paste,
+            .closeMode,
             .divider,
-            .mode(.pan),
-            .mode(.edit),
-            .mode(.draw)
+            .newNote,
+            .paste
         ])
     }
 
-    @Test func panSelectionToolbarShowsCopyInfoAndArrange() {
+    @Test func panSelectionToolbarShowsAIArrangeAndInfoOnly() {
         let configuration = CanvasToolbarConfiguration.make(selectedCount: 1, mode: .pan)
 
         #expect(configuration.items == [
             .askAI,
             .divider,
-            .arrangeSelection, .details,
-            .divider,
-            .delete
+            .arrangeSelection, .details
         ])
     }
 
@@ -50,6 +46,8 @@ import Testing
         let configuration = CanvasToolbarConfiguration.make(selectedCount: 1, mode: .edit)
 
         #expect(configuration.items == [
+            .closeMode,
+            .divider,
             .editContent,
             .divider,
             .color, .manageTags,
@@ -61,12 +59,11 @@ import Testing
     @Test func drawToolbarUsesCloseButtonInsteadOfMainModeTools() {
         let configuration = CanvasToolbarConfiguration.make(selectedCount: 0, mode: .draw)
 
-        #expect(configuration.items.first == .closeDraw)
+        #expect(configuration.items.first == .closeMode)
         #expect(!configuration.items.contains(.mode(.pan)))
         #expect(!configuration.items.contains(.mode(.edit)))
         #expect(!configuration.items.contains(.mode(.draw)))
         #expect(configuration.items.contains(.drawPen))
-        #expect(configuration.items.contains(.drawClear))
         #expect(!configuration.items.contains(.paste))
     }
 }
