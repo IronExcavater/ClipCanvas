@@ -45,14 +45,13 @@ import Testing
         ])
     }
 
-    @Test func drawToolbarKeepsModeSwitcherVisible() {
+    @Test func drawToolbarUsesCloseButtonInsteadOfMainModeTools() {
         let configuration = CanvasToolbarConfiguration.make(selectedCount: 0, mode: .draw)
 
-        #expect(configuration.items.starts(with: [
-            .mode(.pan),
-            .mode(.edit),
-            .mode(.draw),
-        ]))
+        #expect(configuration.items.first == .closeDraw)
+        #expect(!configuration.items.contains(.mode(.pan)))
+        #expect(!configuration.items.contains(.mode(.edit)))
+        #expect(!configuration.items.contains(.mode(.draw)))
         #expect(configuration.items.contains(.drawPen))
         #expect(configuration.items.contains(.drawClear))
     }

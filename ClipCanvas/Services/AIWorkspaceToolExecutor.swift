@@ -94,8 +94,6 @@ private extension AIWorkspaceToolExecutor {
         "canvas_resize_objects": .canvasResizeObjects,
         "canvas_delete_objects": .canvasDeleteObjects,
         "canvas_duplicate_objects": .canvasDuplicateObjects,
-        "canvas_create_connector": .canvasCreateConnector,
-        "canvas_update_connector": .canvasUpdateConnector,
         "canvas_group_objects": .canvasGroupObjects,
         "canvas_ungroup_objects": .canvasUngroupObjects,
         "canvas_arrange_grid": .canvasArrangeGrid,

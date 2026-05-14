@@ -76,7 +76,7 @@ nonisolated struct CanvasConnector: Codable, Equatable {
 }
 
 @Model
-final class CanvasObject {
+final class CanvasObject: Identifiable {
     var id: UUID = UUID()
     var kindRaw: String
     var workspace: Workspace?

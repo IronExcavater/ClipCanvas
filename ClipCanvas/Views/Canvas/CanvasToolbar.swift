@@ -77,6 +77,8 @@ struct CanvasToolbar: View {
             AppDivider()
         case .mode(let canvasMode):
             modeButton(canvasMode.systemImage, for: canvasMode)
+        case .closeDraw:
+            toolButton("xmark", action: { mode = .pan })
         case .drawPen:
             toolButton("pencil.tip", action: onDrawPen)
         case .drawHighlighter:

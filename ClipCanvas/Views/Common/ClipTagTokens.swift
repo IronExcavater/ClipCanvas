@@ -124,7 +124,6 @@ private struct EditableTagToken: View {
     let onChangeColor: (String) -> Void
     let onDelete: () -> Void
 
-    @State private var showingColorPicker = false
     @FocusState private var nameFocused: Bool
 
     private var color: Color {
@@ -137,7 +136,6 @@ private struct EditableTagToken: View {
                 hex: colorHex,
                 icon: showsIconInColorCircle ? icon : nil,
                 presets: presets,
-                isPresented: $showingColorPicker,
                 onSelect: onChangeColor
             )
 
@@ -211,9 +209,6 @@ private struct EditableTagToken: View {
         if canToggle {
             Button(state == .selected ? "Remove from Clip" : "Add to Clip", systemImage: "tag", action: onToggle)
         }
-        Button("Change Color", systemImage: "paintpalette") {
-            showingColorPicker = true
-        }
         if canRename {
             Button("Rename", systemImage: "pencil", action: onBeginRename)
         }
@@ -230,8 +225,6 @@ struct NewTagComposer: View {
     let presets: [String]
     let onCreate: () -> Void
 
-    @State private var showingColorPicker = false
-
     private var canCreate: Bool {
         !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
@@ -242,7 +235,6 @@ struct NewTagComposer: View {
                 hex: selectedColor,
                 icon: "tag",
                 presets: presets,
-                isPresented: $showingColorPicker
             ) { selectedColor = $0 }
 
             TextField("New tag", text: $name)
@@ -264,10 +256,10 @@ struct NewTagComposer: View {
             .buttonStyle(.plain)
             .disabled(!canCreate)
         }
-        .frame(minHeight: 42)
+        .frame(minHeight: 38)
         .padding(.leading, 9)
         .padding(.trailing, 6)
-        .padding(.vertical, 5)
+        .padding(.vertical, 4)
         .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: Capsule())
         .shadow(color: .black.opacity(0.12), radius: 12, y: 5)
         .padding(.bottom, 8)
@@ -278,12 +270,17 @@ private struct TagColorPickerButton: View {
     let hex: String
     let icon: String?
     let presets: [String]
-    @Binding var isPresented: Bool
     let onSelect: (String) -> Void
 
     var body: some View {
-        Button {
-            isPresented = true
+        Menu {
+            ForEach(presets, id: \.self) { preset in
+                Button {
+                    onSelect(preset)
+                } label: {
+                    Label(preset, systemImage: preset == hex ? "checkmark.circle.fill" : "circle.fill")
+                }
+            }
         } label: {
             Circle()
                 .fill(Color(hex: hex) ?? .accentColor)
@@ -297,14 +294,6 @@ private struct TagColorPickerButton: View {
                 }
         }
         .buttonStyle(.plain)
-        .popover(isPresented: $isPresented, attachmentAnchor: .point(.bottom), arrowEdge: .top) {
-            ColorPresetGrid(presets: presets, selectedColor: hex) { selected in
-                onSelect(selected)
-                isPresented = false
-            }
-            .padding(12)
-            .presentationCompactAdaptation(.popover)
-        }
         .accessibilityLabel("Change color")
     }
 }
@@ -323,30 +312,5 @@ private struct TagDeleteButton: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("Delete tag")
-    }
-}
-
-struct ColorPresetGrid: View {
-    let presets: [String]
-    let selectedColor: String
-    let onSelect: (String) -> Void
-
-    var body: some View {
-        HStack(spacing: 9) {
-            ForEach(presets, id: \.self) { hex in
-                Button {
-                    onSelect(hex)
-                } label: {
-                    Circle()
-                        .fill(Color(hex: hex) ?? .accentColor)
-                        .frame(width: 30, height: 30)
-                        .overlay(
-                            Circle()
-                                .strokeBorder(selectedColor == hex ? Color.primary.opacity(0.72) : Color.primary.opacity(0.10), lineWidth: selectedColor == hex ? 2 : 1)
-                        )
-                }
-                .buttonStyle(.plain)
-            }
-        }
     }
 }

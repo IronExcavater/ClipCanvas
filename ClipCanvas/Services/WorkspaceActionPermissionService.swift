@@ -22,8 +22,6 @@ nonisolated enum WorkspaceActionName: String, Codable, CaseIterable {
     case canvasResizeObjects = "canvas.resizeObjects"
     case canvasDeleteObjects = "canvas.deleteObjects"
     case canvasDuplicateObjects = "canvas.duplicateObjects"
-    case canvasCreateConnector = "canvas.createConnector"
-    case canvasUpdateConnector = "canvas.updateConnector"
     case canvasGroupObjects = "canvas.groupObjects"
     case canvasUngroupObjects = "canvas.ungroupObjects"
     case canvasArrangeGrid = "canvas.arrangeGrid"

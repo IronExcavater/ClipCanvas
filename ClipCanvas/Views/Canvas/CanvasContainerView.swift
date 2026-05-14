@@ -20,6 +20,7 @@ struct CanvasContainerView: View {
     @State private var detailClip: Clip?
     @State private var activeAIChat: AIChat?
     @State private var tagEditSelection: ClipTagEditSelection?
+    @State private var colorEditSelection: CanvasObjectColorSelection?
     @State private var isRenaming = false
     @State private var renameText = ""
     @State private var activeDrawing: PKDrawing = PKDrawing()
@@ -38,8 +39,7 @@ struct CanvasContainerView: View {
                 visibleViewportCenter: $visibleViewportCenter,
                 visibleObjectIDs: $visibleObjectIDs,
                 activeDrawing: $activeDrawing,
-                drawingTool: drawingTool,
-                onCreateConnector: createConnector
+                drawingTool: drawingTool
             )
             .ignoresSafeArea()
 
@@ -54,8 +54,7 @@ struct CanvasContainerView: View {
                     onCommitRename: commitRename,
                     selectedCount: selectedObjectIDs.count,
                     visibleCount: visibleObjectIDs.count,
-                    onAskAISelection: askAIAboutSelection,
-                    onAskAIVisible: askAIAboutVisibleCards,
+                    onAskAI: askAIAboutCurrentContext,
                     onClearAll: clearAll,
                     onArrangeAll: { zoomCommand = .arrangeAll },
                     onFitContent: { zoomCommand = .fitContent }
@@ -85,13 +84,13 @@ struct CanvasContainerView: View {
                     selectedCount: selectedObjectIDs.count,
                     isEditing: editingObjectID != nil,
                     onPaste: paste,
-                    onAskAI: askAIAboutSelection,
+                    onAskAI: askAIAboutCurrentContext,
                     onDetails: showSelectedDetails,
                     onEditContent: editSelectedContent,
                     onManageTags: showSelectedTags,
                     onArrangeSelection: { zoomCommand = .arrangeSelection },
                     onBullet: {},
-                    onColor: {},
+                    onColor: showSelectedColors,
                     onDone: exitEditing,
                     onDelete: deleteSelected,
                     onDrawPen: { drawingTool = PKInkingTool(.pen, color: .label, width: 3) },
@@ -111,6 +110,15 @@ struct CanvasContainerView: View {
                 )
                 .transition(.move(edge: .bottom).combined(with: .opacity))
                 .zIndex(8)
+            }
+
+            if let selection = colorEditSelection {
+                CanvasColorPanel(
+                    objects: selection.objects,
+                    onDismiss: { colorEditSelection = nil }
+                )
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .zIndex(9)
             }
 
             VStack {
@@ -209,6 +217,16 @@ struct CanvasContainerView: View {
         tagEditSelection = ClipTagEditSelection(clips: clips)
     }
 
+    private func showSelectedColors() {
+        let objects = orderedCanvasObjects(matching: selectedObjectIDs)
+            .filter { $0.kind != .image && $0.kind != .drawing && $0.kind != .group && $0.kind != .connector }
+        guard !objects.isEmpty else {
+            showFeedback("Select a note to color")
+            return
+        }
+        colorEditSelection = CanvasObjectColorSelection(objects: objects)
+    }
+
     private func editSelectedContent() {
         guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first else { return }
         editingObjectID = id
@@ -228,14 +246,21 @@ struct CanvasContainerView: View {
         showFeedback(selected.count == 1 ? "Deleted 1 card" : "Deleted \(selected.count) cards")
     }
 
+    private func askAIAboutCurrentContext() {
+        if selectedObjectIDs.isEmpty {
+            askAIAboutVisibleCards()
+        } else {
+            askAIAboutSelection()
+        }
+    }
+
     private func askAIAboutSelection() {
         let objects = orderedCanvasObjects(matching: selectedObjectIDs)
         openAIChat(attaching: objects)
     }
 
     private func askAIAboutVisibleCards() {
-        let objects = orderedCanvasObjects(matching: visibleObjectIDs)
-        openAIChat(attaching: objects)
+        openAIChat(attaching: orderedCanvasObjects(matching: visibleObjectIDs))
     }
 
     private func openAIChat(attaching objects: [CanvasObject]) {
@@ -248,15 +273,6 @@ struct CanvasContainerView: View {
         AIChatService.attachObjects(objects, to: chat, in: context)
         activeAIChat = chat
         showFeedback(objects.count == 1 ? "Attached 1 card" : "Attached \(objects.count) cards")
-    }
-
-    // MARK: - Connectors
-
-    private func createConnector(_ connector: CanvasConnector) {
-        let object = CanvasObject(kind: .connector, workspace: workspace,
-                                  x: 0, y: 0, width: 0, height: 0,
-                                  connector: connector)
-        context.insert(object)
     }
 
     // MARK: - Drawing
@@ -330,4 +346,9 @@ struct CanvasContainerView: View {
 private struct ClipTagEditSelection: Identifiable {
     let id = UUID()
     let clips: [Clip]
+}
+
+private struct CanvasObjectColorSelection: Identifiable {
+    let id = UUID()
+    let objects: [CanvasObject]
 }

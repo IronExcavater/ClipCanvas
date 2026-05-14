@@ -10,8 +10,7 @@ struct CanvasTopBar: View {
     let onCommitRename: () -> Void
     let selectedCount: Int
     let visibleCount: Int
-    let onAskAISelection: () -> Void
-    let onAskAIVisible: () -> Void
+    let onAskAI: () -> Void
     let onClearAll: () -> Void
     let onArrangeAll: () -> Void
     let onFitContent: () -> Void
@@ -39,10 +38,8 @@ struct CanvasTopBar: View {
             Spacer()
 
             Menu {
-                Button("Ask AI About Selection", systemImage: "sparkles", action: onAskAISelection)
-                    .disabled(selectedCount == 0)
-                Button("Ask AI About View", systemImage: "rectangle.dashed", action: onAskAIVisible)
-                    .disabled(visibleCount == 0)
+                Button(askAITitle, systemImage: "sparkles", action: onAskAI)
+                    .disabled(selectedCount == 0 && visibleCount == 0)
                 Divider()
                 Button("Rename", systemImage: "pencil", action: onBeginRename)
                 Button("Fit to Cards", systemImage: "arrow.up.left.and.arrow.down.right", action: onFitContent)
@@ -72,6 +69,10 @@ struct CanvasTopBar: View {
         } message: {
             Text("This removes every card from the current canvas.")
         }
+    }
+
+    private var askAITitle: String {
+        selectedCount > 0 ? "Ask AI About Selection" : "Ask AI About View"
     }
 
     @ViewBuilder

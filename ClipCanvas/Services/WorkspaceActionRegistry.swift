@@ -106,15 +106,6 @@ nonisolated struct WorkspaceDuplicateObjectsArguments: Codable, Equatable {
     var offsetY: Double
 }
 
-nonisolated struct WorkspaceCreateConnectorArguments: Codable, Equatable {
-    var connector: CanvasConnector
-}
-
-nonisolated struct WorkspaceUpdateConnectorArguments: Codable, Equatable {
-    var objectID: UUID
-    var connector: CanvasConnector
-}
-
 nonisolated struct WorkspaceArrangeGridArguments: Codable, Equatable {
     var objectIDs: [UUID]
     var originX: Double
@@ -157,10 +148,6 @@ enum WorkspaceActionRegistry {
                 return try deleteObjects(request, workspace: workspace, context: context)
             case .canvasDuplicateObjects:
                 return try duplicateObjects(request, workspace: workspace, context: context)
-            case .canvasCreateConnector:
-                return try createConnector(request, workspace: workspace, context: context)
-            case .canvasUpdateConnector:
-                return try updateConnector(request, workspace: workspace)
             case .canvasGroupObjects:
                 return try groupObjects(request, workspace: workspace)
             case .canvasUngroupObjects:
@@ -305,38 +292,6 @@ private extension WorkspaceActionRegistry {
             workspace.canvasObjects.append($0)
         }
         return .success("Duplicated objects", changedObjectIDs: copies.map(\.id))
-    }
-
-    static func createConnector(
-        _ request: WorkspaceActionRequest,
-        workspace: Workspace,
-        context: ModelContext
-    ) throws -> WorkspaceActionResult {
-        let arguments = try decode(WorkspaceCreateConnectorArguments.self, from: request)
-        let object = CanvasObject(
-            kind: .connector,
-            workspace: workspace,
-            x: 0,
-            y: 0,
-            width: 1,
-            height: 1,
-            connector: arguments.connector
-        )
-        object.zIndex = nextZIndex(in: workspace)
-        context.insert(object)
-        workspace.canvasObjects.append(object)
-        return .success("Created connector", changedObjectIDs: [object.id])
-    }
-
-    static func updateConnector(_ request: WorkspaceActionRequest, workspace: Workspace) throws -> WorkspaceActionResult {
-        let arguments = try decode(WorkspaceUpdateConnectorArguments.self, from: request)
-        guard let object = object(id: arguments.objectID, in: workspace) else {
-            return .failure("Object not found")
-        }
-        object.connector = arguments.connector
-        object.kind = .connector
-        object.markUpdated()
-        return .success("Updated connector", changedObjectIDs: [object.id])
     }
 
     static func groupObjects(_ request: WorkspaceActionRequest, workspace: Workspace) throws -> WorkspaceActionResult {

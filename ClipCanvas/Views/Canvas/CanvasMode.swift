@@ -37,6 +37,7 @@ nonisolated enum CanvasToolbarItem: Equatable {
     case delete
     case divider
     case mode(CanvasMode)
+    case closeDraw
     case drawPen
     case drawHighlighter
     case drawEraser
@@ -52,8 +53,7 @@ nonisolated struct CanvasToolbarConfiguration: Equatable {
         switch mode {
         case .draw:
             return CanvasToolbarConfiguration(items: [
-                .mode(.pan), .mode(.edit), .mode(.draw),
-                .divider,
+                .closeDraw,
                 .drawPen, .drawHighlighter, .drawEraser, .drawLasso,
                 .divider,
                 .drawConvert, .drawClear

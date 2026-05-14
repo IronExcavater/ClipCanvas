@@ -3,7 +3,7 @@ import SwiftData
 import SwiftUI
 
 @Model
-final class ClipTag {
+final class ClipTag: Identifiable {
     var id: UUID = UUID()
     var name: String
     var colorHex: String

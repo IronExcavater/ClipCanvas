@@ -3,7 +3,7 @@ import Foundation
 import SwiftData
 
 @Model
-final class Workspace: SoftDeletable {
+final class Workspace: SoftDeletable, Identifiable {
     var id: UUID = UUID()
     var name: String
     var isActive: Bool = false
@@ -75,7 +75,7 @@ final class Workspace: SoftDeletable {
 }
 
 @Model
-final class CanvasPlacement {
+final class CanvasPlacement: Identifiable {
     var id: UUID = UUID()
     var workspace: Workspace?
     var clip: Clip?           // nullify on clip delete — placement disappears naturally

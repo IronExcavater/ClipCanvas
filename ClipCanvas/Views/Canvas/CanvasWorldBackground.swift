@@ -7,16 +7,17 @@ struct CanvasDotGrid: View, Animatable {
 
     private let spacing: CGFloat = 28
 
-    var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, CGFloat> {
+    var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, AnimatablePair<CGFloat, CGFloat>> {
         get {
             AnimatablePair(
                 AnimatablePair(viewportOrigin.x, viewportOrigin.y),
-                canvasScale
+                AnimatablePair(canvasScale, boundsRadius)
             )
         }
         set {
             viewportOrigin = CGPoint(x: newValue.first.first, y: newValue.first.second)
-            canvasScale = newValue.second
+            canvasScale = newValue.second.first
+            boundsRadius = newValue.second.second
         }
     }
 

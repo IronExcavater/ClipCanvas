@@ -14,8 +14,6 @@ import Testing
             .canvasResizeObjects,
             .canvasDeleteObjects,
             .canvasDuplicateObjects,
-            .canvasCreateConnector,
-            .canvasUpdateConnector,
             .canvasGroupObjects,
             .canvasUngroupObjects,
             .canvasArrangeGrid,

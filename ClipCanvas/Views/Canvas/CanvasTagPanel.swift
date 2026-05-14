@@ -7,7 +7,7 @@ struct CanvasTagPanel: View {
     var body: some View {
         VStack {
             Spacer()
-            VStack(alignment: .leading, spacing: 12) {
+            VStack(alignment: .leading, spacing: 10) {
                 HStack {
                     Text(clips.count == 1 ? "Tags" : "Tags for \(clips.count)")
                         .font(.headline.weight(.semibold))
@@ -22,12 +22,15 @@ struct CanvasTagPanel: View {
 
                 ScrollView {
                     ClipTagEditor(clips: clips, layout: .twoColumns)
-                        .padding(.bottom, 10)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 4)
+                        .padding(.bottom, 6)
                 }
-                .frame(maxHeight: 320)
+                .scrollClipDisabled()
+                .frame(maxHeight: 250)
                 .scrollDismissesKeyboard(.interactively)
             }
-            .padding(14)
+            .padding(12)
             .background {
                 if #available(iOS 26, *) {
                     RoundedRectangle(cornerRadius: 26, style: .continuous)
@@ -39,8 +42,8 @@ struct CanvasTagPanel: View {
                 }
             }
             .shadow(color: .black.opacity(0.16), radius: 22, y: 10)
-            .padding(.horizontal, 14)
-            .padding(.bottom, 96)
+            .padding(.horizontal, 18)
+            .padding(.bottom, 92)
         }
         .ignoresSafeArea(.container, edges: .bottom)
     }

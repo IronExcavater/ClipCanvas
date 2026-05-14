@@ -34,7 +34,7 @@ nonisolated enum AttachmentState {
 }
 
 @Model
-final class AIChat {
+final class AIChat: Identifiable {
     var id: UUID = UUID()
     var title: String
     var modeRaw: String = AIChatMode.quick.rawValue
@@ -77,7 +77,7 @@ final class AIChat {
 }
 
 @Model
-final class ChatMessage {
+final class ChatMessage: Identifiable {
     var id: UUID = UUID()
     var role: ChatRole
     var content: String
@@ -124,7 +124,7 @@ final class ChatMessage {
 }
 
 @Model
-final class ChatAttachment {
+final class ChatAttachment: Identifiable {
     var id: UUID = UUID()
     var message: ChatMessage?
     var canvasObject: CanvasObject?
@@ -154,7 +154,7 @@ final class ChatAttachment {
 }
 
 @Model
-final class AIToolEvent {
+final class AIToolEvent: Identifiable {
     var id: UUID = UUID()
     var message: ChatMessage?
     var toolName: String

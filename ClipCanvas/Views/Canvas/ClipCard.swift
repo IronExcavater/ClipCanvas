@@ -3,6 +3,7 @@ import UIKit
 
 struct ClipCard: View {
     let clip: Clip
+    var fillColor: Color?
     let isSelected: Bool
     var showsContent = true
     let onTap: () -> Void
@@ -86,7 +87,7 @@ struct ClipCard: View {
     private var cardSurface: some View {
         ZStack {
             Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground)
-            primaryColor.opacity(0.24)
+            (fillColor ?? primaryColor).opacity(0.24)
         }
     }
 
