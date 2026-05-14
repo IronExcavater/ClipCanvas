@@ -6,8 +6,10 @@ struct ClipRowView: View {
     let compact: Bool
     var isSelecting = false
     var isSelected = false
+    var isExpanded = false
     var onSelect: (() -> Void)?
     var onDetails: (() -> Void)?
+    var onPrimaryAction: (() -> Void)?
 
     @Query(
         filter: #Predicate<Workspace> { $0.deletedAt == nil },
@@ -16,10 +18,12 @@ struct ClipRowView: View {
 
     var body: some View {
         AppListItemButton(tint: primaryTagColor, opacity: 0.20, action: primaryAction) {
-            HStack(alignment: .center, spacing: 10) {
+            HStack(alignment: .top, spacing: 10) {
                 if isSelecting {
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                        .font(.system(size: 19, weight: .semibold))
                         .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+                        .padding(.top, 2)
                 }
 
                 textContent
@@ -31,7 +35,7 @@ struct ClipRowView: View {
                         .accessibilityLabel("Pinned")
                     }
             }
-            .frame(minHeight: compact ? 42 : 54)
+            .frame(minHeight: compact ? 42 : (isExpanded ? 112 : 68))
         }
         .contentShape(Rectangle())
         .listRowSeparator(.hidden)
@@ -80,6 +84,8 @@ struct ClipRowView: View {
     private func primaryAction() {
         if isSelecting {
             onSelect?()
+        } else if let onPrimaryAction {
+            onPrimaryAction()
         } else {
             ClipActionService.copy(clip)
         }
@@ -101,8 +107,9 @@ struct ClipRowView: View {
         VStack(alignment: .leading, spacing: 2) {
             Text(clip.preview)
                 .font(.subheadline.weight(.medium))
-                .lineLimit(compact ? 1 : 2)
+                .lineLimit(compact ? 1 : (isExpanded ? 8 : 3))
                 .foregroundStyle(.primary)
+                .fixedSize(horizontal: false, vertical: true)
 
             HStack(spacing: 5) {
                 Text("From \(clip.origin.label)").font(.caption2)

@@ -113,10 +113,22 @@ struct AppTagPill: View {
         .padding(.vertical, 7)
         .foregroundStyle(.primary)
         .background(background, in: Capsule())
+        .shadow(color: color.opacity(isSelected ? 0.18 : 0), radius: isSelected ? 6 : 0, y: 2)
     }
 
     private var background: Color {
-        isSelected ? color.opacity(0.32) : color.opacity(0.16)
+        isSelected ? color.opacity(0.34) : color.opacity(0.13)
+    }
+}
+
+struct AppSectionHeader: View {
+    let title: String
+
+    var body: some View {
+        Text(title)
+            .font(.title3.weight(.semibold))
+            .foregroundStyle(.primary)
+            .textCase(nil)
     }
 }
 

@@ -13,6 +13,8 @@ struct HistoryPage: View {
     @State private var isSelecting = false
     @State private var selectedClipIDs = Set<UUID>()
     @State private var searchPresented = false
+    @State private var expandedClipID: UUID?
+    @State private var confirmingClearHistory = false
 
     private var filtered: [Clip] {
         clips
@@ -38,15 +40,9 @@ struct HistoryPage: View {
             if filtered.isEmpty {
                 emptyState
             } else {
-                selectionControl
-                    .appListItemRowInsets(vertical: 0)
-
                 ForEach(grouped, id: \.label) { group in
-                    Text(group.label)
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                        .textCase(nil)
-                        .appListItemRowInsets(horizontal: 14, vertical: 1)
+                    AppSectionHeader(title: group.label)
+                        .appListItemRowInsets(horizontal: 14, vertical: 0)
 
                     ForEach(group.clips) { clip in
                         ClipRowView(
@@ -54,10 +50,12 @@ struct HistoryPage: View {
                             compact: false,
                             isSelecting: isSelecting,
                             isSelected: selectedClipIDs.contains(clip.id),
+                            isExpanded: expandedClipID == clip.id,
                             onSelect: { toggleSelection(clip) },
-                            onDetails: { detailClip = clip }
+                            onDetails: { detailClip = clip },
+                            onPrimaryAction: { handlePrimaryAction(clip) }
                         )
-                        .appListItemRowInsets(vertical: 3)
+                        .appListItemRowInsets(vertical: 2)
                     }
                 }
             }
@@ -70,6 +68,18 @@ struct HistoryPage: View {
         .searchable(text: searchBinding, isPresented: $searchPresented, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search history")
         .animation(.easeInOut(duration: 0.18), value: filter.search.isEmpty)
         .animation(.easeInOut(duration: 0.18), value: searchPresented)
+        .animation(.easeInOut(duration: 0.18), value: expandedClipID)
+        .toolbar {
+            ToolbarItemGroup(placement: .primaryAction) {
+                toolbarActions
+            }
+        }
+        .confirmationDialog("Clear clipboard history?", isPresented: $confirmingClearHistory, titleVisibility: .visible) {
+            Button("Clear History", role: .destructive, action: clearHistory)
+            Button("Cancel", role: .cancel) {}
+        } message: {
+            Text("All clipboard history items will move to Recently Deleted.")
+        }
         .sheet(item: $detailClip) { clip in
             ClipDetailSheet(clip: clip)
         }
@@ -104,32 +114,51 @@ struct HistoryPage: View {
         }
     }
 
-    private var selectionControl: some View {
-        AppListSelectionControl(
-            isSelecting: isSelecting,
-            selectedCount: selectedClipIDs.count,
-            selectTitle: "Select",
-            onToggle: { isSelecting ? endSelection() : beginSelection() }
-        ) {
-            HStack(spacing: 2) {
-                Button {
-                    tagEditSelection = ClipTagEditSelection(clips: selectedClips)
-                } label: {
-                    Image(systemName: "tag")
-                        .font(.system(size: 16, weight: .semibold))
-                        .frame(width: 40, height: 40)
-                }
-                .appSelectionIconButtonStyle()
-                .disabled(selectedClipIDs.isEmpty)
+    @ViewBuilder
+    private var toolbarActions: some View {
+        if isSelecting {
+            Text("\(selectedClipIDs.count)")
+                .font(.headline.weight(.semibold))
+                .monospacedDigit()
+                .foregroundStyle(.primary)
+                .frame(minWidth: 22)
+                .accessibilityLabel("\(selectedClipIDs.count) selected")
 
-                Button(role: .destructive, action: deleteSelected) {
-                    Image(systemName: "trash")
-                        .font(.system(size: 16, weight: .semibold))
-                        .frame(width: 40, height: 40)
-                }
-                .appSelectionIconButtonStyle()
-                .disabled(selectedClipIDs.isEmpty)
+            Button {
+                tagEditSelection = ClipTagEditSelection(clips: selectedClips)
+            } label: {
+                AppCircleIconLabel(systemImage: "tag", size: 36, symbolSize: 15)
             }
+            .buttonStyle(BlendedIconButtonStyle(size: 36))
+            .disabled(selectedClipIDs.isEmpty)
+
+            Button(role: .destructive, action: deleteSelected) {
+                AppCircleIconLabel(systemImage: "trash", size: 36, symbolSize: 15)
+            }
+            .buttonStyle(BlendedIconButtonStyle(size: 36))
+            .disabled(selectedClipIDs.isEmpty)
+
+            Button(action: endSelection) {
+                AppCircleIconLabel(systemImage: "checkmark", size: 36, symbolSize: 15)
+            }
+            .buttonStyle(BlendedIconButtonStyle(size: 36))
+        } else {
+            Button(action: beginSelection) {
+                AppCircleIconLabel(systemImage: "checklist", size: 36, symbolSize: 15)
+            }
+            .buttonStyle(BlendedIconButtonStyle(size: 36))
+            .accessibilityLabel("Select")
+
+            Menu {
+                Button("Clear History", systemImage: "trash", role: .destructive) {
+                    confirmingClearHistory = true
+                }
+                .disabled(clips.isEmpty)
+            } label: {
+                AppCircleIconLabel(systemImage: AppSymbol.options, size: 36, symbolSize: 18)
+            }
+            .buttonStyle(BlendedIconButtonStyle(size: 36))
+            .accessibilityLabel("History options")
         }
     }
 
@@ -144,12 +173,28 @@ private extension HistoryPage {
         }
     }
 
+    func handlePrimaryAction(_ clip: Clip) {
+        if expandedClipID == clip.id {
+            expandedClipID = nil
+        } else {
+            ClipActionService.copy(clip)
+            expandedClipID = clip.id
+        }
+    }
+
+    func clearHistory() {
+        ClipActionService.clearHistory(clips)
+        expandedClipID = nil
+        endSelection()
+    }
+
     func deleteSelected() {
         selectedClips.forEach { ClipActionService.softDelete($0) }
         endSelection()
     }
 
     func beginSelection() {
+        expandedClipID = nil
         selectedClipIDs.removeAll()
         isSelecting = true
     }

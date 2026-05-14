@@ -25,6 +25,11 @@ enum ClipActionService {
     }
 
     @MainActor
+    static func clearHistory(_ clips: [Clip]) {
+        clips.forEach(softDelete)
+    }
+
+    @MainActor
     static func openURL(for clip: Clip) {
         guard let url = openableURL(for: clip) else { return }
         UIApplication.shared.open(url)

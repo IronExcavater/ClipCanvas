@@ -11,15 +11,22 @@ struct HistoryFilterBar: View {
     }
 
     var body: some View {
-        fadingFilterRow {
-            typeChip(nil, label: "All", color: .secondary)
-            ForEach(ClipType.allCases, id: \.self) { type in
-                typeChip(type, label: ClipTag.builtInName(for: type), color: ClipTag.builtInColor(for: type))
+        VStack(alignment: .leading, spacing: 4) {
+            fadingFilterRow {
+                ForEach(ClipType.allCases, id: \.self) { type in
+                    typeChip(type, label: ClipTag.builtInName(for: type), color: ClipTag.builtInColor(for: type))
+                }
             }
-            ForEach(userTags) { tag in
-                userTagChip(tag.id, label: tag.name, color: tag.color)
+
+            if !userTags.isEmpty {
+                fadingFilterRow {
+                    ForEach(userTags) { tag in
+                        userTagChip(tag.id, label: tag.name, color: tag.color)
+                    }
+                }
             }
         }
+        .padding(.vertical, 2)
     }
 
     private func fadingFilterRow<Content: View>(@ViewBuilder content: () -> Content) -> some View {
@@ -30,27 +37,23 @@ struct HistoryFilterBar: View {
         .mask(
             HStack(spacing: 0) {
                 LinearGradient(colors: [.clear, .black], startPoint: .leading, endPoint: .trailing)
-                    .frame(width: 8)
+                    .frame(width: 6)
                 Rectangle()
                 LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing)
-                    .frame(width: 8)
+                    .frame(width: 6)
             }
         )
     }
 
-    private func typeChip(_ type: ClipType?, label: String, color: Color) -> some View {
-        let active = filter.type == type && (type != nil || filter.userTagID == nil)
+    private func typeChip(_ type: ClipType, label: String, color: Color) -> some View {
+        let active = filter.type == type
         return AppTagChip(
             title: label,
             color: color,
-            icon: type?.icon,
+            icon: type.icon,
             isSelected: active
         ) {
-            if type == nil {
-                filter.clear()
-            } else {
-                filter.type = active ? nil : type
-            }
+            filter.type = active ? nil : type
         }
     }
 
