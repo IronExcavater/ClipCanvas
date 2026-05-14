@@ -139,6 +139,83 @@ Real-time collaboration comes after the action log is proven.
 
 ## Implementation Tasks
 
+## Immediate Rework Plan
+
+Use this as the next implementation queue after the May 14 stabilization commits. The goal is to move toward a Miro/Freeform-style workspace without making the codebase bigger or more fragile.
+
+### Slice 1: Canvas Mode Contract
+
+- [x] Keep mode switching visible in Draw mode so the user can always leave Draw.
+- [x] Remove the unused draw-save toolbar action; drawings should convert into useful objects rather than become an opaque saved blob.
+- [x] Use a fixed-width bitmap eraser so erasing feels like a finger-sized area, not a point.
+- [ ] Add explicit tests for mode transitions: Pan -> Edit -> Draw -> Pan clears only the state that should be cleared.
+- [ ] Move `mode` side effects into a small `CanvasModeStateReducer` so selection/editing/drawing cleanup is not scattered through views.
+- [ ] Define per-mode primary actions:
+  - Pan: tap selects and exposes move/arrange/copy/info actions.
+  - Edit: tap text/note opens inline editing; selection actions become edit/tags/delete.
+  - Draw: strokes go above objects; lasso/eraser operate on ink first.
+
+### Slice 2: Note Object Surface
+
+- [ ] Rename new user-facing canvas copy from clip/card toward note/object while keeping `Clip` as source history.
+- [ ] Extract one `CanvasNoteSurface` used by `ClipCard`, `CanvasObjectView`, details, and list previews where possible.
+- [ ] Replace sticky-note-only styling with a more general note/textbox surface:
+  - Plain text box by default.
+  - Optional background highlight/fill.
+  - Optional folded/cut-corner note style as a style, not the only object model.
+- [ ] Keep `CanvasObject` as the workspace visual state owner; do not move size/position/z-index back onto `Clip`.
+- [ ] Add tests that clipping/history actions do not mutate `Workspace.updatedAt`, and actual workspace object changes do.
+
+### Slice 3: Inline Rich Text Editing
+
+- [ ] Replace plain `String` editing for canvas notes with an attributed-text editing adapter.
+- [ ] V1 rich text tools: bullet list, bold, highlight/fill color, text color.
+- [ ] Show editing tools near the selected note instead of forcing every editing control into the bottom toolbar.
+- [ ] When the keyboard appears, expand the note and scroll/position the viewport so the editor remains visible.
+- [ ] Autosize while typing, but clamp to viewport-aware max size and avoid layout feedback loops.
+
+### Slice 4: Drawing Into Structured Objects
+
+- [ ] Keep PencilKit as the ink capture layer, but route conversion through a `DrawingConversionPipeline`.
+- [ ] V1 conversions:
+  - Handwriting to text note.
+  - Rough rectangle/circle/diamond to shape object.
+  - Arrow/line to connector object.
+  - Highlighter strokes over note text to text highlight metadata where possible.
+- [ ] Treat lasso as selection for ink and conversion groups; add erase-selected-ink.
+- [ ] Do not add a generic "save drawing" path until there is a clear user-facing use for opaque ink objects.
+
+### Slice 5: Toolbar And Menu Simplification
+
+- [ ] Keep bottom canvas toolbar focused on creation/edit actions only.
+- [ ] Keep zoom, fit, and view manipulation separate from content tools.
+- [ ] Move destructive workspace actions behind native menus with confirmation.
+- [ ] Use `AppCircleIconLabel` + `BlendedIconButtonStyle` for custom circular controls; do not put a background-drawing label inside another button style.
+- [ ] Add a focused UI test or snapshot-style smoke test for toolbar states if the test harness supports it.
+
+### Slice 6: Action Layer And MCP Readiness
+
+- [ ] Add missing user-facing canvas actions to `WorkspaceActionRegistry` before exposing them through AI/MCP.
+- [ ] Route toolbar/context menu mutations through registry where practical.
+- [ ] Add an MCP schema adapter only after registry argument structs are stable.
+- [ ] AI/MCP can edit canvas objects, tags, attachments, arrangements, transforms, and connectors.
+- [ ] AI/MCP cannot create/delete/rename/activate workspaces until account permissions exist.
+
+### Slice 7: Collaboration Foundation
+
+- [ ] Add local action events after registry usage is broad enough to replay a workspace.
+- [ ] Start with iCloud single-user sync and command replay tests.
+- [ ] Keep Google/Microsoft auth as future account-provider adapters, not dependencies of local canvas work.
+
+### Tests For The Immediate Queue
+
+- Mode transition reducer tests.
+- Rich text editor adapter tests for plain text, bullets, bold, and highlight persistence.
+- Keyboard-visible editing smoke test on iPhone-sized simulator.
+- Drawing conversion fixtures for handwriting, shape, arrow, and lasso erase.
+- Action registry tests for every toolbar/context action migrated into the registry.
+- Workspace timestamp tests separating read/selection/copy from actual content changes.
+
 ### Task 1: Finish Note Terminology Layer
 
 - [ ] Rename user-facing canvas labels from clip/card mix to note/card consistently.
