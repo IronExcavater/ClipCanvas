@@ -4,6 +4,7 @@ struct ClipDetailSheet: View {
     let clip: Clip
     @Environment(\.dismiss) private var dismiss
     @State private var isTransforming = false
+    @ObservedObject private var revealStore = PrivateClipRevealStore.shared
 
     var body: some View {
         NavigationStack {
@@ -14,10 +15,14 @@ struct ClipDetailSheet: View {
                         canOpenLink: ClipActionService.openableURL(for: clip) != nil,
                         canTransform: clip.type != .image,
                         isTransforming: isTransforming,
+                        isPrivate: clip.isPrivateContent,
+                        isRevealed: revealStore.isRevealed(clip),
                         onCopy: { ClipActionService.copy(clip) },
                         onOpen: { ClipActionService.openURL(for: clip) },
                         onPin: { ClipActionService.togglePin(clip) },
                         onTransform: applyTransform,
+                        onReveal: { revealStore.toggle(clip) },
+                        onSensitive: { ClipActionService.toggleSensitive(clip) },
                         onDelete: {
                             ClipActionService.softDelete(clip)
                             dismiss()
@@ -76,12 +81,31 @@ private struct ClipInfoPanel: View {
     var body: some View {
         VStack(spacing: 9) {
             ClipInfoRow("Type", value: ClipTag.builtInName(for: clip.type), icon: clip.type.icon)
+            ClipInfoRow("Privacy", value: privacyLabel, icon: privacyIcon)
+            if let expiresAt = clip.expiresAt, clip.isPrivateContent {
+                ClipInfoRow("Expires", value: expiresAt.formatted(date: .omitted, time: .shortened), icon: "timer")
+            }
             ClipUpdatedRow(date: clip.updatedAt)
             ClipInfoRow("Created", value: clip.createdAt.formatted(date: .abbreviated, time: .shortened), icon: "calendar")
         }
         .padding(16)
         .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .shadow(color: .black.opacity(0.06), radius: 8, y: 3)
+    }
+
+    private var privacyLabel: String {
+        switch clip.sensitivity {
+        case .normal:
+            return "Normal"
+        case .sensitive:
+            return "Sensitive"
+        case .privateContent:
+            return "Hidden"
+        }
+    }
+
+    private var privacyIcon: String {
+        clip.isPrivateContent ? "lock.fill" : "hand.raised"
     }
 }
 
@@ -128,10 +152,14 @@ private struct ClipDetailActionToolbar: View {
     let canOpenLink: Bool
     let canTransform: Bool
     let isTransforming: Bool
+    let isPrivate: Bool
+    let isRevealed: Bool
     let onCopy: () -> Void
     let onOpen: () -> Void
     let onPin: () -> Void
     let onTransform: (String) -> Void
+    let onReveal: () -> Void
+    let onSensitive: () -> Void
     let onDelete: () -> Void
 
     var body: some View {
@@ -141,7 +169,15 @@ private struct ClipDetailActionToolbar: View {
                 action("Open", icon: "safari", action: onOpen)
             }
             transformMenu
+            if isPrivate {
+                action(isRevealed ? "Hide" : "Reveal",
+                       icon: isRevealed ? "eye.slash" : "eye",
+                       action: onReveal)
+            }
             action(isPinned ? "Unpin" : "Pin", icon: isPinned ? "pin.slash" : "pin", action: onPin)
+            action(isPrivate ? "Unmark" : "Sensitive",
+                   icon: isPrivate ? "lock.open" : "lock",
+                   action: onSensitive)
             action("Delete", icon: "trash", destructive: true, action: onDelete)
         }
         .padding(8)

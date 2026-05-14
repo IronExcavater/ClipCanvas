@@ -50,6 +50,21 @@ import Testing
         #expect(try context.fetch(FetchDescriptor<CanvasObject>()).isEmpty)
     }
 
+    @MainActor
+    @Test func revealStoreTemporarilyRevealsPrivateClips() {
+        let store = PrivateClipRevealStore(revealDuration: 10)
+        let clip = Clip(content: "N0tArealP@ssword1", origin: .clipboard, sensitivity: .privateContent)
+        let now = Date(timeIntervalSince1970: 100)
+
+        #expect(!store.isRevealed(clip, at: now))
+
+        store.reveal(clip, at: now)
+
+        #expect(store.isRevealed(clip, at: now.addingTimeInterval(9)))
+        #expect(!store.isRevealed(clip, at: now.addingTimeInterval(11)))
+        #expect(store.purgeExpired(at: now.addingTimeInterval(11)) == 1)
+    }
+
     private func makeContext() throws -> ModelContext {
         let container = try ModelContainer(
             for: Clip.self, ClipTag.self, Workspace.self, CanvasPlacement.self, CanvasObject.self,

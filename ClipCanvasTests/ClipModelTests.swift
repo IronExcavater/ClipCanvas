@@ -99,6 +99,30 @@ import SwiftData
         #expect(clip.preview == "Hello world")
     }
 
+    @Test func displayPreviewRequiresRevealForPrivateContent() {
+        let clip = Clip(content: "N0tArealP@ssword1", origin: .clipboard, sensitivity: .privateContent)
+
+        #expect(clip.displayPreview(isRevealed: false) == clip.maskedPreview)
+        #expect(clip.displayPreview(isRevealed: true) == "N0tArealP@ssword1")
+    }
+
+    @Test func userCanMarkAndUnmarkPrivateContent() throws {
+        let now = Date(timeIntervalSince1970: 100)
+        let clip = Clip(content: "plain note", origin: .clipboard)
+
+        clip.markPrivate(at: now)
+
+        #expect(clip.sensitivity == .privateContent)
+        #expect(clip.sensitivityReason == .userMarkedPrivate)
+        #expect(try #require(clip.expiresAt) == now.addingTimeInterval(PrivateClipRetentionPolicy.defaultExpiryInterval))
+
+        clip.unmarkPrivate()
+
+        #expect(clip.sensitivity == .normal)
+        #expect(clip.sensitivityReason == nil)
+        #expect(clip.expiresAt == nil)
+    }
+
     // MARK: - Deduplication
 
     @Test func findOrMakeReusesExistingTextClip() throws {

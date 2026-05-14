@@ -112,7 +112,9 @@ final class Clip: SoftDeletable, Identifiable {
         self.type = Self.detect(content: content, imageData: imageData)
     }
 
-    var isMasked: Bool { sensitivity != .normal }
+    var isPrivateContent: Bool { sensitivity == .privateContent }
+
+    var isMasked: Bool { isPrivateContent }
 
     var sensitivityReason: SensitivityReason? {
         get {
@@ -126,8 +128,18 @@ final class Clip: SoftDeletable, Identifiable {
 
     var preview: String {
         guard !isMasked else {
-            return String(repeating: "•", count: min(max(content.count, 6), 24))
+            return maskedPreview
         }
+        if type == .image { return content.isEmpty ? "Image" : content }
+        return content
+    }
+
+    var maskedPreview: String {
+        SensitiveClipDisplay.mask(for: content)
+    }
+
+    func displayPreview(isRevealed: Bool) -> String {
+        guard !isPrivateContent || isRevealed else { return maskedPreview }
         if type == .image { return content.isEmpty ? "Image" : content }
         return content
     }
@@ -149,6 +161,14 @@ final class Clip: SoftDeletable, Identifiable {
         } else {
             expiresAt = nil
         }
+    }
+
+    func markPrivate(at date: Date = Date()) {
+        updateSensitivity(.privateContent, reason: .userMarkedPrivate, at: date)
+    }
+
+    func unmarkPrivate() {
+        updateSensitivity(.normal, reason: nil)
     }
 
     // MARK: - Type detection

@@ -21,6 +21,8 @@ struct ClipCard: View {
     let onResizeEnded: () -> Void
     let onToggleExpandedSize: () -> Void
 
+    @ObservedObject private var revealStore = PrivateClipRevealStore.shared
+
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             content
@@ -39,6 +41,12 @@ struct ClipCard: View {
 
             if !isEditing {
                 resizeHandle
+            }
+
+            if clip.isPrivateContent {
+                privateRevealButton
+                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topTrailing)
+                    .padding(8)
             }
         }
         .background {
@@ -73,6 +81,8 @@ struct ClipCard: View {
         Group {
             if !showsContent {
                 Color.clear
+            } else if clip.isPrivateContent && !isRevealed {
+                privatePlaceholder
             } else if isEditing, clip.type != .image {
                 NoteTextEditor(
                     initialText: editingText,
@@ -85,7 +95,7 @@ struct ClipCard: View {
             } else if clip.type == .image, let data = clip.imageData, let image = PlatformImage(data: data) {
                 platformImage(image)
             } else {
-                Text(clip.preview.isEmpty ? " " : clip.preview)
+                Text(displayPreview.isEmpty ? " " : displayPreview)
                     .font(.system(size: fontSize))
                     .lineLimit(nil)
                     .foregroundStyle(.primary)
@@ -106,6 +116,40 @@ struct ClipCard: View {
             .scaledToFill()
             .clipped()
         #endif
+    }
+
+    private var isRevealed: Bool {
+        revealStore.isRevealed(clip)
+    }
+
+    private var displayPreview: String {
+        clip.displayPreview(isRevealed: isRevealed)
+    }
+
+    private var privatePlaceholder: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Image(systemName: "lock.fill")
+                .font(.system(size: 18, weight: .semibold))
+            Text(clip.maskedPreview)
+                .font(.system(size: fontSize, weight: .medium))
+                .lineLimit(3)
+        }
+        .foregroundStyle(.primary.opacity(0.72))
+    }
+
+    private var privateRevealButton: some View {
+        Button {
+            revealStore.toggle(clip)
+        } label: {
+            Image(systemName: isRevealed ? "eye.slash.fill" : "eye.fill")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(.primary)
+                .frame(width: 30, height: 30)
+                .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground).opacity(0.88), in: Circle())
+                .shadow(color: .black.opacity(0.08), radius: 5, y: 2)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isRevealed ? "Hide sensitive content" : "Reveal sensitive content")
     }
 
     private var resizeHandle: some View {

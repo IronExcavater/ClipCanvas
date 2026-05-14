@@ -28,6 +28,14 @@ enum ClipActionService {
         clip.softDelete()
     }
 
+    static func toggleSensitive(_ clip: Clip) {
+        if clip.isPrivateContent {
+            clip.unmarkPrivate()
+        } else {
+            clip.markPrivate()
+        }
+    }
+
     @MainActor
     static func clearHistory(_ clips: [Clip]) {
         clips.forEach(softDelete)
