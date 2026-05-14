@@ -148,19 +148,19 @@ Real-time collaboration comes after the action log is proven.
 
 ### Task 2: Extract Canvas Interaction Services
 
-- [ ] Move zoom stepping into a tested service.
-- [ ] Move resize snapping into a tested service.
-- [ ] Move arrange-grid layout math out of `CanvasView`.
+- [x] Move zoom stepping into a tested service.
+- [x] Move resize snapping into a tested service.
+- [x] Move arrange-grid layout math out of `CanvasView`.
 - [ ] Move bounds math out of `CanvasView`.
 - [ ] Keep `CanvasView` focused on rendering and gesture orchestration.
 
 ### Task 3: Build AI Tool Executor
 
-- [ ] Map tool names to `WorkspaceActionRequest`.
-- [ ] Create `AIToolEvent` before execution.
-- [ ] Return confirmation requests for destructive actions.
-- [ ] Reject workspace management actions.
-- [ ] Add tests for success, rejection, confirmation, and error rows.
+- [x] Map tool names to `WorkspaceActionRequest`.
+- [x] Create `AIToolEvent` before execution.
+- [x] Return confirmation requests for destructive actions.
+- [x] Reject workspace management actions.
+- [x] Add tests for success, rejection, confirmation, and error rows.
 
 ### Task 4: Implement Streaming Chat Detail
 
