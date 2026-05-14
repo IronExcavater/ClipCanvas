@@ -16,7 +16,6 @@ struct CanvasTopBar: View {
     let onArrangeAll: () -> Void
     let onFitContent: () -> Void
 
-    @State private var showingWorkspaceActions = false
     @State private var confirmingClear = false
 
     var body: some View {
@@ -39,25 +38,23 @@ struct CanvasTopBar: View {
 
             Spacer()
 
-            Button {
-                showingWorkspaceActions = true
-            } label: {
-                AppMenuIconLabel()
-            }
-            .buttonStyle(.plain)
-            .confirmationDialog("Workspace", isPresented: $showingWorkspaceActions, titleVisibility: .visible) {
+            Menu {
                 Button("Ask AI About Selection", systemImage: "sparkles", action: onAskAISelection)
                     .disabled(selectedCount == 0)
                 Button("Ask AI About View", systemImage: "rectangle.dashed", action: onAskAIVisible)
                     .disabled(visibleCount == 0)
+                Divider()
                 Button("Rename", systemImage: "pencil", action: onBeginRename)
                 Button("Fit to Cards", systemImage: "arrow.up.left.and.arrow.down.right", action: onFitContent)
                 Button("Arrange Grid", systemImage: "square.grid.2x2", action: onArrangeAll)
+                Divider()
                 Button("Clear Cards", systemImage: "trash", role: .destructive) {
                     confirmingClear = true
                 }
-                Button("Cancel", role: .cancel) {}
+            } label: {
+                AppMenuIconLabel()
             }
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, 16)
         .padding(.top, 4)
@@ -137,37 +134,17 @@ private struct CanvasTopBarFade: View {
 
 private struct WorkspaceTitleBackdrop: View {
     var body: some View {
-        Capsule()
-            .fill(.ultraThinMaterial)
-            .mask(
-                LinearGradient(
-                    stops: [
-                        .init(color: .clear, location: 0),
-                        .init(color: .black, location: 0.14),
-                        .init(color: .black, location: 0.86),
-                        .init(color: .clear, location: 1),
-                    ],
-                    startPoint: .leading,
-                    endPoint: .trailing
-                )
-            )
-            .overlay {
-                Capsule()
-                    .stroke(Color.primary.opacity(0.10), lineWidth: 1)
-                    .blur(radius: 2.5)
-                    .mask(
-                        LinearGradient(
-                            stops: [
-                                .init(color: .clear, location: 0),
-                                .init(color: .black.opacity(0.8), location: 0.22),
-                                .init(color: .black.opacity(0.8), location: 0.78),
-                                .init(color: .clear, location: 1),
-                            ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        )
-                    )
-            }
-            .shadow(color: .black.opacity(0.12), radius: 14, y: 5)
+        if #available(iOS 26, *) {
+            Capsule()
+                .fill(Color.clear)
+                .glassEffect(.regular, in: .capsule)
+        } else {
+            Capsule()
+                .fill(.ultraThinMaterial)
+                .overlay {
+                    Capsule().stroke(Color.primary.opacity(0.10), lineWidth: 1)
+                }
+                .shadow(color: .black.opacity(0.10), radius: 12, y: 4)
+        }
     }
 }
