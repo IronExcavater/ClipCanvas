@@ -10,6 +10,23 @@
 
 ---
 
+## Current API Check
+
+As of May 14, 2026, keep the OpenAI implementation on the Responses API:
+
+- Responses supports stored response state, streaming, tool choice, function tools, and MCP tools through the `tools` parameter.
+- Streaming emits typed semantic events such as response lifecycle, output text deltas, function-call arguments, MCP-call arguments, completion, and errors.
+- Conversations support continuing state across turns and include MCP approval request/response item types.
+
+Do not reintroduce Assistants-style thread abstractions. `AIChat`, `ChatMessage`, `ChatAttachment`, and `AIToolEvent` remain the app source of truth.
+
+## Current Implementation Status
+
+- Done: `AIChatMode`, `ChatMessageStatus`, `AIToolEvent`, `AIContextPacker`, `AIModelPresetService`, `TransformSkillRegistry`, `WorkspaceActionRegistry`, `AIWorkspaceToolExecutor`, and the first `AIChatDetailSheet`.
+- Done: AI tool execution is routed through `WorkspaceActionRegistry` and rejects workspace create/delete/rename/activate actions.
+- Done: context packing excludes private clip bodies by default.
+- Remaining: real `OpenAIResponsesClient`, streamed response loop, function/MCP argument streaming, inline confirmation continuation, retry handling, and replacing placeholder assistant responses.
+
 ## Supersedes
 
 This plan supersedes the AI portions of `2026-05-12-clipcanvas-rewrite.md`. The old plan introduced `AISession` and `AIMessage`; this branch already has `AIChat`, `ChatMessage`, and `ChatAttachment`, so implementation must extend those current models.
@@ -230,14 +247,14 @@ Create an `AIChatDetailView` for the existing `AIChatsPage`.
 ### Task 5: Add AI Tool Executor
 
 **Files:**
-- Create: `ClipCanvas/Services/AIToolExecutor.swift`
-- Test: `ClipCanvasTests/AIToolExecutorTests.swift`
+- Create: `ClipCanvas/Services/AIWorkspaceToolExecutor.swift`
+- Test: `ClipCanvasTests/AIWorkspaceToolExecutorTests.swift`
 
-- [ ] Map OpenAI tool names to `WorkspaceActionRequest`.
-- [ ] Create `AIToolEvent` rows before execution.
-- [ ] Return `needsConfirmation` for destructive AI requests.
-- [ ] Reject workspace-management actions.
-- [ ] Write tool results back to the response loop only after the action registry returns success.
+- [x] Map OpenAI tool names to `WorkspaceActionRequest`.
+- [x] Create `AIToolEvent` rows before execution.
+- [x] Return `needsConfirmation` for destructive AI requests.
+- [x] Reject workspace-management actions.
+- [ ] Write tool results back to the OpenAI response loop only after the action registry returns success.
 
 ### Task 6: Build Chat UI
 
@@ -247,10 +264,11 @@ Create an `AIChatDetailView` for the existing `AIChatsPage`.
 - Create: `ClipCanvas/Views/AI/AIToolEventRow.swift`
 - Modify: `ClipCanvas/Views/AIChats/AIChatsPage.swift`
 
-- [ ] Make chat rows navigate to `AIChatDetailView`.
-- [ ] Add quick/thinking mode control.
+- [x] Make chat rows open `AIChatDetailSheet`.
+- [x] Add quick/thinking mode control.
 - [ ] Add streaming assistant bubble and throbber.
-- [ ] Add inline tool event rows and confirmation buttons.
+- [x] Add inline tool event rows.
+- [ ] Add inline confirmation buttons.
 - [ ] Add attach selected/visible object actions from canvas entry points.
 
 ### Task 7: Connect Canvas Entry Points
@@ -260,9 +278,9 @@ Create an `AIChatDetailView` for the existing `AIChatsPage`.
 - Modify: `ClipCanvas/Views/Canvas/CanvasContainerView.swift`
 - Modify: `ClipCanvas/Views/Canvas/ClipDetailSheet.swift`
 
-- [ ] Add "Ask AI" action for selected canvas objects.
+- [x] Add "Ask AI" action for selected or visible canvas objects.
 - [ ] Add transform skill actions to details and selected-object toolbar.
-- [ ] Attach selected objects to a new or existing chat.
+- [x] Attach selected or visible objects to a new or existing chat.
 - [ ] Keep undo/redo and editing sent messages out of scope.
 
 ## Acceptance Criteria

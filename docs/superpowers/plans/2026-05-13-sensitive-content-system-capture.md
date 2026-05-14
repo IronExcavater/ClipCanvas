@@ -10,6 +10,24 @@
 
 ---
 
+## Current Platform Check
+
+As of May 14, 2026:
+
+- `UIPasteboard.changedNotification` reports changes for a pasteboard object while the app process is alive; it is not an App Store-safe always-on iOS background clipboard listener.
+- iOS/iPadOS background execution modes are limited to declared system categories such as audio, location, Bluetooth, background fetch/processing, remote notifications, and similar services. Clipboard monitoring is not a background mode.
+- App Intents foreground continuation should use current supported modes such as `.foreground(.dynamic)` instead of planning new work around deprecated `ForegroundContinuableIntent`.
+- macOS can support true always-on capture with a user-enabled helper that polls or observes `NSPasteboard.general.changeCount`.
+
+Product implication: implement iOS/iPadOS capture through foreground import, Share Extension, Action Extension, App Intents, and Shortcuts. Implement true always-on clipboard capture only on macOS.
+
+## Current Implementation Status
+
+- Done: password-like and secret-keyword detection in `ClipClassificationService`.
+- Done: `SensitivityReason`, `Clip.expiresAt`, default 30-minute private expiry, `PrivateClipRetentionService`, bootstrap purge, and tests for expiry/purge/classification reasons.
+- Done: `AIContextPacker` excludes private clip bodies by default.
+- Remaining: eye reveal UI, optional LocalAuthentication, reveal timeout store, masking in every surface, settings controls, external capture queue, extensions, App Intents, Shortcuts, and macOS pasteboard helper.
+
 ## Product Policy
 
 - Private/password-like clips are useful but should not stay visible or permanent by default.
@@ -178,9 +196,9 @@ If the app is not running, the extension opens the app with a URL/deep-link cont
 - Modify: `ClipCanvas/Services/ClipClassificationService.swift`
 - Test: `ClipCanvasTests/SensitiveClipExpiryTests.swift`
 
-- [ ] Add expiry and reason fields to `Clip`.
-- [ ] Add `SensitivityReason`.
-- [ ] Update clip creation so password-like/private clips get default expiry.
+- [x] Add expiry and reason fields to `Clip`.
+- [x] Add `SensitivityReason`.
+- [x] Update clip creation so password-like/private clips get default expiry.
 - [ ] Test standalone passwords, labeled passwords, API keys, bearer tokens, and false positives.
 
 ### Task 2: Purge and Reveal Services
@@ -190,7 +208,7 @@ If the app is not running, the extension opens the app with a URL/deep-link cont
 - Create: `ClipCanvas/Services/PrivateClipRevealStore.swift`
 - Test: `ClipCanvasTests/PrivateClipRetentionTests.swift`
 
-- [ ] Hard delete expired private clips.
+- [x] Hard delete expired private clips.
 - [ ] Provide transient reveal state by clip ID.
 - [ ] Auto-hide revealed clips after 60 seconds.
 - [ ] Add LocalAuthentication wrapper with injectable test double.
@@ -253,7 +271,7 @@ If the app is not running, the extension opens the app with a URL/deep-link cont
 - [ ] Add Import Clipboard.
 - [ ] Add Create Sticky Note.
 - [ ] Add Ask ClipCanvas AI.
-- [ ] Use `ForegroundContinuableIntent` where the chat UI must open.
+- [ ] Use current App Intent foreground supported modes, such as `.foreground(.dynamic)`, where the chat UI must open.
 - [ ] Route all writes through `ExternalCaptureImportService` or `WorkspaceActionRegistry`.
 
 ### Task 8: macOS Pasteboard Helper
@@ -293,7 +311,9 @@ If the app is not running, the extension opens the app with a URL/deep-link cont
 - UIPasteboard: https://developer.apple.com/documentation/uikit/uipasteboard
 - UIPasteboard change notification: https://developer.apple.com/documentation/uikit/uipasteboard/changednotification
 - App Intents: https://developer.apple.com/documentation/AppIntents/app-intents
+- App Intent foreground mode: https://developer.apple.com/documentation/appintents/appintent/supportedmodes
 - App Shortcuts: https://developer.apple.com/documentation/appintents/app-shortcuts
 - Action extensions: https://developer.apple.com/library/archive/documentation/General/Conceptual/ExtensibilityPG/Action.html
 - Share extensions: https://developer.apple.com/library/archive/documentation/General/Conceptual/ExtensibilityPG/Share.html
 - Background execution modes: https://developer.apple.com/documentation/xcode/configuring-background-execution-modes
+- NSPasteboard: https://developer.apple.com/documentation/appkit/nspasteboard
