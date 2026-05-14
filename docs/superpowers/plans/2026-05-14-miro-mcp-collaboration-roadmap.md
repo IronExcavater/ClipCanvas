@@ -57,6 +57,13 @@ All externally visible mutations go through `WorkspaceActionRegistry`:
 
 Do not add direct SwiftData mutation paths for AI-only behavior.
 
+Current implementation state:
+
+- Done: canvas create/update/move/resize/delete/duplicate/group/ungroup/arrange actions.
+- Done: clip content update, local clip transform, clip tag add/remove, and chat object attachment actions.
+- Done: manual selected-note transforms in the edit toolbar route through `TransformSkillRegistry` and then `WorkspaceActionRegistry`.
+- Remaining: schema generation for MCP, action-event persistence, broader toolbar/context-menu migration, and streaming OpenAI result continuation.
+
 Action registry additions:
 
 - `canvas.create_note`
@@ -195,8 +202,9 @@ Use this as the next implementation queue after the May 14 stabilization commits
 
 ### Slice 6: Action Layer And MCP Readiness
 
-- [ ] Add missing user-facing canvas actions to `WorkspaceActionRegistry` before exposing them through AI/MCP.
-- [ ] Route toolbar/context menu mutations through registry where practical.
+- [x] Add missing clip/tag/chat actions to `WorkspaceActionRegistry` before exposing them through AI/MCP.
+- [x] Route selected-note transform toolbar mutations through registry.
+- [ ] Route remaining toolbar/context menu mutations through registry where practical.
 - [ ] Add an MCP schema adapter only after registry argument structs are stable.
 - [ ] AI/MCP can edit canvas objects, tags, attachments, arrangements, transforms, and connectors.
 - [ ] AI/MCP cannot create/delete/rename/activate workspaces until account permissions exist.

@@ -26,7 +26,8 @@ Product implication: implement iOS/iPadOS capture through foreground import, Sha
 - Done: password-like and secret-keyword detection in `ClipClassificationService`.
 - Done: `SensitivityReason`, `Clip.expiresAt`, default 30-minute private expiry, `PrivateClipRetentionService`, bootstrap purge, and tests for expiry/purge/classification reasons.
 - Done: `AIContextPacker` excludes private clip bodies by default.
-- Remaining: eye reveal UI, optional LocalAuthentication, reveal timeout store, masking in every surface, settings controls, external capture queue, extensions, App Intents, Shortcuts, and macOS pasteboard helper.
+- Done: `PrivateClipRevealStore`, 60-second transient reveal state, shared mask formatting, eye/eye-slash controls in canvas notes and clipboard rows, reveal/sensitive actions in note details, and mark/unmark sensitive context actions.
+- Remaining: optional LocalAuthentication, full chat/recently-deleted masking audit, settings controls, external capture queue, extensions, App Intents, Shortcuts, and macOS pasteboard helper.
 
 ## Product Policy
 
@@ -209,8 +210,8 @@ If the app is not running, the extension opens the app with a URL/deep-link cont
 - Test: `ClipCanvasTests/PrivateClipRetentionTests.swift`
 
 - [x] Hard delete expired private clips.
-- [ ] Provide transient reveal state by clip ID.
-- [ ] Auto-hide revealed clips after 60 seconds.
+- [x] Provide transient reveal state by clip ID.
+- [x] Auto-hide revealed clips after 60 seconds.
 - [ ] Add LocalAuthentication wrapper with injectable test double.
 
 ### Task 3: Mask Private Content Everywhere
@@ -222,7 +223,8 @@ If the app is not running, the extension opens the app with a URL/deep-link cont
 - Modify: `ClipCanvas/Views/Trash/TrashPage.swift`
 
 - [ ] Add shared `PrivateClipContentView`.
-- [ ] Add eye/eye-slash reveal controls.
+- [x] Add eye/eye-slash reveal controls to canvas notes and clipboard rows.
+- [x] Add reveal and mark/unmark sensitive actions to note details and clipboard row context menus.
 - [ ] Ensure masked text does not leak through accessibility labels.
 - [ ] Ensure details view starts masked after app relaunch.
 
@@ -232,9 +234,9 @@ If the app is not running, the extension opens the app with a URL/deep-link cont
 - Modify: `ClipCanvas/Services/AIContextPacker.swift`
 - Test: `ClipCanvasTests/AIContextPackerPrivateContentTests.swift`
 
-- [ ] Exclude private clip bodies by default.
+- [x] Exclude private clip bodies by default.
 - [ ] Include private content only when a one-turn explicit attachment flag is set.
-- [ ] Add context metadata that says private content was omitted.
+- [x] Add context metadata that says private content was omitted.
 
 ### Task 5: External Capture Queue
 

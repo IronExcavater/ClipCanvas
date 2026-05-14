@@ -25,6 +25,8 @@ Do not reintroduce Assistants-style thread abstractions. `AIChat`, `ChatMessage`
 - Done: `AIChatMode`, `ChatMessageStatus`, `AIToolEvent`, `AIContextPacker`, `AIModelPresetService`, `TransformSkillRegistry`, `WorkspaceActionRegistry`, `AIWorkspaceToolExecutor`, and the first `AIChatDetailSheet`.
 - Done: AI tool execution is routed through `WorkspaceActionRegistry` and rejects workspace create/delete/rename/activate actions.
 - Done: context packing excludes private clip bodies by default.
+- Done: deterministic text-transform fallbacks are centralized in `TextTransformFallbacks`, and the edit selection toolbar can manually apply selected-note transforms through `TransformSkillRegistry`.
+- Done: `WorkspaceActionRegistry` handles clip content updates, local clip transforms, clip tag add/remove, and chat object attachment, so OpenAI tools and user-triggered transforms share the same mutation path.
 - Remaining: real `OpenAIResponsesClient`, streamed response loop, function/MCP argument streaming, inline confirmation continuation, retry handling, and replacing placeholder assistant responses.
 
 ## Supersedes
@@ -254,6 +256,7 @@ Create an `AIChatDetailView` for the existing `AIChatsPage`.
 - [x] Create `AIToolEvent` rows before execution.
 - [x] Return `needsConfirmation` for destructive AI requests.
 - [x] Reject workspace-management actions.
+- [x] Execute non-destructive clip update, transform, tag, and chat attachment tools through `WorkspaceActionRegistry`.
 - [ ] Write tool results back to the OpenAI response loop only after the action registry returns success.
 
 ### Task 6: Build Chat UI
