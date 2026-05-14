@@ -79,6 +79,21 @@ import Testing
         #expect(attachment.state == .hardDeleted)
     }
 
+    @Test func chatServiceCreatesChatForActiveWorkspace() throws {
+        let context = try makeContext()
+        let inactive = Workspace(name: "Inbox")
+        let active = Workspace(name: "Board", isActive: true)
+        context.insert(inactive)
+        context.insert(active)
+
+        let chat = AIChatService.createChat(in: context, workspaces: [inactive, active])
+
+        #expect(chat.title == "New Chat")
+        #expect(chat.workspace?.id == active.id)
+        #expect(active.chats.contains { $0.id == chat.id })
+        #expect((try context.fetch(FetchDescriptor<AIChat>())).count == 1)
+    }
+
     private func makeContext() throws -> ModelContext {
         let container = try ModelContainer(
             for: Clip.self, ClipTag.self, Workspace.self, CanvasPlacement.self, CanvasObject.self,

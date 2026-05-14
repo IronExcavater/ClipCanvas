@@ -2,8 +2,11 @@ import SwiftUI
 import SwiftData
 
 struct SidebarView: View {
+    @Environment(\.modelContext) private var context
+
     let onClose: (() -> Void)?
     var isOpen = true
+    var onOpenAIChat: ((AIChat) -> Void)?
 
     @Query(
         filter: #Predicate<Workspace> { $0.deletedAt == nil },
@@ -137,20 +140,32 @@ struct SidebarView: View {
                     .appListItemRowInsets(horizontal: 16, vertical: 2)
             } else {
                 ForEach(recentChats) { chat in
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(chat.title)
-                            .font(.subheadline)
-                        Text(chat.preview)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                            .lineLimit(1)
+                    Button {
+                        onOpenAIChat?(chat)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(chat.title)
+                                .font(.subheadline)
+                                .foregroundStyle(.primary)
+                            Text(chat.preview)
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .lineLimit(1)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    .buttonStyle(.plain)
                     .appListCard(tint: .secondary, opacity: 0.08)
+                    .contextMenu {
+                        Button("Delete", systemImage: "trash", role: .destructive) {
+                            context.delete(chat)
+                        }
+                    }
                     .appListItemRowInsets(vertical: 3)
                 }
             }
         } header: {
-            sectionHeader("AI Chats", destination: AIChatsPage())
+            aiChatsHeader
         }
     }
 
@@ -171,6 +186,37 @@ struct SidebarView: View {
             }
         }
         .buttonStyle(.plain)
+        .textCase(nil)
+        .padding(.vertical, 4)
+    }
+
+    private var aiChatsHeader: some View {
+        HStack(spacing: 8) {
+            NavigationLink(destination: AIChatsPage()) {
+                HStack(spacing: 8) {
+                    Text("AI Chats")
+                        .font(.headline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    HStack(spacing: 4) {
+                        Text("View all")
+                        Image(systemName: "chevron.right")
+                            .font(.caption.weight(.bold))
+                    }
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(Color.accentColor)
+                }
+            }
+            .buttonStyle(.plain)
+
+            Button(action: createChat) {
+                Image(systemName: "plus")
+                    .font(.system(size: 15, weight: .semibold))
+                    .frame(width: 34, height: 34)
+            }
+            .buttonStyle(BlendedIconButtonStyle(size: 34))
+            .accessibilityLabel("New Chat")
+        }
         .textCase(nil)
         .padding(.vertical, 4)
     }
@@ -234,5 +280,10 @@ struct SidebarView: View {
         WorkspaceActionService.rename(renamingWorkspace, to: renameText)
         renamingWorkspace = nil
         renameText = ""
+    }
+
+    private func createChat() {
+        let chat = AIChatService.createChat(in: context, workspaces: workspaces)
+        onOpenAIChat?(chat)
     }
 }

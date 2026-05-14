@@ -128,13 +128,7 @@ struct AIChatsPage: View {
     }
 
     private func createChat() {
-        let chat = AIChat(title: "New Chat")
-        if let workspace = workspaces.first(where: \.isActive) ?? workspaces.first {
-            chat.workspace = workspace
-            workspace.chats.append(chat)
-        }
-        context.insert(chat)
-        activeChat = chat
+        activeChat = AIChatService.createChat(in: context, workspaces: workspaces)
     }
 
     private func deleteSelected() {

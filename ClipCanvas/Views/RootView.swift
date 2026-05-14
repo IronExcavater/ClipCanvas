@@ -7,9 +7,15 @@ struct RootView: View {
 
     @State private var sidebarOpen = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
+    @State private var activeAIChat: AIChat?
 
     var body: some View {
-        if hSizeClass == .compact { iPhoneLayout } else { splitLayout }
+        Group {
+            if hSizeClass == .compact { iPhoneLayout } else { splitLayout }
+        }
+        .sheet(item: $activeAIChat) { chat in
+            AIChatDetailSheet(chat: chat)
+        }
     }
 
     // MARK: - iPhone: canvas-first + overlay sidebar drawer
@@ -28,7 +34,8 @@ struct RootView: View {
                 NavigationStack {
                     SidebarView(
                         onClose: { withAnimation { sidebarOpen = false } },
-                        isOpen: sidebarOpen
+                        isOpen: sidebarOpen,
+                        onOpenAIChat: openAIChatFromSidebar
                     )
                 }
                 .frame(width: drawerWidth)
@@ -48,7 +55,10 @@ struct RootView: View {
     private var splitLayout: some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             NavigationStack {
-                SidebarView(onClose: { columnVisibility = .detailOnly })
+                SidebarView(
+                    onClose: { columnVisibility = .detailOnly },
+                    onOpenAIChat: { activeAIChat = $0 }
+                )
             }
         } detail: {
             CanvasHost(onToggleSidebar: {
@@ -69,5 +79,12 @@ struct RootView: View {
             Rectangle()
                 .fill(.regularMaterial)
         }
+    }
+
+    private func openAIChatFromSidebar(_ chat: AIChat) {
+        withAnimation {
+            sidebarOpen = false
+        }
+        activeAIChat = chat
     }
 }
