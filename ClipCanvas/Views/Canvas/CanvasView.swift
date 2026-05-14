@@ -13,17 +13,23 @@ struct CanvasView: View {
     @Binding var visibleObjectIDs: Set<UUID>
     @Binding var activeDrawing: PKDrawing
     var drawingTool: PKTool
+    var onCreateConnector: (CanvasConnector) -> Void = { _ in }
 
     @Query private var allClips: [Clip]
     @State private var viewportOrigin: CGPoint = .zero
     @State private var canvasScale: CGFloat = 1.0
     @State private var activeDrag: (id: UUID, offset: CGSize)?
     @State private var activeResize: (id: UUID, start: CGSize, translation: CGSize)?
+    @State private var draftConnector: DraftConnector?
     @State private var zOrder: [UUID: Double] = [:]
     @State private var nextZOrder: Double = 1
     @State private var panStartOrigin: CGPoint?
     @State private var pinchStartScale: CGFloat?
     @State private var pinchAnchorCenter: CGPoint?
+
+    private var objectsByID: [UUID: CanvasObject] {
+        Dictionary(uniqueKeysWithValues: canvasObjects.map { ($0.id, $0) })
+    }
 
     private var canvasObjects: [CanvasObject] {
         workspace.canvasObjects
@@ -69,6 +75,21 @@ struct CanvasView: View {
                         )
                         .allowsHitTesting(false)
                         .zIndex(1)
+                }
+
+                if let draft = draftConnector {
+                    Canvas { ctx, _ in
+                        let start = canvasToScreen(draft.startPoint)
+                        let end = canvasToScreen(draft.endPoint)
+                        var line = Path()
+                        line.move(to: start)
+                        line.addLine(to: end)
+                        ctx.stroke(line, with: .color(.accentColor.opacity(0.5)),
+                                   style: StrokeStyle(lineWidth: 2, dash: [5, 3]))
+                    }
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .allowsHitTesting(false)
+                    .zIndex(40_000)
                 }
 
                 if mode == .draw {
@@ -119,7 +140,8 @@ struct CanvasView: View {
                 connector: connector,
                 viewportOrigin: viewportOrigin,
                 canvasScale: canvasScale,
-                isSelected: selectedObjectIDs.contains(object.id)
+                isSelected: selectedObjectIDs.contains(object.id),
+                objectLookup: objectsByID
             )
             .frame(width: geo.size.width, height: geo.size.height)
             .zIndex(zIndex(for: object, isSelected: selectedObjectIDs.contains(object.id), isDragging: false))
@@ -149,6 +171,7 @@ struct CanvasView: View {
             onResizeEnded: { commitResize(for: object, in: geo) },
             onToggleExpandedSize: { toggleExpandedSize(for: object, in: geo) }
         )
+        .overlay { edgeHandleOverlay(for: object, size: size, isDragging: isDragging) }
         .modifier(CanvasObjectPositionModifier(
             object: object,
             viewportOrigin: viewportOrigin,
@@ -180,6 +203,7 @@ struct CanvasView: View {
             onResizeEnded: { commitResize(for: object, in: geo) },
             onToggleExpandedSize: { toggleExpandedSize(for: object, in: geo) }
         )
+        .overlay { edgeHandleOverlay(for: object, size: size, isDragging: isDragging) }
         .modifier(CanvasObjectPositionModifier(
             object: object,
             viewportOrigin: viewportOrigin,
@@ -557,6 +581,119 @@ struct CanvasView: View {
         canvasObjects.forEach { clampObject($0, in: geo) }
     }
 
+    // MARK: - Connectors
+
+    @ViewBuilder
+    private func edgeHandleOverlay(for object: CanvasObject, size: CGSize, isDragging: Bool) -> some View {
+        if selectedObjectIDs.contains(object.id) && mode == .pan && !isDragging && object.kind != .connector {
+            ZStack {
+                edgeHandle(for: object, anchor: .top, in: size)
+                edgeHandle(for: object, anchor: .trailing, in: size)
+                edgeHandle(for: object, anchor: .bottom, in: size)
+                edgeHandle(for: object, anchor: .leading, in: size)
+            }
+            .frame(width: size.width, height: size.height)
+        }
+    }
+
+    private func edgeHandle(for object: CanvasObject, anchor: CanvasAnchor, in size: CGSize) -> some View {
+        let pos: CGPoint
+        switch anchor {
+        case .top:      pos = CGPoint(x: size.width / 2, y: 0)
+        case .trailing: pos = CGPoint(x: size.width, y: size.height / 2)
+        case .bottom:   pos = CGPoint(x: size.width / 2, y: size.height)
+        case .leading:  pos = CGPoint(x: 0, y: size.height / 2)
+        default:        pos = CGPoint(x: size.width / 2, y: size.height / 2)
+        }
+        return Circle()
+            .fill(Color.accentColor)
+            .frame(width: 14, height: 14)
+            .overlay(Circle().stroke(Color.white, lineWidth: 2))
+            .shadow(color: .black.opacity(0.18), radius: 3, y: 1)
+            .position(pos)
+            .gesture(
+                DragGesture(minimumDistance: 4, coordinateSpace: .global)
+                    .onChanged { value in
+                        beginConnectorIfNeeded(from: object, anchor: anchor)
+                        draftConnector?.endPoint = globalToCanvas(value.location)
+                    }
+                    .onEnded { value in
+                        let dist = hypot(value.translation.width, value.translation.height)
+                        if dist < 10 {
+                            draftConnector = nil
+                        } else {
+                            commitDraftConnector(at: globalToCanvas(value.location), excludingID: object.id)
+                        }
+                    }
+            )
+    }
+
+    private func beginConnectorIfNeeded(from object: CanvasObject, anchor: CanvasAnchor) {
+        guard draftConnector == nil else { return }
+        let f = object.frame
+        let start: CGPoint
+        switch anchor {
+        case .top:      start = CGPoint(x: f.midX, y: f.minY)
+        case .trailing: start = CGPoint(x: f.maxX, y: f.midY)
+        case .bottom:   start = CGPoint(x: f.midX, y: f.maxY)
+        case .leading:  start = CGPoint(x: f.minX, y: f.midY)
+        default:        start = CGPoint(x: f.midX, y: f.midY)
+        }
+        draftConnector = DraftConnector(startObjectID: object.id, startAnchor: anchor,
+                                        startPoint: start, endPoint: start)
+    }
+
+    private func commitDraftConnector(at canvasEnd: CGPoint, excludingID: UUID) {
+        guard let draft = draftConnector else { return }
+        draftConnector = nil
+
+        let snapRadius: CGFloat = 40
+        var bestDist = snapRadius
+        var snapID: UUID?
+        var snapAnchor: CanvasAnchor = .free
+        var snapPoint = canvasEnd
+
+        for obj in canvasObjects where obj.id != excludingID && obj.kind != .connector {
+            for (anchor, point) in edgeAnchorPoints(for: obj) {
+                let d = hypot(canvasEnd.x - point.x, canvasEnd.y - point.y)
+                if d < bestDist {
+                    bestDist = d
+                    snapID = obj.id
+                    snapAnchor = anchor
+                    snapPoint = point
+                }
+            }
+        }
+
+        let start = CanvasConnectorEndpoint(objectID: draft.startObjectID,
+                                            point: CGPointCodable(draft.startPoint),
+                                            anchor: draft.startAnchor)
+        let end = CanvasConnectorEndpoint(objectID: snapID,
+                                          point: CGPointCodable(snapPoint),
+                                          anchor: snapID != nil ? snapAnchor : .free)
+        onCreateConnector(CanvasConnector(start: start, end: end))
+    }
+
+    private func edgeAnchorPoints(for obj: CanvasObject) -> [(CanvasAnchor, CGPoint)] {
+        let f = obj.frame
+        return [
+            (.top,      CGPoint(x: f.midX, y: f.minY)),
+            (.trailing, CGPoint(x: f.maxX, y: f.midY)),
+            (.bottom,   CGPoint(x: f.midX, y: f.maxY)),
+            (.leading,  CGPoint(x: f.minX, y: f.midY))
+        ]
+    }
+
+    private func globalToCanvas(_ point: CGPoint) -> CGPoint {
+        CGPoint(x: viewportOrigin.x + point.x / canvasScale,
+                y: viewportOrigin.y + point.y / canvasScale)
+    }
+
+    private func canvasToScreen(_ point: CGPoint) -> CGPoint {
+        CGPoint(x: (point.x - viewportOrigin.x) * canvasScale,
+                y: (point.y - viewportOrigin.y) * canvasScale)
+    }
+
     private func updateVisibleObjectIDs(in geo: GeometryProxy) {
         let viewport = CGRect(
             x: viewportOrigin.x,
@@ -566,6 +703,13 @@ struct CanvasView: View {
         ).insetBy(dx: -80, dy: -80)
         visibleObjectIDs = Set(canvasObjects.filter { viewport.intersects($0.frame) }.map(\.id))
     }
+}
+
+private struct DraftConnector {
+    let startObjectID: UUID
+    let startAnchor: CanvasAnchor
+    let startPoint: CGPoint
+    var endPoint: CGPoint
 }
 
 private struct CanvasObjectPositionModifier: ViewModifier {

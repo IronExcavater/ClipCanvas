@@ -37,7 +37,8 @@ struct CanvasContainerView: View {
                 visibleViewportCenter: $visibleViewportCenter,
                 visibleObjectIDs: $visibleObjectIDs,
                 activeDrawing: $activeDrawing,
-                drawingTool: drawingTool
+                drawingTool: drawingTool,
+                onCreateConnector: createConnector
             )
             .ignoresSafeArea()
 
@@ -240,6 +241,15 @@ struct CanvasContainerView: View {
         AIChatService.attachObjects(objects, to: chat, in: context)
         activeAIChat = chat
         showFeedback(objects.count == 1 ? "Attached 1 card" : "Attached \(objects.count) cards")
+    }
+
+    // MARK: - Connectors
+
+    private func createConnector(_ connector: CanvasConnector) {
+        let object = CanvasObject(kind: .connector, workspace: workspace,
+                                  x: 0, y: 0, width: 0, height: 0,
+                                  connector: connector)
+        context.insert(object)
     }
 
     // MARK: - Drawing
