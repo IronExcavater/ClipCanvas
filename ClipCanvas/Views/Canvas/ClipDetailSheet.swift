@@ -54,9 +54,9 @@ struct ClipDetailSheet: View {
                     Button {
                         dismiss()
                     } label: {
-                        AppCircleIconButtonLabel(systemImage: "xmark", size: 36, symbolSize: 14)
+                        AppCircleIconLabel(systemImage: "xmark", size: 36, symbolSize: 14)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(BlendedIconButtonStyle(size: 36))
                     .accessibilityLabel("Cancel")
                 }
                 ToolbarItem(placement: .confirmationAction) {
@@ -64,9 +64,9 @@ struct ClipDetailSheet: View {
                         commitEdit()
                         dismiss()
                     } label: {
-                        AppCircleIconButtonLabel(systemImage: "checkmark", size: 36, symbolSize: 14)
+                        AppCircleIconLabel(systemImage: "checkmark", size: 36, symbolSize: 14)
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(BlendedIconButtonStyle(size: 36))
                     .fontWeight(.semibold)
                     .accessibilityLabel("Done")
                 }

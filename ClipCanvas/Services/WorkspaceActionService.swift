@@ -10,7 +10,7 @@ enum WorkspaceActionService {
     static func create(in context: ModelContext, existing workspaces: [Workspace], name: String? = nil) -> Workspace {
         let workspace = Workspace(
             name: name ?? "Canvas \(workspaces.count + 1)",
-            sortIndex: (workspaces.map(\.sortIndex).max() ?? -1) + 1,
+            sortIndex: (workspaces.map(\.sortIndex).min() ?? 0) - 1,
             isActive: true
         )
         workspaces.forEach { $0.isActive = false }

@@ -90,9 +90,9 @@ struct WorkspacesPage: View {
             ToolbarItem(placement: .primaryAction) {
                 if !isSelecting {
                     Button(action: createWorkspace) {
-                        AppCircleIconButtonLabel(systemImage: "plus")
+                        AppCircleIconLabel(systemImage: "plus")
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(BlendedIconButtonStyle())
                     .accessibilityLabel("New Workspace")
                     .opacity(searchPresented ? 0 : 1)
                     .disabled(searchPresented)
@@ -124,6 +124,9 @@ struct WorkspacesPage: View {
     }
 
     private func createWorkspace() {
+        search = ""
+        searchPresented = false
+        endSelection()
         let workspace = WorkspaceActionService.create(in: context, existing: workspaces, name: "")
         editingName = ""
         renamingID = workspace.id

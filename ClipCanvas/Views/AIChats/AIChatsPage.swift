@@ -79,9 +79,9 @@ struct AIChatsPage: View {
             ToolbarItem(placement: .primaryAction) {
                 if !isSelecting {
                     Button(action: createChat) {
-                        AppCircleIconButtonLabel(systemImage: "plus")
+                        AppCircleIconLabel(systemImage: "plus")
                     }
-                    .buttonStyle(.plain)
+                    .buttonStyle(BlendedIconButtonStyle())
                     .accessibilityLabel("New Chat")
                     .opacity(searchPresented ? 0 : 1)
                     .disabled(searchPresented)
@@ -137,6 +137,10 @@ struct AIChatsPage: View {
     }
 
     private func createChat() {
+        search = ""
+        searchPresented = false
+        selection.removeAll()
+        isSelecting = false
         activeChat = AIChatService.createChat(in: context, workspaces: workspaces)
     }
 

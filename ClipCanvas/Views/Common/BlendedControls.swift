@@ -49,7 +49,7 @@ struct AppMenuIconLabel: View {
     }
 }
 
-struct AppCircleIconButtonLabel: View {
+struct AppCircleIconLabel: View {
     let systemImage: String
     var size: CGFloat = 46
     var symbolSize: CGFloat = 18
@@ -59,8 +59,6 @@ struct AppCircleIconButtonLabel: View {
             .font(.system(size: symbolSize, weight: .semibold))
             .foregroundStyle(.primary)
             .frame(width: size, height: size)
-            .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: Circle())
-            .shadow(color: .black.opacity(0.14), radius: 10, y: 5)
             .contentShape(Circle())
     }
 }
@@ -343,28 +341,12 @@ private struct AppSearchAwareTitle: View {
     let title: String
     let isSearching: Bool
 
-    @State private var visible = false
-
     var body: some View {
         Text(title)
             .font(.headline.weight(.semibold))
             .foregroundStyle(.primary)
-            .opacity(visible ? 1 : 0)
-            .scaleEffect(visible ? 1 : 0.96)
-            .onAppear {
-                visible = false
-                if !isSearching {
-                    DispatchQueue.main.async {
-                        withAnimation(.easeInOut(duration: 0.24)) {
-                            visible = true
-                        }
-                    }
-                }
-            }
-            .onChange(of: isSearching) { _, searching in
-                withAnimation(.easeInOut(duration: 0.22)) {
-                    visible = !searching
-                }
-            }
+            .opacity(isSearching ? 0 : 1)
+            .scaleEffect(isSearching ? 0.96 : 1)
+            .animation(.easeInOut(duration: 0.24), value: isSearching)
     }
 }
