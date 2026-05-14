@@ -51,6 +51,37 @@ struct AppCircleIconLabel: View {
     }
 }
 
+struct AppToolbarCircleLabel: View {
+    let systemImage: String
+    var size: CGFloat = 40
+    var symbolSize: CGFloat = 16
+
+    var body: some View {
+        Image(systemName: systemImage)
+            .font(.system(size: symbolSize, weight: .semibold))
+            .foregroundStyle(.primary)
+            .frame(width: size, height: size)
+            .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: Circle())
+            .shadow(color: .black.opacity(0.10), radius: 8, y: 3)
+            .contentShape(Circle())
+    }
+}
+
+struct AppToolbarCircleButton: View {
+    let systemImage: String
+    var size: CGFloat = 40
+    var symbolSize: CGFloat = 16
+    var role: ButtonRole?
+    let action: () -> Void
+
+    var body: some View {
+        Button(role: role, action: action) {
+            AppToolbarCircleLabel(systemImage: systemImage, size: size, symbolSize: symbolSize)
+        }
+        .buttonStyle(.plain)
+    }
+}
+
 struct AppDivider: View {
     var body: some View {
         Rectangle()
@@ -129,8 +160,8 @@ struct AppListItemButton<Content: View>: View {
     var body: some View {
         Button(action: action) {
             content
-                .padding(.horizontal, 10)
-                .padding(.vertical, 8)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 7)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background {
                     AppListItemBackground(tint: tint, opacity: opacity)
@@ -149,8 +180,8 @@ struct AppListItemContainer<Content: View>: View {
 
     var body: some View {
         content
-            .padding(.horizontal, 10)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 9)
+            .padding(.vertical, 7)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background {
                 AppListItemBackground(tint: tint, opacity: opacity)

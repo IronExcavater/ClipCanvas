@@ -27,10 +27,9 @@ struct AIChatDetailSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(action: { dismiss() }) {
-                        AppCircleIconLabel(systemImage: "xmark", size: 36, symbolSize: 14)
+                    AppToolbarCircleButton(systemImage: "xmark", size: 36, symbolSize: 14) {
+                        dismiss()
                     }
-                    .buttonStyle(BlendedIconButtonStyle(size: 36))
                     .accessibilityLabel("Close")
                 }
             }

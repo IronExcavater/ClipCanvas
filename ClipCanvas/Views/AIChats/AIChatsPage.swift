@@ -44,9 +44,6 @@ struct AIChatsPage: View {
                 ContentUnavailableView.search(text: search)
                     .appEmptyStateRow()
             } else {
-                selectionControl
-                    .appListItemRowInsets(vertical: 0)
-
                 ForEach(filteredChats) { chat in
                     AIChatRow(
                         chat: chat,
@@ -76,16 +73,8 @@ struct AIChatsPage: View {
             Button("Cancel", role: .cancel) { renamingChat = nil }
         }
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                if !isSelecting {
-                    Button(action: createChat) {
-                        AppCircleIconLabel(systemImage: "plus")
-                    }
-                    .buttonStyle(BlendedIconButtonStyle())
-                    .accessibilityLabel("New Chat")
-                    .opacity(searchPresented ? 0 : 1)
-                    .disabled(searchPresented)
-                }
+            ToolbarItemGroup(placement: .primaryAction) {
+                toolbarActions
             }
         }
         .sheet(item: $activeChat) { chat in
@@ -93,30 +82,39 @@ struct AIChatsPage: View {
         }
     }
 
-    private var selectionControl: some View {
-        AppListSelectionControl(
-            isSelecting: isSelecting,
-            selectedCount: selection.count,
-            selectTitle: "Select",
-            onToggle: {
-                if isSelecting {
-                    selection.removeAll()
-                    isSelecting = false
-                } else {
-                    selection.removeAll()
-                    isSelecting = true
-                }
-            }
-        ) {
+    @ViewBuilder
+    private var toolbarActions: some View {
+        if isSelecting {
+            Text("\(selection.count)")
+                .font(.headline.weight(.semibold))
+                .monospacedDigit()
+                .frame(minWidth: 22)
+
             Button(role: .destructive) {
                 confirmingDelete = true
             } label: {
-                Image(systemName: "trash")
-                    .font(.system(size: 16, weight: .semibold))
-                    .frame(width: 40, height: 40)
+                AppToolbarCircleLabel(systemImage: "trash", size: 36, symbolSize: 15)
             }
-            .appSelectionIconButtonStyle()
+            .buttonStyle(.plain)
             .disabled(selection.isEmpty)
+
+            Button(action: endSelection) {
+                AppToolbarCircleLabel(systemImage: "checkmark", size: 36, symbolSize: 15)
+            }
+            .buttonStyle(.plain)
+        } else {
+            Button(action: beginSelection) {
+                AppToolbarCircleLabel(systemImage: "checklist", size: 36, symbolSize: 15)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Select")
+            .opacity(searchPresented ? 0 : 1)
+            .disabled(searchPresented)
+
+            AppToolbarCircleButton(systemImage: "plus", action: createChat)
+                .accessibilityLabel("New Chat")
+                .opacity(searchPresented ? 0 : 1)
+                .disabled(searchPresented)
         }
     }
 
@@ -139,8 +137,7 @@ struct AIChatsPage: View {
     private func createChat() {
         search = ""
         searchPresented = false
-        selection.removeAll()
-        isSelecting = false
+        endSelection()
         activeChat = AIChatService.createChat(in: context, workspaces: workspaces)
     }
 
@@ -161,6 +158,15 @@ struct AIChatsPage: View {
 
     private func deleteSelected() {
         selectedChats.forEach { context.delete($0) }
+        endSelection()
+    }
+
+    private func beginSelection() {
+        selection.removeAll()
+        isSelecting = true
+    }
+
+    private func endSelection() {
         selection.removeAll()
         isSelecting = false
     }

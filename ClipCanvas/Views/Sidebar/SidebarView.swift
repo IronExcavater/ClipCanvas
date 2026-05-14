@@ -15,12 +15,6 @@ struct SidebarView: View {
 
     @Query(sort: \AIChat.updatedAt, order: .reverse) private var chats: [AIChat]
 
-    @State private var renamingWorkspace: Workspace?
-    @State private var renameText = ""
-    @State private var renamingChat: AIChat?
-    @State private var renameChatText = ""
-    @State private var showRenameChatAlert = false
-
     private var activeWorkspace: Workspace? {
         workspaces.first(where: \.isActive) ?? workspaces.first
     }
@@ -35,9 +29,19 @@ struct SidebarView: View {
             sidebarHeader
 
             List {
-                currentWorkspaceSection
-                librarySection
-                chatsSection
+                if workspaceChats.isEmpty {
+                    ContentUnavailableView(
+                        "No AI Chats",
+                        systemImage: "sparkles",
+                        description: Text("Chats for the current workspace appear here.")
+                    )
+                    .appEmptyStateRow()
+                } else {
+                    ForEach(workspaceChats) { chat in
+                        sidebarChatRow(chat)
+                            .appListItemRowInsets(vertical: 3)
+                    }
+                }
             }
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
@@ -56,154 +60,25 @@ struct SidebarView: View {
         .toolbar(.hidden, for: .navigationBar)
         .ignoresSafeArea(.container, edges: .bottom)
         .ignoresSafeArea(.keyboard, edges: .bottom)
-        .onChange(of: isOpen) { _, newValue in
-            if !newValue { finishRenaming() }
-        }
     }
 
     private var sidebarHeader: some View {
-        HStack(alignment: .center, spacing: 12) {
+        HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 2) {
                 Text("ClipCanvas")
                     .font(.title3.weight(.bold))
                     .foregroundStyle(Color.accentColor)
-                Text("Capture, arrange, and reuse ideas")
+                Text(activeWorkspace?.name ?? "Choose a workspace")
+                    .font(.headline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                Text("AI chats for this canvas")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+
             Spacer()
-            if onClose != nil {
-                Button(action: closeSidebar) {
-                    Image(systemName: AppSymbol.sidebar)
-                        .font(.system(size: 18, weight: .semibold))
-                }
-                .buttonStyle(BlendedIconButtonStyle())
-                .accessibilityLabel("Collapse Sidebar")
-            }
-        }
-        .padding(.top, 4)
-        .padding(.bottom, 10)
-        .padding(.leading, 16)
-        .padding(.trailing, 12)
-    }
-
-    // MARK: - Sections
-
-    private var currentWorkspaceSection: some View {
-        Section {
-            if let ws = activeWorkspace {
-                WorkspaceRowView(
-                    workspace: ws,
-                    isRenaming: renamingWorkspace?.id == ws.id,
-                    editingName: $renameText,
-                    onActivate: { activateWorkspace(ws) },
-                    onRename: { beginWorkspaceRename(ws) },
-                    onCommitRename: { commitWorkspaceRename() },
-                    onDelete: { WorkspaceActionService.softDelete(ws, among: workspaces) }
-                )
-                .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                    Button(role: .destructive) {
-                        WorkspaceActionService.softDelete(ws, among: workspaces)
-                    } label: {
-                        Label("Delete", systemImage: "trash")
-                    }
-                }
-                .swipeActions(edge: .leading, allowsFullSwipe: false) {
-                    Button { beginWorkspaceRename(ws) } label: {
-                        Label("Rename", systemImage: "pencil")
-                    }
-                    .tint(.accentColor)
-                }
-                .appListItemRowInsets(vertical: 3)
-            } else {
-                Text("Create a workspace to start")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .appListItemRowInsets(horizontal: 16, vertical: 2)
-            }
-        } header: {
-            workspaceHeader
-        }
-    }
-
-    private var librarySection: some View {
-        Section {
-            NavigationLink(destination: HistoryPage()) {
-                sidebarNavRow(title: "Clipboard History", systemImage: "doc.on.clipboard")
-            }
-            .buttonStyle(.plain)
-            .appListItemRowInsets(vertical: 3)
-
-            NavigationLink(destination: WorkspacesPage()) {
-                sidebarNavRow(title: "All Workspaces", systemImage: "square.grid.2x2")
-            }
-            .buttonStyle(.plain)
-            .appListItemRowInsets(vertical: 3)
-        } header: {
-            sectionHeader("Library", destination: HistoryPage())
-        }
-    }
-
-    private var chatsSection: some View {
-        Section {
-            if workspaceChats.isEmpty {
-                Text("No workspace chats yet")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .appListItemRowInsets(horizontal: 16, vertical: 2)
-            } else {
-                ForEach(workspaceChats) { chat in
-                    Button {
-                        onOpenAIChat?(chat)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(chat.title)
-                                .font(.subheadline)
-                                .foregroundStyle(.primary)
-                            Text(chat.preview)
-                                .font(.caption)
-                                .foregroundStyle(.secondary)
-                                .lineLimit(1)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .buttonStyle(.plain)
-                    .appListCard(tint: .secondary, opacity: 0.06)
-                    .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-                        Button(role: .destructive) {
-                            context.delete(chat)
-                        } label: {
-                            Label("Delete", systemImage: "trash")
-                        }
-                    }
-                    .contextMenu {
-                        Button("Rename", systemImage: "pencil") {
-                            beginChatRename(chat)
-                        }
-                        Button("Delete", systemImage: "trash", role: .destructive) {
-                            context.delete(chat)
-                        }
-                    }
-                    .appListItemRowInsets(vertical: 3)
-                }
-            }
-        } header: {
-            workspaceAIHeader
-        }
-    }
-
-    private var workspaceHeader: some View {
-        HStack(spacing: 8) {
-            NavigationLink(destination: WorkspacesPage()) {
-                HStack(spacing: 8) {
-                    Text("Workspace")
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                    Spacer()
-                    viewAllLabel
-                }
-            }
-            .buttonStyle(.plain)
 
             Menu {
                 ForEach(workspaces) { workspace in
@@ -216,95 +91,86 @@ struct SidebarView: View {
             } label: {
                 Image(systemName: "arrow.up.arrow.down")
                     .font(.system(size: 14, weight: .semibold))
-                    .frame(width: 34, height: 34)
+                    .frame(width: 38, height: 38)
             }
-            .buttonStyle(BlendedIconButtonStyle(size: 34))
+            .buttonStyle(BlendedIconButtonStyle(size: 38))
             .accessibilityLabel("Switch Workspace")
-
-            Button(action: createWorkspace) {
-                Image(systemName: "plus")
-                    .font(.system(size: 15, weight: .semibold))
-                    .frame(width: 34, height: 34)
-            }
-            .buttonStyle(BlendedIconButtonStyle(size: 34))
-            .accessibilityLabel("New Workspace")
-        }
-        .textCase(nil)
-        .padding(.vertical, 4)
-    }
-
-    private func sectionHeader<Destination: View>(_ title: String, destination: Destination) -> some View {
-        NavigationLink(destination: destination) {
-            HStack(spacing: 8) {
-                Text(title)
-                    .font(.headline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                Spacer()
-                viewAllLabel
-            }
-        }
-        .buttonStyle(.plain)
-        .textCase(nil)
-        .padding(.vertical, 4)
-    }
-
-    private var workspaceAIHeader: some View {
-        HStack(spacing: 8) {
-            NavigationLink(destination: AIChatsPage()) {
-                HStack(spacing: 8) {
-                    Text("Workspace AI")
-                        .font(.headline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                    Spacer()
-                    viewAllLabel
-                }
-            }
-            .buttonStyle(.plain)
 
             Button(action: createChat) {
                 Image(systemName: "plus")
                     .font(.system(size: 15, weight: .semibold))
-                    .frame(width: 34, height: 34)
+                    .frame(width: 38, height: 38)
             }
-            .buttonStyle(BlendedIconButtonStyle(size: 34))
+            .buttonStyle(BlendedIconButtonStyle(size: 38))
             .accessibilityLabel("New Chat")
+
+            if onClose != nil {
+                Button(action: closeSidebar) {
+                    Image(systemName: AppSymbol.sidebar)
+                        .font(.system(size: 18, weight: .semibold))
+                }
+                .buttonStyle(BlendedIconButtonStyle(size: 38))
+                .accessibilityLabel("Collapse Sidebar")
+            }
         }
-        .textCase(nil)
-        .padding(.vertical, 4)
+        .padding(.top, 4)
+        .padding(.bottom, 10)
+        .padding(.leading, 16)
+        .padding(.trailing, 12)
     }
 
-    private var viewAllLabel: some View {
-        HStack(spacing: 4) {
-            Text("View all")
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.bold))
-        }
-        .font(.subheadline.weight(.semibold))
-        .foregroundStyle(Color.accentColor)
-    }
+    // MARK: - Chats
 
-    private func sidebarNavRow(title: String, systemImage: String) -> some View {
-        HStack(spacing: 10) {
-            Image(systemName: systemImage)
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundStyle(Color.accentColor)
-                .frame(width: 24)
-            Text(title)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
-            Spacer()
-            Image(systemName: "chevron.right")
-                .font(.caption.weight(.bold))
-                .foregroundStyle(.secondary)
+    private func sidebarChatRow(_ chat: AIChat) -> some View {
+        Button {
+            onOpenAIChat?(chat)
+        } label: {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(chat.title)
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                Text(chat.preview)
+                    .font(.caption)
+                    .foregroundStyle(.primary.opacity(0.68))
+                    .lineLimit(2)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .frame(minHeight: 44)
-        .appListCard(tint: .secondary, opacity: 0.06)
+        .buttonStyle(.plain)
+        .appListCard(tint: .secondary, opacity: 0.05)
+        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
+            Button(role: .destructive) {
+                context.delete(chat)
+            } label: {
+                Label("Delete", systemImage: "trash")
+            }
+        }
+        .contextMenu {
+            Button("Delete", systemImage: "trash", role: .destructive) {
+                context.delete(chat)
+            }
+        }
     }
 
     // MARK: - Bottom nav
 
     private var bottomNav: some View {
         HStack(spacing: 0) {
+            NavigationLink(destination: HistoryPage()) {
+                Image(systemName: "doc.on.clipboard")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(BlendedIconButtonStyle())
+            Spacer()
+            NavigationLink(destination: WorkspacesPage()) {
+                Image(systemName: "square.grid.2x2")
+                    .font(.system(size: 18, weight: .semibold))
+                    .foregroundStyle(.secondary)
+            }
+            .buttonStyle(BlendedIconButtonStyle())
+            Spacer()
             NavigationLink(destination: TrashPage()) {
                 Image(systemName: "trash")
                     .font(.system(size: 18, weight: .semibold))
@@ -339,50 +205,11 @@ struct SidebarView: View {
     }
 
     private func closeSidebar() {
-        finishRenaming()
         onClose?()
     }
 
     private func activateWorkspace(_ workspace: Workspace) {
         WorkspaceActionService.activate(workspace, among: workspaces)
-    }
-
-    private func beginWorkspaceRename(_ workspace: Workspace) {
-        renameText = workspace.name
-        renamingWorkspace = workspace
-    }
-
-    private func commitWorkspaceRename() {
-        finishRenaming()
-    }
-
-    private func finishRenaming() {
-        WorkspaceActionService.rename(renamingWorkspace, to: renameText)
-        renamingWorkspace = nil
-        renameText = ""
-        commitChatRename()
-    }
-
-    private func beginChatRename(_ chat: AIChat) {
-        renamingChat = chat
-        renameChatText = chat.title
-        showRenameChatAlert = true
-    }
-
-    private func commitChatRename() {
-        let trimmed = renameChatText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty, let chat = renamingChat {
-            chat.title = trimmed
-            chat.updatedAt = Date()
-        }
-        renamingChat = nil
-        renameChatText = ""
-    }
-
-    private func createWorkspace() {
-        let ws = WorkspaceActionService.create(in: context, existing: workspaces)
-        activateWorkspace(ws)
-        beginWorkspaceRename(ws)
     }
 
     private func createChat() {

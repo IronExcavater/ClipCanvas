@@ -44,11 +44,6 @@ struct TrashPage: View {
 
     var body: some View {
         List {
-            if hasDeletedItems {
-                trashControls
-                    .appListItemRowInsets(vertical: 0)
-            }
-
             if deletedWorkspaces.isEmpty && deletedClips.isEmpty {
                 ContentUnavailableView(
                     "Recently Deleted is Empty",
@@ -107,18 +102,9 @@ struct TrashPage: View {
         .searchable(text: $search, isPresented: $searchPresented, placement: .navigationBarDrawer(displayMode: .always), prompt: "Search deleted")
         .animation(.easeInOut(duration: 0.18), value: searchPresented)
         .toolbar {
-            if hasDeletedItems && !isSelecting && !searchPresented {
+            if hasDeletedItems && !searchPresented {
                 ToolbarItem(placement: .primaryAction) {
-                    Menu {
-                        Button("Restore All", systemImage: "arrow.counterclockwise", action: restoreAll)
-                        Button("Delete All", systemImage: "trash", role: .destructive) {
-                            confirmingDeleteAll = true
-                        }
-                    } label: {
-                        AppCircleIconLabel(systemImage: AppSymbol.options)
-                    }
-                    .buttonStyle(BlendedIconButtonStyle())
-                    .accessibilityLabel("Recently deleted options")
+                    toolbarActions
                 }
             }
         }
@@ -139,31 +125,51 @@ struct TrashPage: View {
         }
     }
 
-    private var trashControls: some View {
-        AppListSelectionControl(
-            isSelecting: isSelecting,
-            selectedCount: selectedItemIDs.count,
-            selectTitle: "Select",
-            onToggle: { isSelecting ? endSelection() : beginSelection() }
-        ) {
-            HStack(spacing: 2) {
+    @ViewBuilder
+    private var toolbarActions: some View {
+        if isSelecting {
+            HStack(spacing: 8) {
+                Text("\(selectedItemIDs.count)")
+                    .font(.headline.weight(.semibold))
+                    .monospacedDigit()
+                    .frame(minWidth: 22)
+
                 Button(action: restoreSelected) {
-                    Image(systemName: "arrow.counterclockwise")
-                        .font(.system(size: 16, weight: .semibold))
-                        .frame(width: 40, height: 40)
+                    AppToolbarCircleLabel(systemImage: "arrow.counterclockwise", size: 36, symbolSize: 15)
                 }
-                .appSelectionIconButtonStyle()
+                .buttonStyle(.plain)
                 .disabled(selectedItemIDs.isEmpty)
 
                 Button(role: .destructive) {
                     confirmingDeleteSelected = true
                 } label: {
-                    Image(systemName: "trash")
-                        .font(.system(size: 16, weight: .semibold))
-                        .frame(width: 40, height: 40)
+                    AppToolbarCircleLabel(systemImage: "trash", size: 36, symbolSize: 15)
                 }
-                .appSelectionIconButtonStyle()
+                .buttonStyle(.plain)
                 .disabled(selectedItemIDs.isEmpty)
+
+                Button(action: endSelection) {
+                    AppToolbarCircleLabel(systemImage: "checkmark", size: 36, symbolSize: 15)
+                }
+                .buttonStyle(.plain)
+            }
+        } else {
+            HStack(spacing: 8) {
+                Button(action: beginSelection) {
+                    AppToolbarCircleLabel(systemImage: "checklist", size: 36, symbolSize: 15)
+                }
+                .buttonStyle(.plain)
+                .accessibilityLabel("Select")
+
+                Menu {
+                    Button("Restore All", systemImage: "arrow.counterclockwise", action: restoreAll)
+                    Button("Delete All", systemImage: "trash", role: .destructive) {
+                        confirmingDeleteAll = true
+                    }
+                } label: {
+                    AppToolbarCircleLabel(systemImage: AppSymbol.options, size: 36, symbolSize: 18)
+                }
+                .accessibilityLabel("Recently deleted options")
             }
         }
     }

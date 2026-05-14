@@ -16,7 +16,7 @@ struct WorkspaceRowView: View {
     var body: some View {
         AppListItemButton(tint: .secondary, opacity: workspace.isActive ? 0.12 : 0.07, action: onActivate) {
             rowContent
-                .frame(minHeight: 48)
+                .frame(minHeight: 42)
         }
         .contentShape(Rectangle())
         .listRowSeparator(.hidden)
@@ -38,7 +38,7 @@ struct WorkspaceRowView: View {
                     .foregroundStyle(isSelected ? Color.accentColor : .secondary)
             }
 
-            VStack(alignment: .leading, spacing: 3) {
+            VStack(alignment: .leading, spacing: 2) {
                 if isRenaming {
                     TextField("Workspace name", text: $editingName)
                         .font(.subheadline.weight(.semibold))

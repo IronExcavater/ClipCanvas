@@ -5,24 +5,12 @@ struct ClipDetailSheet: View {
     let clip: Clip
     @Environment(\.dismiss) private var dismiss
 
-    @State private var editedContent = ""
-    @FocusState private var contentFocused: Bool
-
     var body: some View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 14) {
                     ClipDetailSection("Info") {
                         ClipInfoPanel(clip: clip)
-                    }
-
-                    ClipDetailSection("Content") {
-                        contentEditor
-                            .padding(12)
-                            .frame(minHeight: 180)
-                            .background {
-                                ClipDetailContentBackground(tint: clip.primaryDisplayColor)
-                            }
                     }
 
                     ClipDetailSection("Actions") {
@@ -51,45 +39,13 @@ struct ClipDetailSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button {
+                    AppToolbarCircleButton(systemImage: "xmark", size: 36, symbolSize: 14) {
                         dismiss()
-                    } label: {
-                        AppCircleIconLabel(systemImage: "xmark", size: 36, symbolSize: 14)
                     }
-                    .buttonStyle(BlendedIconButtonStyle(size: 36))
-                    .accessibilityLabel("Cancel")
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button {
-                        commitEdit()
-                        dismiss()
-                    } label: {
-                        AppCircleIconLabel(systemImage: "checkmark", size: 36, symbolSize: 14)
-                    }
-                    .buttonStyle(BlendedIconButtonStyle(size: 36))
-                    .fontWeight(.semibold)
-                    .accessibilityLabel("Done")
+                    .accessibilityLabel("Close")
                 }
             }
-            .onAppear { editedContent = clip.content }
             .scrollDismissesKeyboard(.interactively)
-        }
-    }
-
-    private var contentEditor: some View {
-        TextEditor(text: $editedContent)
-            .font(.body)
-            .scrollContentBackground(.hidden)
-            .focused($contentFocused)
-    }
-
-    private func commitEdit() {
-        let trimmed = editedContent.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty, trimmed != clip.content {
-            clip.content = trimmed
-            clip.type = Clip.detect(content: trimmed, imageData: clip.imageData)
-            clip.sensitivity = ClipClassificationService.detectSensitivity(trimmed)
-            clip.updatedAt = Date()
         }
     }
 }
@@ -126,20 +82,6 @@ private struct ClipInfoPanel: View {
         .padding(12)
         .background(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
         .shadow(color: .black.opacity(0.06), radius: 8, y: 3)
-    }
-}
-
-private struct ClipDetailContentBackground: View {
-    let tint: Color
-
-    var body: some View {
-        ZStack {
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.adaptive(light: .white, dark: UIColor.secondarySystemBackground))
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(tint.opacity(0.20))
-        }
-        .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
     }
 }
 

@@ -46,9 +46,6 @@ struct WorkspacesPage: View {
                     ContentUnavailableView.search(text: search)
                         .appEmptyStateRow()
                 }
-            } else {
-                selectionControl
-                    .appListItemRowInsets(vertical: 0)
             }
 
             ForEach(filteredWorkspaces) { ws in
@@ -87,34 +84,43 @@ struct WorkspacesPage: View {
         .animation(.easeInOut(duration: 0.18), value: search.isEmpty)
         .animation(.easeInOut(duration: 0.18), value: searchPresented)
         .toolbar {
-            ToolbarItem(placement: .primaryAction) {
-                if !isSelecting {
-                    Button(action: createWorkspace) {
-                        AppCircleIconLabel(systemImage: "plus")
-                    }
-                    .buttonStyle(BlendedIconButtonStyle())
-                    .accessibilityLabel("New Workspace")
-                    .opacity(searchPresented ? 0 : 1)
-                    .disabled(searchPresented)
-                }
+            ToolbarItemGroup(placement: .primaryAction) {
+                toolbarActions
             }
         }
     }
 
-    private var selectionControl: some View {
-        AppListSelectionControl(
-            isSelecting: isSelecting,
-            selectedCount: selectedWorkspaceIDs.count,
-            selectTitle: "Select",
-            onToggle: { isSelecting ? endSelection() : beginSelection() }
-        ) {
+    @ViewBuilder
+    private var toolbarActions: some View {
+        if isSelecting {
+            Text("\(selectedWorkspaceIDs.count)")
+                .font(.headline.weight(.semibold))
+                .monospacedDigit()
+                .frame(minWidth: 22)
+
             Button(role: .destructive, action: deleteSelected) {
-                Image(systemName: "trash")
-                    .font(.system(size: 16, weight: .semibold))
-                    .frame(width: 40, height: 40)
+                AppToolbarCircleLabel(systemImage: "trash", size: 36, symbolSize: 15)
             }
-            .appSelectionIconButtonStyle()
+            .buttonStyle(.plain)
             .disabled(selectedWorkspaceIDs.isEmpty)
+
+            Button(action: endSelection) {
+                AppToolbarCircleLabel(systemImage: "checkmark", size: 36, symbolSize: 15)
+            }
+            .buttonStyle(.plain)
+        } else {
+            Button(action: beginSelection) {
+                AppToolbarCircleLabel(systemImage: "checklist", size: 36, symbolSize: 15)
+            }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Select")
+            .opacity(searchPresented ? 0 : 1)
+            .disabled(searchPresented)
+
+            AppToolbarCircleButton(systemImage: "plus", action: createWorkspace)
+                .accessibilityLabel("New Workspace")
+                .opacity(searchPresented ? 0 : 1)
+                .disabled(searchPresented)
         }
     }
 

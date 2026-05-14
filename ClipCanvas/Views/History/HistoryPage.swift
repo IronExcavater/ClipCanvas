@@ -127,26 +127,26 @@ struct HistoryPage: View {
             Button {
                 tagEditSelection = ClipTagEditSelection(clips: selectedClips)
             } label: {
-                AppCircleIconLabel(systemImage: "tag", size: 36, symbolSize: 15)
+                AppToolbarCircleLabel(systemImage: "tag", size: 36, symbolSize: 15)
             }
-            .buttonStyle(BlendedIconButtonStyle(size: 36))
+            .buttonStyle(.plain)
             .disabled(selectedClipIDs.isEmpty)
 
             Button(role: .destructive, action: deleteSelected) {
-                AppCircleIconLabel(systemImage: "trash", size: 36, symbolSize: 15)
+                AppToolbarCircleLabel(systemImage: "trash", size: 36, symbolSize: 15)
             }
-            .buttonStyle(BlendedIconButtonStyle(size: 36))
+            .buttonStyle(.plain)
             .disabled(selectedClipIDs.isEmpty)
 
             Button(action: endSelection) {
-                AppCircleIconLabel(systemImage: "checkmark", size: 36, symbolSize: 15)
+                AppToolbarCircleLabel(systemImage: "checkmark", size: 36, symbolSize: 15)
             }
-            .buttonStyle(BlendedIconButtonStyle(size: 36))
+            .buttonStyle(.plain)
         } else {
             Button(action: beginSelection) {
-                AppCircleIconLabel(systemImage: "checklist", size: 36, symbolSize: 15)
+                AppToolbarCircleLabel(systemImage: "checklist", size: 36, symbolSize: 15)
             }
-            .buttonStyle(BlendedIconButtonStyle(size: 36))
+            .buttonStyle(.plain)
             .accessibilityLabel("Select")
 
             Menu {
@@ -155,9 +155,8 @@ struct HistoryPage: View {
                 }
                 .disabled(clips.isEmpty)
             } label: {
-                AppCircleIconLabel(systemImage: AppSymbol.options, size: 36, symbolSize: 18)
+                AppToolbarCircleLabel(systemImage: AppSymbol.options, size: 36, symbolSize: 18)
             }
-            .buttonStyle(BlendedIconButtonStyle(size: 36))
             .accessibilityLabel("History options")
         }
     }
