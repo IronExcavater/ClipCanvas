@@ -1,3 +1,5 @@
+import CoreGraphics
+
 nonisolated enum CanvasMode: Equatable, CaseIterable {
     case pan    // drag pans, tap selects
     case edit   // tap opens inline editing
@@ -51,9 +53,11 @@ nonisolated struct CanvasToolbarConfiguration: Equatable {
         switch mode {
         case .draw:
             return CanvasToolbarConfiguration(items: [
+                .mode(.pan), .mode(.edit), .mode(.draw),
+                .divider,
                 .drawPen, .drawHighlighter, .drawEraser, .drawLasso,
                 .divider,
-                .drawConvert, .drawSave, .drawClear
+                .drawConvert, .drawClear
             ])
 
         case .edit:
@@ -97,5 +101,9 @@ nonisolated struct CanvasToolbarConfiguration: Equatable {
                 .mode(.pan), .mode(.edit), .mode(.draw)
             ])
         }
+    }
+
+    var preferredWidth: CGFloat {
+        CGFloat(items.count * 52 + max(items.count - 1, 0) * 2 + 24)
     }
 }

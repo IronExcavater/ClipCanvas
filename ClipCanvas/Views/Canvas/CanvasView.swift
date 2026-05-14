@@ -108,7 +108,9 @@ struct CanvasView: View {
             .onChange(of: zoomCommand) { _, command in
                 guard let command else { return }
                 handleZoom(command, in: geo)
-                zoomCommand = nil
+                DispatchQueue.main.async {
+                    zoomCommand = nil
+                }
             }
             .onChange(of: canvasScale) { _, newValue in
                 visibleScale = newValue
@@ -167,6 +169,7 @@ struct CanvasView: View {
             editingText: clip.content,
             onCommitEditing: { commitClipText($0, clip: clip, object: object) },
             onExitEditing: { editingObjectID = nil },
+            onEditorSizeChange: { resizeForEditing(object, contentSize: $0, in: geo) },
             onResize: { updateResizePreview(for: object, translation: $0) },
             onResizeEnded: { commitResize(for: object, in: geo) },
             onToggleExpandedSize: { toggleExpandedSize(for: object, in: geo) }
@@ -199,6 +202,7 @@ struct CanvasView: View {
             editingText: object.text,
             onCommitEditing: { commitObjectText($0, object: object) },
             onExitEditing: { editingObjectID = nil },
+            onEditorSizeChange: { resizeForEditing(object, contentSize: $0, in: geo) },
             onResize: { updateResizePreview(for: object, translation: $0) },
             onResizeEnded: { commitResize(for: object, in: geo) },
             onToggleExpandedSize: { toggleExpandedSize(for: object, in: geo) }
@@ -374,7 +378,7 @@ struct CanvasView: View {
     }
 
     private func commitResize(for object: CanvasObject, in geo: GeometryProxy) {
-        let size = CanvasPlacementSizing.softSnapSize(displaySize(for: object))
+        let size = CanvasPlacementSizing.snappedSize(displaySize(for: object), for: object.clip)
         object.width = size.width
         object.height = size.height
         clampObject(object, in: geo)
@@ -419,7 +423,28 @@ struct CanvasView: View {
         guard canEditText(object) else { return }
         selectedObjectIDs = [object.id]
         editingObjectID = object.id
+        expandForEditing(object)
         bringToFront(object.id)
+    }
+
+    private func expandForEditing(_ object: CanvasObject) {
+        let width = max(object.width, min(CanvasPlacementSizing.defaultSize.width * 1.35, 420))
+        let height = max(object.height, CanvasPlacementSizing.defaultSize.height * 1.35)
+        guard width != object.width || height != object.height else { return }
+        object.width = width
+        object.height = height
+        object.markUpdated()
+    }
+
+    private func resizeForEditing(_ object: CanvasObject, contentSize: CGSize, in geo: GeometryProxy) {
+        guard editingObjectID == object.id, activeResize?.id != object.id else { return }
+        let targetHeight = CanvasPlacementSizing.softSnapSize(CGSize(
+            width: object.width,
+            height: max(object.height, contentSize.height + 54)
+        )).height
+        guard targetHeight > object.height + 6 else { return }
+        object.height = targetHeight
+        clampObject(object, in: geo)
     }
 
     private func canEditText(_ object: CanvasObject) -> Bool {
@@ -701,7 +726,13 @@ struct CanvasView: View {
             width: geo.size.width / canvasScale,
             height: geo.size.height / canvasScale
         ).insetBy(dx: -80, dy: -80)
-        visibleObjectIDs = Set(canvasObjects.filter { viewport.intersects($0.frame) }.map(\.id))
+        let ids = Set(canvasObjects.filter { viewport.intersects($0.frame) }.map(\.id))
+        guard ids != visibleObjectIDs else { return }
+        DispatchQueue.main.async {
+            if visibleObjectIDs != ids {
+                visibleObjectIDs = ids
+            }
+        }
     }
 }
 

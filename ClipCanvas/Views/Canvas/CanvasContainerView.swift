@@ -263,8 +263,8 @@ struct CanvasContainerView: View {
     // MARK: - Drawing
 
     private func saveDrawing() {
-        guard !activeDrawing.strokes.isEmpty,
-              let data = try? activeDrawing.dataRepresentation() else { return }
+        guard !activeDrawing.strokes.isEmpty else { return }
+        let data = activeDrawing.dataRepresentation()
         let bounds = activeDrawing.bounds
         let size = CanvasPlacementSizing.softSnapSize(CGSize(
             width: max(bounds.width, CanvasPlacementSizing.defaultSize.width),

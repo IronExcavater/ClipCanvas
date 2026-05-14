@@ -5,7 +5,9 @@ enum CanvasPlacementSizing {
     static let defaultSize = CGSize(width: 220, height: 150)
     static let minimumSize = CGSize(width: 220, height: 150)
     static let maximumSize = CGSize(width: 440, height: 540)
-    static let snapGrid: CGFloat = 16
+    static let contentChrome = CGSize(width: 28, height: 34)
+    static let estimatedCharacterWidth: CGFloat = 8
+    static let estimatedLineHeight: CGFloat = 20
 
     static func toggledSize(for placement: CanvasPlacement, availableScreenWidth: CGFloat? = nil) -> CGSize {
         if isExpanded(placement) { return minimumSize }
@@ -41,13 +43,40 @@ enum CanvasPlacementSizing {
     }
 
     static func fluidSize(dragging proposed: CGSize) -> CGSize {
-        softSnapSize(proposed)
+        boundedSize(proposed)
     }
 
     static func softSnapSize(_ proposed: CGSize) -> CGSize {
+        snappedSize(proposed, for: nil)
+    }
+
+    static func snappedSize(_ proposed: CGSize, for clip: Clip?) -> CGSize {
+        if clip?.type == .image {
+            return boundedSize(proposed, step: 16, chrome: .zero)
+        }
+        return boundedSize(
+            proposed,
+            widthStep: estimatedCharacterWidth,
+            heightStep: estimatedLineHeight,
+            chrome: contentChrome
+        )
+    }
+
+    private static func boundedSize(_ proposed: CGSize, step: CGFloat = 16, chrome: CGSize = .zero) -> CGSize {
+        boundedSize(proposed, widthStep: step, heightStep: step, chrome: chrome)
+    }
+
+    private static func boundedSize(
+        _ proposed: CGSize,
+        widthStep: CGFloat,
+        heightStep: CGFloat,
+        chrome: CGSize
+    ) -> CGSize {
         CGSize(
-            width: softSnap(proposed.width).clamped(to: minimumSize.width...maximumSize.width),
-            height: softSnap(proposed.height).clamped(to: minimumSize.height...maximumSize.height)
+            width: snapped(proposed.width, step: widthStep, chrome: chrome.width)
+                .clamped(to: minimumSize.width...maximumSize.width),
+            height: snapped(proposed.height, step: heightStep, chrome: chrome.height)
+                .clamped(to: minimumSize.height...maximumSize.height)
         )
     }
 
@@ -55,8 +84,9 @@ enum CanvasPlacementSizing {
         (width / 18.0).clamped(to: 11...22)
     }
 
-    private static func softSnap(_ value: CGFloat) -> CGFloat {
-        (value / snapGrid).rounded() * snapGrid
+    private static func snapped(_ value: CGFloat, step: CGFloat, chrome: CGFloat) -> CGFloat {
+        let content = max(value - chrome, step)
+        return chrome + (content / step).rounded() * step
     }
 
     private static func isExpanded(_ placement: CanvasPlacement) -> Bool {

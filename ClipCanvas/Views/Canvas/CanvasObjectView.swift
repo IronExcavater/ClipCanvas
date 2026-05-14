@@ -10,6 +10,7 @@ struct CanvasObjectView: View {
     var editingText = ""
     let onCommitEditing: (String) -> Void
     var onExitEditing: () -> Void = {}
+    var onEditorSizeChange: (CGSize) -> Void = { _ in }
     let onResize: (CGSize) -> Void
     let onResizeEnded: () -> Void
     let onToggleExpandedSize: () -> Void
@@ -74,7 +75,8 @@ struct CanvasObjectView: View {
                 initialText: editingText,
                 fontSize: noteFontSize,
                 onCommit: onCommitEditing,
-                onExitEditing: onExitEditing
+                onExitEditing: onExitEditing,
+                onSizeChange: onEditorSizeChange
             )
         } else {
             switch object.kind {

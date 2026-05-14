@@ -25,10 +25,11 @@ import Testing
         let configuration = CanvasToolbarConfiguration.make(selectedCount: 1, mode: .pan)
 
         #expect(configuration.items == [
-            .copy,
+            .askAI,
             .divider,
-            .details,
-            .arrangeSelection
+            .arrangeSelection, .details,
+            .divider,
+            .delete
         ])
     }
 
@@ -38,8 +39,21 @@ import Testing
         #expect(configuration.items == [
             .editContent,
             .divider,
-            .manageTags,
+            .color, .manageTags,
+            .divider,
             .delete
         ])
+    }
+
+    @Test func drawToolbarKeepsModeSwitcherVisible() {
+        let configuration = CanvasToolbarConfiguration.make(selectedCount: 0, mode: .draw)
+
+        #expect(configuration.items.starts(with: [
+            .mode(.pan),
+            .mode(.edit),
+            .mode(.draw),
+        ]))
+        #expect(configuration.items.contains(.drawPen))
+        #expect(configuration.items.contains(.drawClear))
     }
 }

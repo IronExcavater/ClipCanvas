@@ -29,18 +29,20 @@ struct CanvasToolbar: View {
     private let iconSize: CGFloat = 19
 
     var body: some View {
-        HStack(spacing: 0) {
-            ForEach(Array(configuration.items.enumerated()), id: \.offset) { _, item in
-                toolbarItem(item)
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 2) {
+                ForEach(Array(configuration.items.enumerated()), id: \.offset) { _, item in
+                    toolbarItem(item)
+                }
             }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 7)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 7)
         .background { toolbarBackground }
         .shadow(color: .black.opacity(0.18), radius: 20, y: 8)
         .padding(.horizontal, 20)
         .padding(.bottom, 24)
-        .frame(maxWidth: selectedCount > 0 ? 420 : 300)
+        .frame(maxWidth: min(configuration.preferredWidth, 560))
         .frame(maxWidth: .infinity)
         .ignoresSafeArea(.container, edges: .bottom)
         .ignoresSafeArea(.keyboard, edges: .bottom)
@@ -170,15 +172,15 @@ struct CanvasUndoControls: View {
     let onRedo: () -> Void
 
     var body: some View {
-        HStack(spacing: 0) {
+        VStack(spacing: 0) {
             undoButton("arrow.uturn.backward", action: onUndo)
             undoButton("arrow.uturn.forward", action: onRedo)
         }
         .font(.system(size: 16, weight: .semibold))
         .foregroundStyle(.primary)
         .buttonStyle(.plain)
-        .frame(width: 88)
-        .padding(.vertical, 5)
+        .frame(width: 44)
+        .padding(.vertical, 6)
         .background { undoBackground }
         .shadow(color: .black.opacity(0.14), radius: 12, y: 5)
         .ignoresSafeArea(.container, edges: .bottom)

@@ -19,7 +19,9 @@ struct CanvasDrawingLayer: UIViewRepresentable {
     func updateUIView(_ uiView: PKCanvasView, context: Context) {
         uiView.tool = activeTool
         if uiView.drawing != drawing {
+            context.coordinator.isApplyingSwiftUIUpdate = true
             uiView.drawing = drawing
+            context.coordinator.isApplyingSwiftUIUpdate = false
         }
     }
 
@@ -29,13 +31,18 @@ struct CanvasDrawingLayer: UIViewRepresentable {
 
     final class Coordinator: NSObject, PKCanvasViewDelegate {
         @Binding var drawing: PKDrawing
+        var isApplyingSwiftUIUpdate = false
 
         init(drawing: Binding<PKDrawing>) {
             _drawing = drawing
         }
 
         func canvasViewDrawingDidChange(_ canvasView: PKCanvasView) {
-            drawing = canvasView.drawing
+            guard !isApplyingSwiftUIUpdate else { return }
+            let nextDrawing = canvasView.drawing
+            DispatchQueue.main.async { [weak self] in
+                self?.drawing = nextDrawing
+            }
         }
     }
 }

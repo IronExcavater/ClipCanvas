@@ -11,6 +11,7 @@ struct ClipCard: View {
     var editingText = ""
     let onCommitEditing: (String) -> Void
     var onExitEditing: () -> Void = {}
+    var onEditorSizeChange: (CGSize) -> Void = { _ in }
     let onResize: (CGSize) -> Void
     let onResizeEnded: () -> Void
     let onToggleExpandedSize: () -> Void
@@ -52,7 +53,12 @@ struct ClipCard: View {
             if !showsContent {
                 Color.clear
             } else if isEditing, clip.type != .image {
-                NoteTextEditor(initialText: editingText, onCommit: onCommitEditing, onExitEditing: onExitEditing)
+                NoteTextEditor(
+                    initialText: editingText,
+                    onCommit: onCommitEditing,
+                    onExitEditing: onExitEditing,
+                    onSizeChange: onEditorSizeChange
+                )
             } else if clip.type == .image, let data = clip.imageData, let uiImage = UIImage(data: data) {
                 Image(uiImage: uiImage)
                     .resizable()
@@ -121,9 +127,15 @@ struct NoteTextEditor: UIViewRepresentable {
     var fontSize: CGFloat = 15
     let onCommit: (String) -> Void
     var onExitEditing: () -> Void = {}
+    var onSizeChange: (CGSize) -> Void = { _ in }
 
     func makeCoordinator() -> Coordinator {
-        Coordinator(text: initialText, onCommit: onCommit, onExitEditing: onExitEditing)
+        Coordinator(
+            text: initialText,
+            onCommit: onCommit,
+            onExitEditing: onExitEditing,
+            onSizeChange: onSizeChange
+        )
     }
 
     func makeUIView(context: Context) -> UITextView {
@@ -138,29 +150,43 @@ struct NoteTextEditor: UIViewRepresentable {
         tv.textContainerInset = .zero
         tv.textContainer.lineFragmentPadding = 0
         DispatchQueue.main.async { tv.becomeFirstResponder() }
+        let coordinator = context.coordinator
+        DispatchQueue.main.async { coordinator.reportSize(tv) }
         return tv
     }
 
     func updateUIView(_ uiView: UITextView, context: Context) {
         uiView.font = .systemFont(ofSize: fontSize)
+        let coordinator = context.coordinator
+        DispatchQueue.main.async {
+            coordinator.reportSize(uiView)
+        }
     }
 
     final class Coordinator: NSObject, UITextViewDelegate {
         var text: String
         let onCommit: (String) -> Void
         let onExitEditing: () -> Void
+        let onSizeChange: (CGSize) -> Void
         weak var textView: UITextView?
         private var hasExited = false
 
-        init(text: String, onCommit: @escaping (String) -> Void, onExitEditing: @escaping () -> Void) {
+        init(
+            text: String,
+            onCommit: @escaping (String) -> Void,
+            onExitEditing: @escaping () -> Void,
+            onSizeChange: @escaping (CGSize) -> Void
+        ) {
             self.text = text
             self.onCommit = onCommit
             self.onExitEditing = onExitEditing
+            self.onSizeChange = onSizeChange
         }
 
         func textViewDidChange(_ textView: UITextView) {
             text = textView.text ?? ""
             onCommit(text)
+            reportSize(textView)
         }
 
         func textViewDidEndEditing(_ textView: UITextView) {
@@ -169,6 +195,11 @@ struct NoteTextEditor: UIViewRepresentable {
             guard !hasExited else { return }
             hasExited = true
             onExitEditing()
+        }
+
+        func reportSize(_ textView: UITextView) {
+            let size = textView.sizeThatFits(CGSize(width: textView.bounds.width, height: .greatestFiniteMagnitude))
+            onSizeChange(size)
         }
     }
 }
