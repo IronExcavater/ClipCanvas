@@ -56,6 +56,7 @@ import Testing
         #expect(configuration.items == [
             .closeMode,
             .editContent,
+            .transform,
             .color, .manageTags,
             .delete
         ])

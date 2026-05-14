@@ -158,6 +158,57 @@ import Testing
         #expect(result.changedObjectIDs.isEmpty)
     }
 
+    @Test func clipActionsUpdateContentTagsAndTransforms() throws {
+        let (context, workspace) = try makeWorkspace()
+        let clip = Clip(content: "  Clean   this\n\ntext  ", origin: .clipboard)
+        let tag = ClipTag(name: "Project", colorHex: "#FF9800", isBuiltIn: false, sortIndex: 20)
+        context.insert(clip)
+        context.insert(tag)
+
+        let update = try request(
+            .clipUpdateContent,
+            workspace: workspace,
+            arguments: WorkspaceClipUpdateContentArguments(clipID: clip.id, content: "Updated text")
+        )
+        #expect(WorkspaceActionRegistry.perform(update, in: context).success)
+        #expect(clip.content == "Updated text")
+
+        let addTags = try request(
+            .clipAddTags,
+            workspace: workspace,
+            arguments: WorkspaceClipTagsArguments(clipIDs: [clip.id], tagIDs: [tag.id], tagNames: ["AI"])
+        )
+        #expect(WorkspaceActionRegistry.perform(addTags, in: context).success)
+        #expect(clip.tags.contains { $0.name == "Project" })
+        #expect(clip.tags.contains { $0.name == "AI" })
+
+        let transform = try request(
+            .clipApplyTransform,
+            workspace: workspace,
+            arguments: WorkspaceClipApplyTransformArguments(clipIDs: [clip.id], skillID: "clip.cleanUp")
+        )
+        clip.content = "  Clean   this\n\ntext  "
+        #expect(WorkspaceActionRegistry.perform(transform, in: context).success)
+        #expect(clip.content == "Clean this\ntext")
+    }
+
+    @Test func automationCannotTransformPrivateClipContent() throws {
+        let (context, workspace) = try makeWorkspace()
+        let clip = Clip(content: "password: hunter2", origin: .clipboard, sensitivity: .privateContent)
+        context.insert(clip)
+        let transform = try request(
+            .clipApplyTransform,
+            workspace: workspace,
+            arguments: WorkspaceClipApplyTransformArguments(clipIDs: [clip.id], skillID: "clip.cleanUp"),
+            source: .ai
+        )
+
+        let result = WorkspaceActionRegistry.perform(transform, in: context)
+
+        #expect(!result.success)
+        #expect(clip.content == "password: hunter2")
+    }
+
     @Test func aiDeleteRequiresConfirmationBeforeMutating() throws {
         let (context, workspace) = try makeWorkspace()
         let object = makeObject(in: workspace, context: context)

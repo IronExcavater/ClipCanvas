@@ -115,6 +115,28 @@ nonisolated struct WorkspaceArrangeGridArguments: Codable, Equatable {
     var verticalSpacing: Double
 }
 
+nonisolated struct WorkspaceClipApplyTransformArguments: Codable, Equatable {
+    var clipIDs: [UUID]
+    var skillID: String
+}
+
+nonisolated struct WorkspaceClipUpdateContentArguments: Codable, Equatable {
+    var clipID: UUID
+    var content: String
+}
+
+nonisolated struct WorkspaceClipTagsArguments: Codable, Equatable {
+    var clipIDs: [UUID]
+    var tagIDs: [UUID]
+    var tagNames: [String]
+}
+
+nonisolated struct WorkspaceChatAttachObjectsArguments: Codable, Equatable {
+    var chatID: UUID
+    var objectIDs: [UUID]
+    var messageContent: String?
+}
+
 enum WorkspaceActionRegistry {
     static func perform(
         _ request: WorkspaceActionRequest,
@@ -156,8 +178,16 @@ enum WorkspaceActionRegistry {
                 return try arrangeGrid(request, workspace: workspace)
             case .canvasFitViewToContent:
                 return .success("Fit view to content")
-            case .clipApplyTransform, .clipUpdateContent, .clipAddTags, .clipRemoveTags, .chatAttachObjects:
-                return .failure("Action handler not implemented yet")
+            case .clipApplyTransform:
+                return try applyClipTransform(request, context: context)
+            case .clipUpdateContent:
+                return try updateClipContent(request, context: context)
+            case .clipAddTags:
+                return try addClipTags(request, context: context)
+            case .clipRemoveTags:
+                return try removeClipTags(request, context: context)
+            case .chatAttachObjects:
+                return try attachObjectsToChat(request, workspace: workspace, context: context)
             case .workspaceCreate, .workspaceDelete, .workspaceRename, .workspaceActivate:
                 return .failure("Workspace management is not available through shared workspace actions.")
             }
@@ -341,6 +371,95 @@ private extension WorkspaceActionRegistry {
         return .success("Arranged objects", changedObjectIDs: changedIDs)
     }
 
+    static func applyClipTransform(_ request: WorkspaceActionRequest, context: ModelContext) throws -> WorkspaceActionResult {
+        let arguments = try decode(WorkspaceClipApplyTransformArguments.self, from: request)
+        let selected = clips(ids: arguments.clipIDs, in: context)
+        guard !selected.isEmpty else { return .failure("Clip not found") }
+        guard canReadPrivateContent(selected, source: request.source) else {
+            return .failure("Private clips cannot be transformed by automation.")
+        }
+        guard selected.allSatisfy({ TextTransformFallbacks.text(for: arguments.skillID, input: $0.content) != nil }) else {
+            return .failure("Transform not found")
+        }
+
+        let now = Date()
+        for clip in selected {
+            guard let transformed = TextTransformFallbacks.text(for: arguments.skillID, input: clip.content) else { continue }
+            update(clip, content: transformed, at: now)
+        }
+        return .success("Transformed clips", changedClipIDs: selected.map(\.id))
+    }
+
+    static func updateClipContent(_ request: WorkspaceActionRequest, context: ModelContext) throws -> WorkspaceActionResult {
+        let arguments = try decode(WorkspaceClipUpdateContentArguments.self, from: request)
+        guard let clip = fetchClip(id: arguments.clipID, in: context), clip.deletedAt == nil else {
+            return .failure("Clip not found")
+        }
+        guard canReadPrivateContent([clip], source: request.source) else {
+            return .failure("Private clips cannot be updated by automation.")
+        }
+        update(clip, content: arguments.content)
+        return .success("Updated clip", changedClipIDs: [clip.id])
+    }
+
+    static func addClipTags(_ request: WorkspaceActionRequest, context: ModelContext) throws -> WorkspaceActionResult {
+        let arguments = try decode(WorkspaceClipTagsArguments.self, from: request)
+        let selected = clips(ids: arguments.clipIDs, in: context)
+        guard !selected.isEmpty else { return .failure("Clip not found") }
+        let tags = resolveTags(ids: arguments.tagIDs, names: arguments.tagNames, in: context)
+        guard !tags.isEmpty else { return .failure("Tag not found") }
+
+        for clip in selected {
+            for tag in tags where !clip.tags.contains(where: { $0.id == tag.id }) {
+                clip.tags.append(tag)
+            }
+        }
+        return .success("Added tags", changedClipIDs: selected.map(\.id))
+    }
+
+    static func removeClipTags(_ request: WorkspaceActionRequest, context: ModelContext) throws -> WorkspaceActionResult {
+        let arguments = try decode(WorkspaceClipTagsArguments.self, from: request)
+        let selected = clips(ids: arguments.clipIDs, in: context)
+        guard !selected.isEmpty else { return .failure("Clip not found") }
+        let tagIDs = Set(arguments.tagIDs)
+        let tagNames = Set(arguments.tagNames.map { normalizedTagName($0) })
+
+        for clip in selected {
+            clip.tags.removeAll { tag in
+                tagIDs.contains(tag.id) || tagNames.contains(normalizedTagName(tag.name))
+            }
+        }
+        return .success("Removed tags", changedClipIDs: selected.map(\.id))
+    }
+
+    static func attachObjectsToChat(
+        _ request: WorkspaceActionRequest,
+        workspace: Workspace,
+        context: ModelContext
+    ) throws -> WorkspaceActionResult {
+        let arguments = try decode(WorkspaceChatAttachObjectsArguments.self, from: request)
+        guard let chat = fetchChat(id: arguments.chatID, in: context) else {
+            return .failure("Chat not found")
+        }
+        let selected = objects(ids: arguments.objectIDs, in: workspace)
+        guard !selected.isEmpty else { return .failure("Object not found") }
+        _ = AIChatService.attachObjects(
+            selected,
+            to: chat,
+            in: context,
+            messageContent: arguments.messageContent
+        )
+        return .success("Attached objects", changedObjectIDs: selected.map(\.id))
+    }
+
+    static func update(_ clip: Clip, content: String, at date: Date = Date()) {
+        let classification = ClipClassificationService.classifySensitivity(content)
+        clip.content = content
+        clip.type = Clip.detect(content: content, imageData: clip.imageData)
+        clip.updateSensitivity(classification.sensitivity, reason: classification.reason, at: date)
+        clip.updatedAt = date
+    }
+
     static func decode<T: Decodable>(_ type: T.Type, from request: WorkspaceActionRequest) throws -> T {
         try JSONDecoder().decode(type, from: request.argumentsData)
     }
@@ -355,6 +474,17 @@ private extension WorkspaceActionRegistry {
         return try? context.fetch(descriptor).first
     }
 
+    static func fetchChat(id: UUID, in context: ModelContext) -> AIChat? {
+        let descriptor = FetchDescriptor<AIChat>(predicate: #Predicate { $0.id == id })
+        return try? context.fetch(descriptor).first
+    }
+
+    static func clips(ids: [UUID], in context: ModelContext) -> [Clip] {
+        let all = (try? context.fetch(FetchDescriptor<Clip>(predicate: #Predicate { $0.deletedAt == nil }))) ?? []
+        let ids = Set(ids)
+        return all.filter { ids.contains($0.id) }
+    }
+
     static func object(id: UUID, in workspace: Workspace) -> CanvasObject? {
         workspace.canvasObjects.first { $0.id == id && $0.deletedAt == nil }
     }
@@ -365,5 +495,41 @@ private extension WorkspaceActionRegistry {
 
     static func nextZIndex(in workspace: Workspace) -> Double {
         (workspace.canvasObjects.map(\.zIndex).max() ?? 0) + 1
+    }
+
+    static func canReadPrivateContent(_ clips: [Clip], source: WorkspaceActionSource) -> Bool {
+        source == .user || !clips.contains(where: \.isPrivateContent)
+    }
+
+    static func resolveTags(ids: [UUID], names: [String], in context: ModelContext) -> [ClipTag] {
+        let existing = (try? context.fetch(FetchDescriptor<ClipTag>())) ?? []
+        let tagIDs = Set(ids)
+        var resolved = existing.filter { tagIDs.contains($0.id) }
+        let normalizedExisting = existing.reduce(into: [String: ClipTag]()) { result, tag in
+            result[normalizedTagName(tag.name)] = tag
+        }
+        var nextSortIndex = (existing.map(\.sortIndex).max() ?? 10) + 1
+
+        for name in names {
+            let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty else { continue }
+            let normalized = normalizedTagName(trimmed)
+            if let tag = normalizedExisting[normalized] {
+                if !resolved.contains(where: { $0.id == tag.id }) {
+                    resolved.append(tag)
+                }
+            } else {
+                let tag = ClipTag(name: trimmed, colorHex: "#FF9800", isBuiltIn: false, sortIndex: nextSortIndex)
+                nextSortIndex += 1
+                context.insert(tag)
+                resolved.append(tag)
+            }
+        }
+
+        return resolved
+    }
+
+    static func normalizedTagName(_ name: String) -> String {
+        name.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
     }
 }

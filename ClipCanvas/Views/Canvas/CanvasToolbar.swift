@@ -7,6 +7,7 @@ struct CanvasToolbar: View {
     let onPaste: () -> Void
     let onCreateNote: () -> Void
     let onAskAI: () -> Void
+    let onTransform: (String) -> Void
     let onDetails: () -> Void
     let onEditContent: () -> Void
     let onManageTags: () -> Void
@@ -62,6 +63,8 @@ struct CanvasToolbar: View {
             toolButton("square.and.pencil", action: onCreateNote)
         case .askAI:
             toolButton("sparkles", action: onAskAI)
+        case .transform:
+            transformMenu()
         case .details:
             toolButton("info.circle", action: onDetails)
                 .disabled(selectedCount != 1)
@@ -135,6 +138,27 @@ struct CanvasToolbar: View {
             .contentShape(Circle())
         }
         .buttonStyle(.plain)
+    }
+
+    private func transformMenu() -> some View {
+        Menu {
+            ForEach(TextTransformFallbacks.manualEditingOptions) { option in
+                Button(option.title, systemImage: option.systemImage) {
+                    onTransform(option.id)
+                }
+            }
+        } label: {
+            ZStack {
+                Color.clear
+                Image(systemName: "wand.and.sparkles")
+                    .font(.system(size: iconSize, weight: .medium))
+                    .foregroundStyle(.primary)
+            }
+            .frame(width: buttonSize, height: buttonSize)
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Transform")
     }
 
     private func drawToolButton(_ tool: CanvasDrawTool) -> some View {

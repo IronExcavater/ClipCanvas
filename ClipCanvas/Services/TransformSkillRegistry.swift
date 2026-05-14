@@ -94,70 +94,46 @@ private extension TransformSkillRegistry {
         if let text = try await provider.transform(skillID: id, input: input) {
             return TransformSkillResult(text: text)
         }
-        return TransformSkillResult(text: collapseWhitespace(input.text))
+        return TransformSkillResult(text: TextTransformFallbacks.text(for: id, input: input.text))
     }
 
     static func distill(id: String, input: TransformSkillInput, provider: FoundationTransformProvider) async throws -> TransformSkillResult {
         if let text = try await provider.transform(skillID: id, input: input) {
             return TransformSkillResult(text: text)
         }
-        let cleaned = collapseWhitespace(input.text)
-        let sentenceEnd = cleaned.firstIndex(where: { ".!?".contains($0) })
-        if let sentenceEnd {
-            return TransformSkillResult(text: String(cleaned[...sentenceEnd]))
-        }
-        return TransformSkillResult(text: String(cleaned.prefix(180)))
+        return TransformSkillResult(text: TextTransformFallbacks.text(for: id, input: input.text))
     }
 
     static func actionItems(id: String, input: TransformSkillInput, provider: FoundationTransformProvider) async throws -> TransformSkillResult {
         if let text = try await provider.transform(skillID: id, input: input) {
             return TransformSkillResult(text: text)
         }
-        let clauses = input.text
-            .components(separatedBy: CharacterSet(charactersIn: ".\n"))
-            .map { collapseWhitespace($0) }
-            .filter { !$0.isEmpty }
-        let items = clauses.prefix(5).map { "- \($0)" }.joined(separator: "\n")
-        return TransformSkillResult(text: items)
+        return TransformSkillResult(text: TextTransformFallbacks.text(for: id, input: input.text))
     }
 
     static func rewrite(id: String, input: TransformSkillInput, provider: FoundationTransformProvider) async throws -> TransformSkillResult {
         if let text = try await provider.transform(skillID: id, input: input) {
             return TransformSkillResult(text: text)
         }
-        return TransformSkillResult(text: collapseWhitespace(input.text))
+        return TransformSkillResult(text: TextTransformFallbacks.text(for: id, input: input.text))
     }
 
     static func title(id: String, input: TransformSkillInput, provider: FoundationTransformProvider) async throws -> TransformSkillResult {
         if let text = try await provider.transform(skillID: id, input: input) {
             return TransformSkillResult(text: text)
         }
-        let words = collapseWhitespace(input.text)
-            .components(separatedBy: .whitespaces)
-            .filter { !$0.isEmpty }
-        let stopWords = Set(["for", "to", "and", "or", "of", "the", "a", "an"])
-        var titleWords = Array(words.prefix(5))
-        while let last = titleWords.last?.lowercased().trimmingCharacters(in: CharacterSet(charactersIn: ".,:;")),
-              stopWords.contains(last) {
-            titleWords.removeLast()
-        }
-        return TransformSkillResult(text: titleWords.joined(separator: " ").trimmingCharacters(in: CharacterSet(charactersIn: ".,:;")))
+        return TransformSkillResult(text: TextTransformFallbacks.text(for: id, input: input.text))
     }
 
     static func suggestTags(id: String, input: TransformSkillInput, provider: FoundationTransformProvider) async throws -> TransformSkillResult {
         _ = try await provider.transform(skillID: id, input: input)
-        let lower = input.text.lowercased()
-        var tags: [String] = []
-        if lower.contains("http://") || lower.contains("https://") { tags.append("Link") }
-        if lower.contains("swift") || lower.contains("swiftdata") || lower.contains("swiftui") { tags.append("Swift") }
-        if lower.contains("todo") || lower.contains("action") { tags.append("Action") }
-        if tags.isEmpty { tags.append("Note") }
-        return TransformSkillResult(suggestedTagNames: tags)
+        return TransformSkillResult(suggestedTagNames: TextTransformFallbacks.suggestedTags(for: input.text))
     }
 
     static func createStickyNotes(id: String, input: TransformSkillInput, provider: FoundationTransformProvider) async throws -> TransformSkillResult {
         guard let workspaceID = input.workspaceID else { throw TransformSkillError.missingWorkspace }
-        let text = try await provider.transform(skillID: id, input: input) ?? collapseWhitespace(input.text)
+        let text = try await provider.transform(skillID: id, input: input)
+            ?? TextTransformFallbacks.collapseWhitespace(input.text)
         let arguments = WorkspaceCreateStickyNoteArguments(
             text: text,
             x: 0,
@@ -206,16 +182,4 @@ private extension TransformSkillRegistry {
         )
     }
 
-    static func collapseWhitespace(_ text: String) -> String {
-        text
-            .components(separatedBy: .newlines)
-            .map { line in
-                line
-                    .components(separatedBy: .whitespacesAndNewlines)
-                    .filter { !$0.isEmpty }
-                    .joined(separator: " ")
-            }
-            .filter { !$0.isEmpty }
-            .joined(separator: "\n")
-    }
 }

@@ -28,6 +28,7 @@ nonisolated enum CanvasToolbarItem: Equatable {
     case paste
     case newNote
     case askAI
+    case transform
     case details
     case editContent
     case manageTags
@@ -94,6 +95,7 @@ nonisolated struct CanvasToolbarConfiguration: Equatable {
                 return CanvasToolbarConfiguration(items: [
                     .closeMode,
                     .editContent,
+                    .transform,
                     .color, .manageTags,
                     .delete
                 ])
