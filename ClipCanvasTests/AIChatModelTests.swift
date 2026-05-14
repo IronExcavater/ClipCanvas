@@ -129,7 +129,7 @@ import Testing
 
         let chat = AIChatService.createChat(in: context, workspaces: [inactive, active])
 
-        #expect(chat.title == "New Chat")
+        #expect(chat.title == "Board AI")
         #expect(chat.workspace?.id == active.id)
         #expect(active.chats.contains { $0.id == chat.id })
         #expect((try context.fetch(FetchDescriptor<AIChat>())).count == 1)

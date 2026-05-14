@@ -132,7 +132,7 @@ struct AIChatDetailSheet: View {
         guard !trimmed.isEmpty else { return }
 
         input = ""
-        if chat.title == "New Chat" {
+        if chat.messages.isEmpty {
             chat.title = String(trimmed.prefix(42))
         }
 

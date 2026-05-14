@@ -58,7 +58,13 @@ final class AIChat: Identifiable {
     }
 
     var preview: String {
-        lastMessage?.content.components(separatedBy: .newlines).first ?? "No messages"
+        if let lastMessage {
+            return lastMessage.content.components(separatedBy: .newlines).first ?? "No messages"
+        }
+        if let workspace {
+            return "Ready for \(workspace.name)"
+        }
+        return "Ready to help"
     }
 
     var mode: AIChatMode {

@@ -8,7 +8,8 @@ enum AIChatService {
     }
 
     static func createChat(in context: ModelContext, workspace: Workspace?) -> AIChat {
-        let chat = AIChat(title: "New Chat")
+        let title = workspace.map { "\($0.name) AI" } ?? "New Chat"
+        let chat = AIChat(title: title)
 
         if let workspace {
             chat.workspace = workspace
@@ -44,7 +45,7 @@ enum AIChatService {
             context.insert(attachment)
         }
 
-        if chat.title == "New Chat" {
+        if shouldReplacePlaceholderTitle(chat) {
             chat.title = defaultTitle(for: uniqueObjects)
         }
         chat.updatedAt = Date()
@@ -76,5 +77,11 @@ private extension AIChatService {
             }
         }
         return "\(objects.count) Canvas Cards"
+    }
+
+    static func shouldReplacePlaceholderTitle(_ chat: AIChat) -> Bool {
+        if chat.title == "New Chat" { return true }
+        guard let workspace = chat.workspace else { return false }
+        return chat.title == "\(workspace.name) AI"
     }
 }

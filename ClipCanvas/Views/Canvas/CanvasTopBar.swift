@@ -2,12 +2,15 @@ import SwiftUI
 
 struct CanvasTopBar: View {
     let workspaceName: String
+    let workspaces: [Workspace]
+    let activeWorkspaceID: UUID
     @Binding var isRenaming: Bool
     @Binding var renameText: String
     var renameFocused: FocusState<Bool>.Binding
     let onToggleSidebar: () -> Void
     let onBeginRename: () -> Void
     let onCommitRename: () -> Void
+    let onSelectWorkspace: (Workspace) -> Void
     let selectedCount: Int
     let visibleCount: Int
     let onAskAI: () -> Void
@@ -34,6 +37,8 @@ struct CanvasTopBar: View {
                 .background {
                     WorkspaceTitleBackdrop()
                 }
+                .animation(.spring(response: 0.24, dampingFraction: 0.86), value: isRenaming)
+                .animation(.spring(response: 0.24, dampingFraction: 0.86), value: workspaceName)
 
             Spacer()
 
@@ -42,10 +47,10 @@ struct CanvasTopBar: View {
                     .disabled(selectedCount == 0 && visibleCount == 0)
                 Divider()
                 Button("Rename", systemImage: "pencil", action: onBeginRename)
-                Button("Fit to Cards", systemImage: "arrow.up.left.and.arrow.down.right", action: onFitContent)
-                Button("Arrange Grid", systemImage: "square.grid.2x2", action: onArrangeAll)
+                Button("Fit", systemImage: "arrow.up.left.and.arrow.down.right", action: onFitContent)
+                Button("Grid", systemImage: "square.grid.2x2", action: onArrangeAll)
                 Divider()
-                Button("Clear Cards", systemImage: "trash", role: .destructive) {
+                Button("Clear", systemImage: "trash", role: .destructive) {
                     confirmingClear = true
                 }
             } label: {
@@ -65,14 +70,14 @@ struct CanvasTopBar: View {
         }
         .alert("Clear all cards from this workspace?", isPresented: $confirmingClear) {
             Button("Cancel", role: .cancel) {}
-            Button("Clear All", role: .destructive, action: onClearAll)
+            Button("Clear", role: .destructive, action: onClearAll)
         } message: {
             Text("This removes every card from the current canvas.")
         }
     }
 
     private var askAITitle: String {
-        selectedCount > 0 ? "Ask AI About Selection" : "Ask AI About View"
+        selectedCount > 0 ? "Ask Selection" : "Ask View"
     }
 
     @ViewBuilder
@@ -88,12 +93,27 @@ struct CanvasTopBar: View {
                 .onDisappear {
                     if isRenaming { onCommitRename() }
                 }
-                .frame(maxWidth: 220)
+                .frame(minWidth: 180, maxWidth: 260)
         } else {
-            Text(workspaceName)
-                .font(.title3.weight(.semibold))
-                .lineLimit(1)
-                .onTapGesture(count: 2, perform: onBeginRename)
+            Menu {
+                ForEach(workspaces) { workspace in
+                    Button {
+                        onSelectWorkspace(workspace)
+                    } label: {
+                        Label(workspace.name, systemImage: workspace.id == activeWorkspaceID ? "checkmark" : "square")
+                    }
+                }
+                Divider()
+                Button("Rename", systemImage: "pencil", action: onBeginRename)
+            } label: {
+                Text(workspaceName)
+                    .font(.title3.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .frame(maxWidth: 220)
+            }
+            .buttonStyle(.plain)
+            .simultaneousGesture(LongPressGesture(minimumDuration: 0.45).onEnded { _ in onBeginRename() })
         }
     }
 }
