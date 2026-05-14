@@ -363,24 +363,24 @@ private extension WorkspaceActionRegistry {
     static func arrangeGrid(_ request: WorkspaceActionRequest, workspace: Workspace) throws -> WorkspaceActionResult {
         let arguments = try decode(WorkspaceArrangeGridArguments.self, from: request)
         let selected = objects(ids: arguments.objectIDs, in: workspace)
-        let columns = max(1, arguments.columnCount)
+        let objectsByID = Dictionary(uniqueKeysWithValues: selected.map { ($0.id, $0) })
+        let items = selected.map {
+            CanvasGridLayoutItem(id: $0.id, size: CGSize(width: $0.width, height: $0.height))
+        }
+        let frames = CanvasGridLayout.frames(
+            for: items,
+            columns: arguments.columnCount,
+            origin: CGPoint(x: arguments.originX, y: arguments.originY),
+            spacing: CGSize(width: arguments.horizontalSpacing, height: arguments.verticalSpacing)
+        )
         var changedIDs: [UUID] = []
-        var y = arguments.originY
 
-        for rowStart in stride(from: 0, to: selected.count, by: columns) {
-            let row = Array(selected[rowStart..<min(rowStart + columns, selected.count)])
-            var x = arguments.originX
-            let rowHeight = row.map(\.height).max() ?? 0
-
-            for object in row {
-                object.x = x
-                object.y = y
-                object.markUpdated()
-                changedIDs.append(object.id)
-                x += object.width + arguments.horizontalSpacing
-            }
-
-            y += rowHeight + arguments.verticalSpacing
+        for frame in frames {
+            guard let object = objectsByID[frame.id] else { continue }
+            object.x = Double(frame.origin.x)
+            object.y = Double(frame.origin.y)
+            object.markUpdated()
+            changedIDs.append(object.id)
         }
 
         return .success("Arranged objects", changedObjectIDs: changedIDs)

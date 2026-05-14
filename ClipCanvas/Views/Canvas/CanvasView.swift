@@ -418,33 +418,26 @@ struct CanvasView: View {
 
     private func arrangeObjects(_ target: [CanvasObject], at center: CGPoint, fitAfter: Bool, in geo: GeometryProxy) {
         guard !target.isEmpty else { return }
-        let columns = max(1, Int(ceil(sqrt(Double(target.count)))))
-        let rows = Int(ceil(Double(target.count) / Double(columns)))
-        let spacing: Double = 22
-        var columnWidths = Array(repeating: 0.0, count: columns)
-        var rowHeights = Array(repeating: 0.0, count: rows)
 
-        for (index, object) in target.enumerated() {
-            let col = index % columns
-            let row = index / columns
-            columnWidths[col] = max(columnWidths[col], object.width)
-            rowHeights[row] = max(rowHeights[row], object.height)
+        let objectsByID = Dictionary(uniqueKeysWithValues: target.map { ($0.id, $0) })
+        let items = target.map {
+            CanvasGridLayoutItem(id: $0.id, size: CGSize(width: $0.width, height: $0.height))
         }
+        let frames = CanvasGridLayout.centeredFrames(
+            for: items,
+            columns: CanvasGridLayout.balancedColumnCount(for: target.count),
+            center: center
+        )
 
-        let totalWidth = columnWidths.reduce(0, +) + spacing * Double(max(columns - 1, 0))
-        let totalHeight = rowHeights.reduce(0, +) + spacing * Double(max(rows - 1, 0))
-        let originX = Double(center.x) - totalWidth / 2
-        let originY = Double(center.y) - totalHeight / 2
-
-        for (index, object) in target.enumerated() {
-            let col = index % columns
-            let row = index / columns
-            object.x = originX + columnWidths.prefix(col).reduce(0.0, +) + spacing * Double(col)
-            object.y = originY + rowHeights.prefix(row).reduce(0.0, +) + spacing * Double(row)
+        for frame in frames {
+            guard let object = objectsByID[frame.id] else { continue }
+            object.x = Double(frame.origin.x)
+            object.y = Double(frame.origin.y)
             clampObject(object, in: geo)
             bringToFront(object.id)
             object.markUpdated()
         }
+
         if fitAfter { fitContent(in: geo) }
     }
 
