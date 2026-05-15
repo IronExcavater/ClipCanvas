@@ -124,7 +124,6 @@ struct CanvasContainerView: View {
                     onPaste: paste,
                     onCreateNote: createNoteAtViewCenter,
                     onAskAI: askAIAboutCurrentContext,
-                    onTransform: applyTransformToSelection,
                     onDetails: showSelectedDetails,
                     onEditContent: editSelectedContent,
                     onManageTags: showSelectedTags,
@@ -133,7 +132,6 @@ struct CanvasContainerView: View {
                     onFormatBold: { noteTextCommand = NoteTextCommand(kind: .bold) },
                     onFormatBullet: { noteTextCommand = NoteTextCommand(kind: .bullet) },
                     onFormatHighlight: { noteTextCommand = NoteTextCommand(kind: .highlight) },
-                    onDone: exitEditing,
                     onDelete: deleteSelected,
                     activeDrawTool: activeDrawTool,
                     penColor: penColor,
@@ -408,58 +406,6 @@ struct CanvasContainerView: View {
     private func editSelectedContent() {
         guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first else { return }
         editingObjectID = id
-    }
-
-    private func applyTransformToSelection(_ skillID: String) {
-        let targets = orderedCanvasObjects(matching: selectedObjectIDs)
-            .filter { $0.kind == .stickyNote || $0.kind == .clipNote }
-        guard !targets.isEmpty else {
-            showFeedback("Select text notes")
-            return
-        }
-
-        Task {
-            await applyTransform(skillID, to: targets.map(\.id))
-        }
-    }
-
-    @MainActor
-    private func applyTransform(_ skillID: String, to objectIDs: [UUID]) async {
-        let registry = TransformSkillRegistry()
-        var changedCount = 0
-
-        for objectID in objectIDs {
-            guard let object = workspace.canvasObjects.first(where: { $0.id == objectID && $0.isVisible }) else {
-                continue
-            }
-            let input = TransformSkillInput(
-                workspaceID: workspace.id,
-                objectIDs: [object.id],
-                clipIDs: object.clip.map { [$0.id] } ?? [],
-                text: object.displayText
-            )
-            guard let result = try? await registry.run(skillID, input: input),
-                  let transformed = result.text else {
-                continue
-            }
-
-            let didChange: Bool
-            if let clip = object.clip {
-                didChange = performWorkspaceAction(
-                    .clipUpdateContent,
-                    arguments: WorkspaceClipUpdateContentArguments(clipID: clip.id, content: transformed)
-                )
-            } else {
-                didChange = performWorkspaceAction(
-                    .canvasUpdateObjectText,
-                    arguments: WorkspaceUpdateObjectTextArguments(objectID: object.id, text: transformed)
-                )
-            }
-
-            if didChange { changedCount += 1 }
-        }
-
-        showFeedback(changedCount == 1 ? "Transformed 1 note" : "Transformed \(changedCount) notes")
     }
 
     private func exitEditing() {

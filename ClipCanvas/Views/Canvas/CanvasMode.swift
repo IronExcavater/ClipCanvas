@@ -28,7 +28,6 @@ nonisolated enum CanvasToolbarItem: Equatable {
     case paste
     case newNote
     case askAI
-    case transform
     case details
     case editContent
     case manageTags
@@ -37,7 +36,6 @@ nonisolated enum CanvasToolbarItem: Equatable {
     case formatBold
     case formatBullet
     case formatHighlight
-    case done
     case delete
     case divider
     case mode(CanvasMode)
