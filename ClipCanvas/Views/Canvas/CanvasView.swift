@@ -22,7 +22,6 @@ struct CanvasView: View {
     @State private var canvasScale: CGFloat = 1.0
     @State private var activeDrag: CanvasDragSession?
     @State private var activeResize: CanvasResizeSession?
-    @State private var editPrimedObjectID: UUID?
     @State private var zOrder: [UUID: Double] = [:]
     @State private var nextZOrder: Double = 1
     @State private var panStartOrigin: CGPoint?
@@ -145,7 +144,7 @@ struct CanvasView: View {
             onDoubleTap: { handleDoubleTap(for: object, in: geo) },
             isEditing: editingObjectID == object.id,
             editingText: clip.content,
-            fontSize: CanvasPlacementSizing.fontSizeForWidth(object.width),
+            fontSize: CanvasPlacementSizing.fontSizeForContent(clip.content, width: object.width),
             textCommand: noteTextCommand,
             onCommitEditing: { commitClipText($0, clip: clip, object: object) },
             onExitEditing: { editingObjectID = nil },
@@ -210,14 +209,8 @@ struct CanvasView: View {
                     guard mode == .edit else { return }
                     createNote(at: viewportCenter(in: geo), in: geo, beginEditing: true)
                 case .second:
-                    if editingObjectID != nil {
-                        editingObjectID = nil
-                        selectedObjectIDs.removeAll()
-                        editPrimedObjectID = nil
-                    } else {
-                        selectedObjectIDs.removeAll()
-                        editPrimedObjectID = nil
-                    }
+                    editingObjectID = nil
+                    selectedObjectIDs.removeAll()
                 }
             }
     }
@@ -424,13 +417,9 @@ struct CanvasView: View {
 
     private func handleDoubleTap(for object: CanvasObject, in geo: GeometryProxy) {
         if mode == .edit, canEditText(object) {
-            if selectedObjectIDs == [object.id], editPrimedObjectID == object.id {
-                beginEditing(object, in: geo)
-            } else {
-                selectedObjectIDs = [object.id]
-                editPrimedObjectID = object.id
-                alignObjectForEditSelection(object, in: geo)
-            }
+            if editingObjectID == object.id { return }
+            selectedObjectIDs = [object.id]
+            beginEditing(object, in: geo)
         } else {
             toggleExpandedSize(for: object, in: geo)
         }
@@ -439,7 +428,6 @@ struct CanvasView: View {
     private func beginEditing(_ object: CanvasObject, in geo: GeometryProxy) {
         guard canEditText(object) else { return }
         selectedObjectIDs = [object.id]
-        editPrimedObjectID = object.id
         editingObjectID = object.id
         bringToFront(object.id)
     }
@@ -451,13 +439,14 @@ struct CanvasView: View {
             return
         }
         selectedObjectIDs = [newValue]
-        editPrimedObjectID = newValue
         alignObjectForEditSelection(object, in: geo)
     }
 
     private func alignObjectForEditSelection(_ object: CanvasObject, in geo: GeometryProxy) {
         let viewport = viewportRect(in: geo)
-        let targetY = viewport.minY + 112 / max(canvasScale, 0.001)
+        // Position note top ~8pt below the canvas topbar (which ends ~122pt from screen top including safe area)
+        let topBarHeight: CGFloat = 130
+        let targetY = viewport.minY + topBarHeight / max(canvasScale, 0.001)
         withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
             object.y = targetY
             clampObject(object, in: geo)
@@ -561,20 +550,16 @@ struct CanvasView: View {
     private func handleTap(for object: CanvasObject, in geo: GeometryProxy) {
         bringToFront(object.id)
         if mode == .edit, canEditText(object) {
-            if editingObjectID == object.id {
-                return
-            }
-            if selectedObjectIDs == [object.id], editPrimedObjectID == object.id {
+            if editingObjectID == object.id { return }
+            if selectedObjectIDs == [object.id] {
                 beginEditing(object, in: geo)
             } else {
                 selectedObjectIDs = [object.id]
-                editPrimedObjectID = object.id
                 alignObjectForEditSelection(object, in: geo)
             }
         } else {
             if selectedObjectIDs.contains(object.id) {
                 selectedObjectIDs.remove(object.id)
-                editPrimedObjectID = nil
             } else {
                 selectedObjectIDs.insert(object.id)
             }
@@ -613,7 +598,6 @@ struct CanvasView: View {
         context.insert(note)
         clampObject(note, in: geo)
         selectedObjectIDs = [note.id]
-        editPrimedObjectID = note.id
         bringToFront(note.id)
         if shouldBeginEditing {
             beginEditing(note, in: geo)
@@ -636,7 +620,6 @@ struct CanvasView: View {
             if let object = workspace.canvasObjects.first(where: { $0.sourcePlacementID == placement.id }) {
                 clampObject(object, in: geo)
                 selectedObjectIDs = [object.id]
-                editPrimedObjectID = nil
             }
             didPlace = true
         }

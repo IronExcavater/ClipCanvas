@@ -102,12 +102,10 @@ struct CanvasTopBar: View {
                     Button {
                         onSelectWorkspace(workspace)
                     } label: {
-                        HStack {
-                            Text(workspace.name)
-                            if workspace.id == activeWorkspaceID {
-                                Image(systemName: "checkmark")
-                            }
-                        }
+                        Label(
+                            workspace.name,
+                            systemImage: workspace.id == activeWorkspaceID ? "checkmark" : "folder"
+                        )
                     }
                 }
                 Divider()
@@ -117,6 +115,7 @@ struct CanvasTopBar: View {
                     .font(.title3.weight(.semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
+                    .truncationMode(.tail)
                     .frame(width: titleWidth(for: workspaceName))
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)

@@ -19,6 +19,8 @@ struct CanvasToolbar: View {
     let onDone: () -> Void
     let onDelete: () -> Void
     var activeDrawTool: CanvasDrawTool = .pen
+    var penColor: PlatformColor = .label
+    var highlighterColor: PlatformColor = .systemYellow
     var onCloseMode: () -> Void = {}
     var onDrawTool: (CanvasDrawTool) -> Void = { _ in }
     var onDrawToolSettings: (CanvasDrawTool) -> Void = { _ in }
@@ -172,9 +174,21 @@ struct CanvasToolbar: View {
             let selected = activeDrawTool == tool
             ZStack {
                 Circle().fill(selected ? Color.accentColor : Color.clear)
-                Image(systemName: tool.systemImage)
-                    .font(.system(size: iconSize, weight: .medium))
-                    .foregroundStyle(selected ? .white : .primary)
+                VStack(spacing: 0) {
+                    Spacer(minLength: 0)
+                    Image(systemName: tool.systemImage)
+                        .font(.system(size: iconSize - 1, weight: .medium))
+                        .foregroundStyle(selected ? .white : .primary)
+                    Spacer(minLength: 0)
+                    if let color = toolSwatchColor(for: tool) {
+                        Capsule()
+                            .fill(Color(platformColor: color))
+                            .frame(width: 16, height: 3)
+                            .padding(.bottom, 7)
+                    } else {
+                        Spacer().frame(height: 10)
+                    }
+                }
             }
             .frame(width: buttonSize, height: buttonSize)
             .contentShape(Circle())
@@ -186,6 +200,14 @@ struct CanvasToolbar: View {
         }
         .buttonStyle(.plain)
         .animation(.spring(response: 0.24, dampingFraction: 0.82), value: activeDrawTool == tool)
+    }
+
+    private func toolSwatchColor(for tool: CanvasDrawTool) -> PlatformColor? {
+        switch tool {
+        case .pen: return penColor
+        case .highlighter: return highlighterColor.withAlphaComponent(1.0)
+        default: return nil
+        }
     }
 
     private func doneButton() -> some View {

@@ -105,11 +105,14 @@ struct SidebarView: View {
                         Button {
                             activateWorkspace(workspace)
                         } label: {
-                            Label(workspace.name, systemImage: workspace.id == activeWorkspace?.id ? "checkmark" : "square")
+                            Label(
+                                workspace.name,
+                                systemImage: workspace.id == activeWorkspace?.id ? "checkmark" : "folder"
+                            )
                         }
                     }
                 } label: {
-                    Image(systemName: "arrow.up.arrow.down")
+                    Image(systemName: "rectangle.stack")
                         .font(.system(size: 14, weight: .semibold))
                         .frame(width: 34, height: 34)
                 }
@@ -123,12 +126,9 @@ struct SidebarView: View {
                             .font(.system(size: 10, weight: .bold))
                     }
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .padding(.horizontal, 10)
-                    .frame(height: 34)
+                    .foregroundStyle(Color.accentColor)
                 }
                 .buttonStyle(.plain)
-                .background(.thinMaterial, in: Capsule())
             }
         }
         .padding(.top, 4)
@@ -143,8 +143,8 @@ struct SidebarView: View {
         Button {
             onOpenAIChat?(chat)
         } label: {
-            VStack(alignment: .leading, spacing: 3) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
+            VStack(alignment: .leading, spacing: 4) {
+                HStack(alignment: .center, spacing: 8) {
                     Image(systemName: chat.mode == .thinking ? "brain" : "bolt.fill")
                         .font(.system(size: 12, weight: .bold))
                         .foregroundStyle(Color.accentColor)
@@ -160,7 +160,7 @@ struct SidebarView: View {
 
                     RelativeAgeText(date: chat.updatedAt, suffix: " ago")
                         .font(.caption2)
-                        .foregroundStyle(.primary.opacity(0.62))
+                        .foregroundStyle(.primary.opacity(0.58))
                 }
 
                 Text(chat.preview)
@@ -168,12 +168,14 @@ struct SidebarView: View {
                     .foregroundStyle(.primary.opacity(0.78))
                     .lineLimit(2)
 
-                HStack(spacing: 6) {
-                    Label("\(chat.sortedMessages.count)", systemImage: "bubble.left.and.bubble.right")
-                    Label("\(chat.sortedMessages.flatMap(\.sortedAttachments).count)", systemImage: "paperclip")
+                HStack(spacing: 10) {
+                    chatStat("\(chat.sortedMessages.count)", icon: "bubble.left.fill")
+                    let attachCount = chat.sortedMessages.flatMap(\.sortedAttachments).count
+                    chatStat("\(attachCount)", icon: "square.on.square")
+                    chatStat(chat.mode == .thinking ? "Deep" : "Quick",
+                             icon: chat.mode == .thinking ? "brain" : "bolt")
                 }
-                .font(.caption2.weight(.semibold))
-                .foregroundStyle(.primary.opacity(0.58))
+                .padding(.top, 3)
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(.horizontal, 12)
@@ -202,6 +204,15 @@ struct SidebarView: View {
         }
     }
 
+    private func chatStat(_ value: String, icon: String) -> some View {
+        HStack(spacing: 2) {
+            Image(systemName: icon)
+            Text(value)
+        }
+        .font(.caption2.weight(.semibold))
+        .foregroundStyle(.primary.opacity(0.52))
+    }
+
     // MARK: - Bottom nav
 
     private var bottomNav: some View {
@@ -209,21 +220,21 @@ struct SidebarView: View {
             NavigationLink(destination: HistoryPage()) {
                 Image(systemName: "doc.on.clipboard")
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
             }
             .buttonStyle(BlendedIconButtonStyle())
             Spacer()
             NavigationLink(destination: TrashPage()) {
                 Image(systemName: "trash")
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
             }
             .buttonStyle(BlendedIconButtonStyle())
             Spacer()
             NavigationLink(destination: SettingsPage()) {
                 Image(systemName: AppSymbol.settings)
                     .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.secondary)
+                    .foregroundStyle(.primary)
             }
             .buttonStyle(BlendedIconButtonStyle())
         }

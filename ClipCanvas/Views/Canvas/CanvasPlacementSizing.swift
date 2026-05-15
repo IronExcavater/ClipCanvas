@@ -6,9 +6,9 @@ enum CanvasPlacementSizing {
     static let lineHeight: CGFloat = 20
     static let contentChrome = CGSize(width: 28, height: 30)
 
-    private static let minimumTextColumns: CGFloat = 20
+    private static let minimumTextColumns: CGFloat = 14
     private static let maximumTextColumns: CGFloat = 84
-    private static let minimumTextLines: CGFloat = 5
+    private static let minimumTextLines: CGFloat = 3
     private static let maximumTextLines: CGFloat = 26
 
     static let defaultSize = CGSize(
@@ -118,7 +118,14 @@ enum CanvasPlacementSizing {
     }
 
     static func fontSizeForWidth(_ width: CGFloat) -> CGFloat {
-        (width / 12.8).clamped(to: 15...28)
+        (width / 10.0).clamped(to: 15...30)
+    }
+
+    static func fontSizeForContent(_ text: String, width: CGFloat) -> CGFloat {
+        let chars = CGFloat(text.trimmingCharacters(in: .whitespacesAndNewlines).count)
+        let widthNorm = (width / minimumSize.width).clamped(to: 0.8...2.5)
+        let base: CGFloat = chars <= 0 ? 28 : 15.0 + 13.0 / (1.0 + chars / 20.0)
+        return (base * widthNorm).clamped(to: 13...32)
     }
 
     static func isExpanded(width: Double, height: Double) -> Bool {

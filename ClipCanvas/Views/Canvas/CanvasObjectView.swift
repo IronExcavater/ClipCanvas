@@ -82,7 +82,7 @@ struct CanvasObjectView: View {
     }
 
     private var noteFontSize: CGFloat {
-        CanvasPlacementSizing.fontSizeForWidth(object.width)
+        CanvasPlacementSizing.fontSizeForContent(object.text, width: object.width)
     }
 
     @ViewBuilder

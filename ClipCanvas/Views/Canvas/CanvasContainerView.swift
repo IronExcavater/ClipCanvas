@@ -1,6 +1,9 @@
 import PencilKit
 import SwiftUI
 import SwiftData
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct CanvasContainerView: View {
     let workspace: Workspace
@@ -33,6 +36,7 @@ struct CanvasContainerView: View {
     @State private var activeDrawing: PKDrawing = PKDrawing()
     @State private var activeDrawTool: CanvasDrawTool = .pen
     @State private var drawToolSettings: CanvasDrawTool?
+    @State private var keyboardHeight: CGFloat = 0
     @State private var penColor: PlatformColor = .label
     @State private var penWidth: CGFloat = 3
     @State private var highlighterColor: PlatformColor = .systemYellow.withAlphaComponent(0.5)
@@ -81,21 +85,36 @@ struct CanvasContainerView: View {
 
                 Spacer()
 
-                HStack {
-                    CanvasUndoControls(
-                        onUndo: { undoManager?.undo() },
-                        onRedo: { undoManager?.redo() }
+                if editingObjectID == nil {
+                    HStack {
+                        CanvasUndoControls(
+                            onUndo: { undoManager?.undo() },
+                            onRedo: { undoManager?.redo() }
+                        )
+                        .padding(.leading, 14)
+                        .padding(.bottom, 12)
+                        Spacer()
+                        CanvasZoomControls(
+                            scale: visibleScale,
+                            onZoomIn: { zoomCommand = .zoomIn },
+                            onZoomOut: { zoomCommand = .zoomOut }
+                        )
+                        .padding(.trailing, 14)
+                        .padding(.bottom, 12)
+                    }
+                }
+
+                if let tool = drawToolSettings {
+                    CanvasDrawToolSettingsPanel(
+                        tool: tool,
+                        color: drawColor(for: tool),
+                        width: drawWidth(for: tool),
+                        onChangeColor: { setDrawColor($0, for: tool) },
+                        onChangeWidth: { setDrawWidth($0, for: tool) },
+                        onDismiss: { drawToolSettings = nil }
                     )
-                    .padding(.leading, 14)
-                    .padding(.bottom, 12)
-                    Spacer()
-                    CanvasZoomControls(
-                        scale: visibleScale,
-                        onZoomIn: { zoomCommand = .zoomIn },
-                        onZoomOut: { zoomCommand = .zoomOut }
-                    )
-                    .padding(.trailing, 14)
-                    .padding(.bottom, 12)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .padding(.bottom, 8)
                 }
 
                 CanvasToolbar(
@@ -117,25 +136,15 @@ struct CanvasContainerView: View {
                     onDone: exitEditing,
                     onDelete: deleteSelected,
                     activeDrawTool: activeDrawTool,
+                    penColor: penColor,
+                    highlighterColor: highlighterColor,
                     onCloseMode: closeToolbarMode,
                     onDrawTool: selectDrawTool,
                     onDrawToolSettings: toggleDrawToolSettings
                 )
+                .padding(.bottom, keyboardHeight > 0 && editingObjectID != nil ? keyboardHeight - 32 : 0)
             }
             .ignoresSafeArea(.container, edges: .bottom)
-
-            if let tool = drawToolSettings {
-                CanvasDrawToolSettingsPanel(
-                    tool: tool,
-                    color: drawColor(for: tool),
-                    width: drawWidth(for: tool),
-                    onChangeColor: { setDrawColor($0, for: tool) },
-                    onChangeWidth: { setDrawWidth($0, for: tool) },
-                    onDismiss: { drawToolSettings = nil }
-                )
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .zIndex(7)
-            }
 
             if let selection = tagEditSelection {
                 CanvasTagPanel(
@@ -167,6 +176,8 @@ struct CanvasContainerView: View {
         }
         .animation(.spring(response: 0.24, dampingFraction: 0.86), value: feedback)
         .animation(.spring(response: 0.25, dampingFraction: 0.82), value: selectedObjectIDs)
+        .animation(.spring(response: 0.28, dampingFraction: 0.86), value: keyboardHeight)
+        .animation(.spring(response: 0.28, dampingFraction: 0.86), value: editingObjectID)
         .onAppear {
             context.undoManager = undoManager
             startClipboardListening()
@@ -192,6 +203,12 @@ struct CanvasContainerView: View {
                 editingObjectID = nil
             }
         }
+        .onChange(of: editingObjectID) { _, newValue in
+            if newValue == nil {
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) { keyboardHeight = 0 }
+            }
+        }
+        .modifier(CanvasKeyboardHeightModifier(isEditing: editingObjectID != nil, keyboardHeight: $keyboardHeight))
         .sheet(item: $detailClip) { clip in
             ClipDetailSheet(clip: clip)
         }
@@ -553,4 +570,31 @@ private struct ClipTagEditSelection: Identifiable {
 private struct CanvasObjectColorSelection: Identifiable {
     let id = UUID()
     let objects: [CanvasObject]
+}
+
+private struct CanvasKeyboardHeightModifier: ViewModifier {
+    let isEditing: Bool
+    @Binding var keyboardHeight: CGFloat
+
+    func body(content: Content) -> some View {
+        #if canImport(UIKit)
+        content
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
+                guard isEditing else { return }
+                if let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
+                    let screenHeight = UIScreen.main.bounds.height
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                        keyboardHeight = max(0, screenHeight - frame.minY)
+                    }
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
+                withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                    keyboardHeight = 0
+                }
+            }
+        #else
+        content
+        #endif
+    }
 }

@@ -7,9 +7,9 @@ nonisolated enum CanvasMode: Equatable, CaseIterable {
 
     var systemImage: String {
         switch self {
-        case .pan:  "hand.point.up.left"
-        case .edit: "text.cursor"
-        case .draw: "pencil.tip"
+        case .pan:  "hand.raised.fill"
+        case .edit: "pencil"
+        case .draw: "scribble.variable"
         }
     }
 
@@ -56,9 +56,9 @@ nonisolated enum CanvasDrawTool: Equatable {
 
     var systemImage: String {
         switch self {
-        case .pen: "pencil.tip"
+        case .pen: "pencil"
         case .highlighter: "highlighter"
-        case .eraser: "eraser"
+        case .eraser: "eraser.fill"
         case .lasso: "lasso"
         }
     }
@@ -95,9 +95,8 @@ nonisolated struct CanvasToolbarConfiguration: Equatable {
                 return CanvasToolbarConfiguration(items: [
                     .closeMode,
                     .editContent,
-                    .transform,
                     .color, .manageTags,
-                    .delete
+                    .details, .delete
                 ])
             }
             return CanvasToolbarConfiguration(items: [
@@ -108,12 +107,12 @@ nonisolated struct CanvasToolbarConfiguration: Equatable {
         case .pan:
             if selectedCount > 0 {
                 return CanvasToolbarConfiguration(items: [
-                    .askAI,
-                    .arrangeSelection, .details
+                    .arrangeSelection, .details, .askAI, .delete
                 ])
             }
             return CanvasToolbarConfiguration(items: [
-                .paste,
+                .paste, .newNote, .askAI,
+                .divider,
                 .mode(.pan), .mode(.edit), .mode(.draw)
             ])
         }

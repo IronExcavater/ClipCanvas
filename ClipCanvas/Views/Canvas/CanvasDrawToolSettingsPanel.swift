@@ -18,56 +18,52 @@ struct CanvasDrawToolSettingsPanel: View {
     }
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            Color.clear.allowsHitTesting(false)
-            VStack(alignment: .leading, spacing: 10) {
-                if color != nil {
-                    HStack(spacing: 8) {
-                        ForEach(colorPresets, id: \.self) { preset in
-                            Button {
-                                onChangeColor(preset.uiColor)
-                            } label: {
-                                Circle()
-                                    .fill(preset.color)
-                                    .frame(width: 28, height: 28)
-                                    .overlay {
-                                        if isSelected(preset.uiColor) {
-                                            Image(systemName: "checkmark")
-                                                .font(.system(size: 11, weight: .bold))
-                                                .foregroundStyle(.white)
-                                        }
+        VStack(spacing: 8) {
+            if color != nil {
+                HStack(spacing: 10) {
+                    ForEach(colorPresets, id: \.self) { preset in
+                        Button {
+                            onChangeColor(preset.uiColor)
+                        } label: {
+                            Circle()
+                                .fill(preset.color)
+                                .frame(width: 30, height: 30)
+                                .overlay {
+                                    if isSelected(preset.uiColor) {
+                                        Image(systemName: "checkmark")
+                                            .font(.system(size: 11, weight: .bold))
+                                            .foregroundStyle(.white)
                                     }
-                            }
-                            .buttonStyle(.plain)
+                                }
+                                .shadow(color: .black.opacity(0.12), radius: 3, y: 1)
                         }
+                        .buttonStyle(.plain)
                     }
                 }
-
-                HStack(spacing: 10) {
-                    Image(systemName: tool.systemImage)
-                        .font(.system(size: 14, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                        .frame(width: 24)
-
-                    Slider(
-                        value: Binding(
-                            get: { Double(width) },
-                            set: { onChangeWidth(CGFloat($0)) }
-                        ),
-                        in: widthRange
-                    )
-                }
             }
-            .padding(.horizontal, 14)
-            .padding(.vertical, 12)
-            .background { panelBackground }
-            .padding(.horizontal, 18)
-            .padding(.bottom, 118)
-            .frame(maxWidth: 360)
-            .contentShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+
+            HStack(spacing: 12) {
+                Image(systemName: tool.systemImage)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: 22)
+
+                Slider(
+                    value: Binding(
+                        get: { Double(width) },
+                        set: { onChangeWidth(CGFloat($0)) }
+                    ),
+                    in: widthRange
+                )
+                .tint(Color.accentColor)
+            }
         }
-        .ignoresSafeArea(.container, edges: .bottom)
-        .ignoresSafeArea(.keyboard, edges: .bottom)
+        .padding(.horizontal, 16)
+        .padding(.vertical, 14)
+        .background { panelBackground }
+        .padding(.horizontal, 20)
+        .frame(maxWidth: 380)
+        .allowsHitTesting(true)
     }
 
     private var colorPresets: [DrawColorPreset] {
