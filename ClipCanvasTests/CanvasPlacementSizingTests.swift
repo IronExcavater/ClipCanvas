@@ -31,7 +31,7 @@ import Testing
         #expect(size.width > CanvasPlacementSizing.defaultSize.width)
         #expect(size.width <= 390)
         #expect((size.width - CanvasPlacementSizing.contentChrome.width)
-            .truncatingRemainder(dividingBy: CanvasPlacementSizing.estimatedCharacterWidth) == 0)
+            .truncatingRemainder(dividingBy: CanvasPlacementSizing.characterWidth) == 0)
     }
 
     @Test func editingSizeUsesFinalWidthForLineHeight() {
@@ -54,7 +54,7 @@ import Testing
         #expect(size.width <= 390)
         #expect(size.height < size.width)
         #expect((size.height - CanvasPlacementSizing.contentChrome.height)
-            .truncatingRemainder(dividingBy: CanvasPlacementSizing.estimatedLineHeight) == 0)
+            .truncatingRemainder(dividingBy: CanvasPlacementSizing.lineHeight) == 0)
     }
 
     @Test func textResizeSnapsToCharacterAndLineSteps() {
@@ -64,13 +64,13 @@ import Testing
         )
 
         #expect((CanvasPlacementSizing.defaultSize.width - CanvasPlacementSizing.contentChrome.width)
-            .truncatingRemainder(dividingBy: CanvasPlacementSizing.estimatedCharacterWidth) == 0)
+            .truncatingRemainder(dividingBy: CanvasPlacementSizing.characterWidth) == 0)
         #expect((CanvasPlacementSizing.defaultSize.height - CanvasPlacementSizing.contentChrome.height)
-            .truncatingRemainder(dividingBy: CanvasPlacementSizing.estimatedLineHeight) == 0)
+            .truncatingRemainder(dividingBy: CanvasPlacementSizing.lineHeight) == 0)
         #expect((size.width - CanvasPlacementSizing.contentChrome.width)
-            .truncatingRemainder(dividingBy: CanvasPlacementSizing.estimatedCharacterWidth) == 0)
+            .truncatingRemainder(dividingBy: CanvasPlacementSizing.characterWidth) == 0)
         #expect((size.height - CanvasPlacementSizing.contentChrome.height)
-            .truncatingRemainder(dividingBy: CanvasPlacementSizing.estimatedLineHeight) == 0)
+            .truncatingRemainder(dividingBy: CanvasPlacementSizing.lineHeight) == 0)
     }
 
     @Test func resizePreviewIsFluidButCommitSnapsToTextGrid() {
@@ -90,9 +90,9 @@ import Testing
         ))
         #expect(committed != preview)
         #expect((committed.width - CanvasPlacementSizing.contentChrome.width)
-            .truncatingRemainder(dividingBy: CanvasPlacementSizing.estimatedCharacterWidth) == 0)
+            .truncatingRemainder(dividingBy: CanvasPlacementSizing.characterWidth) == 0)
         #expect((committed.height - CanvasPlacementSizing.contentChrome.height)
-            .truncatingRemainder(dividingBy: CanvasPlacementSizing.estimatedLineHeight) == 0)
+            .truncatingRemainder(dividingBy: CanvasPlacementSizing.lineHeight) == 0)
     }
 
     @Test func zoomCommandsUseDiscreteSteps() {

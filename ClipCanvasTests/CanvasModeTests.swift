@@ -14,6 +14,9 @@ import Testing
 
         #expect(configuration.items == [
             .paste,
+            .newNote,
+            .askAI,
+            .divider,
             .mode(.pan),
             .mode(.edit),
             .mode(.draw)
@@ -30,12 +33,14 @@ import Testing
         ])
     }
 
-    @Test func panSelectionToolbarShowsAIArrangeAndInfoOnly() {
+    @Test func panSelectionToolbarShowsSelectionActions() {
         let configuration = CanvasToolbarConfiguration.make(selectedCount: 1, mode: .pan)
 
         #expect(configuration.items == [
+            .arrangeSelection,
+            .details,
             .askAI,
-            .arrangeSelection, .details
+            .delete
         ])
     }
 
@@ -56,8 +61,9 @@ import Testing
         #expect(configuration.items == [
             .closeMode,
             .editContent,
-            .transform,
-            .color, .manageTags,
+            .color,
+            .manageTags,
+            .details,
             .delete
         ])
     }
