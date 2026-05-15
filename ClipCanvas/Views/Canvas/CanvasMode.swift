@@ -46,6 +46,13 @@ nonisolated enum CanvasToolbarItem: Equatable {
     case drawLasso
 }
 
+nonisolated enum CanvasSelectionKind: Equatable {
+    case none
+    case text
+    case image
+    case mixed
+}
+
 nonisolated enum CanvasDrawTool: Equatable {
     case pen
     case highlighter
@@ -72,7 +79,12 @@ nonisolated enum CanvasDrawTool: Equatable {
 nonisolated struct CanvasToolbarConfiguration: Equatable {
     var items: [CanvasToolbarItem]
 
-    static func make(selectedCount: Int, mode: CanvasMode, isEditing: Bool = false) -> CanvasToolbarConfiguration {
+    static func make(
+        selectedCount: Int,
+        mode: CanvasMode,
+        selectionKind: CanvasSelectionKind = .none,
+        isEditing: Bool = false
+    ) -> CanvasToolbarConfiguration {
         switch mode {
         case .draw:
             return CanvasToolbarConfiguration(items: [
@@ -90,6 +102,14 @@ nonisolated struct CanvasToolbarConfiguration: Equatable {
                         .formatHighlight
                     ])
                 }
+                if selectionKind == .image {
+                    return CanvasToolbarConfiguration(items: [
+                        .closeMode,
+                        .arrangeSelection,
+                        .details,
+                        .delete
+                    ])
+                }
                 return CanvasToolbarConfiguration(items: [
                     .closeMode,
                     .editContent,
@@ -99,17 +119,20 @@ nonisolated struct CanvasToolbarConfiguration: Equatable {
             }
             return CanvasToolbarConfiguration(items: [
                 .closeMode,
-                .newNote, .color,
+                .newNote,
             ])
 
         case .pan:
             if selectedCount > 0 {
-                return CanvasToolbarConfiguration(items: [
-                    .arrangeSelection, .details, .askAI, .delete
-                ])
+                var items: [CanvasToolbarItem] = [.arrangeSelection]
+                if selectedCount == 1 {
+                    items.append(.details)
+                }
+                items.append(contentsOf: [.askAI, .delete])
+                return CanvasToolbarConfiguration(items: items)
             }
             return CanvasToolbarConfiguration(items: [
-                .paste, .newNote, .askAI,
+                .paste,
                 .divider,
                 .mode(.pan), .mode(.edit), .mode(.draw)
             ])
@@ -117,6 +140,6 @@ nonisolated struct CanvasToolbarConfiguration: Equatable {
     }
 
     var preferredWidth: CGFloat {
-        CGFloat(items.count * 52 + max(items.count - 1, 0) * 2 + 24)
+        CGFloat(items.count * 46 + max(items.count - 1, 0) * 2 + 20)
     }
 }

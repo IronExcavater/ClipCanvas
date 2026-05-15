@@ -48,10 +48,11 @@ struct CanvasContainerView: View {
 
     var body: some View {
         ZStack {
-            CanvasView(
-                workspace: workspace,
-                mode: mode,
-                zoomCommand: $zoomCommand,
+                CanvasView(
+                    workspace: workspace,
+                    mode: mode,
+                    keyboardHeight: keyboardHeight,
+                    zoomCommand: $zoomCommand,
                 selectedObjectIDs: $selectedObjectIDs,
                 editingObjectID: $editingObjectID,
                 visibleScale: $visibleScale,
@@ -104,22 +105,10 @@ struct CanvasContainerView: View {
                     }
                 }
 
-                if let tool = drawToolSettings {
-                    CanvasDrawToolSettingsPanel(
-                        tool: tool,
-                        color: drawColor(for: tool),
-                        width: drawWidth(for: tool),
-                        onChangeColor: { setDrawColor($0, for: tool) },
-                        onChangeWidth: { setDrawWidth($0, for: tool) },
-                        onDismiss: { drawToolSettings = nil }
-                    )
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                    .padding(.bottom, 8)
-                }
-
                 CanvasToolbar(
                     mode: $mode,
                     selectedCount: selectedObjectIDs.count,
+                    selectionKind: selectedCanvasKind,
                     isEditing: editingObjectID != nil,
                     onPaste: paste,
                     onCreateNote: createNoteAtViewCenter,
@@ -143,6 +132,24 @@ struct CanvasContainerView: View {
                 .padding(.bottom, keyboardHeight > 0 && editingObjectID != nil ? keyboardHeight - 32 : 0)
             }
             .ignoresSafeArea(.container, edges: .bottom)
+
+            if let tool = drawToolSettings {
+                VStack {
+                    Spacer()
+                    CanvasDrawToolSettingsPanel(
+                        tool: tool,
+                        color: drawColor(for: tool),
+                        width: drawWidth(for: tool),
+                        onChangeColor: { setDrawColor($0, for: tool) },
+                        onChangeWidth: { setDrawWidth($0, for: tool) },
+                        onDismiss: { drawToolSettings = nil }
+                    )
+                    .padding(.bottom, 98)
+                }
+                .transition(.move(edge: .bottom).combined(with: .opacity))
+                .zIndex(7)
+                .ignoresSafeArea(.container, edges: .bottom)
+            }
 
             if let selection = tagEditSelection {
                 CanvasTagPanel(
@@ -301,6 +308,23 @@ struct CanvasContainerView: View {
         case .lasso:
             break
         }
+    }
+
+    private var selectedCanvasKind: CanvasSelectionKind {
+        let objects = orderedCanvasObjects(matching: selectedObjectIDs)
+        guard !objects.isEmpty else { return .none }
+        let kinds = Set(objects.map(canvasSelectionKind(for:)))
+        return kinds.count == 1 ? (kinds.first ?? .none) : .mixed
+    }
+
+    private func canvasSelectionKind(for object: CanvasObject) -> CanvasSelectionKind {
+        if object.kind == .image || object.clip?.type == .image {
+            return .image
+        }
+        if object.kind == .stickyNote || object.kind == .clipNote {
+            return .text
+        }
+        return .mixed
     }
 
     // MARK: - Clipboard
@@ -514,7 +538,9 @@ private struct CanvasKeyboardHeightModifier: ViewModifier {
             .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillChangeFrameNotification)) { notification in
                 guard isEditing else { return }
                 if let frame = notification.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect {
-                    let screenHeight = UIScreen.main.bounds.height
+                    let screenHeight = UIApplication.shared.connectedScenes
+                        .compactMap { ($0 as? UIWindowScene)?.screen.bounds.height }
+                        .first ?? frame.maxY
                     withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
                         keyboardHeight = max(0, screenHeight - frame.minY)
                     }

@@ -7,6 +7,7 @@ struct CanvasView: View {
 
     let workspace: Workspace
     let mode: CanvasMode
+    let keyboardHeight: CGFloat
     @Binding var zoomCommand: ZoomCommand?
     @Binding var selectedObjectIDs: Set<UUID>
     @Binding var editingObjectID: UUID?
@@ -111,7 +112,9 @@ struct CanvasView: View {
 
     @ViewBuilder
     private func positionedObject(_ object: CanvasObject, in geo: GeometryProxy) -> some View {
-        if (object.kind == .clipNote || object.kind == .image), let clip = object.clip {
+        if object.kind == .image || object.clip?.type == .image, let clip = object.clip {
+            positionedImageObject(object, clip: clip, in: geo)
+        } else if object.kind == .clipNote, let clip = object.clip {
             positionedClipObject(object, clip: clip, in: geo)
         } else {
             positionedCardObject(object, in: geo)
@@ -148,7 +151,34 @@ struct CanvasView: View {
             textCommand: noteTextCommand,
             onCommitEditing: { commitClipText($0, clip: clip, object: object) },
             onExitEditing: { editingObjectID = nil },
-            onEditorSizeChange: { _ in },
+            onEditorSizeChange: { resizeEditingObject(object, editorContentSize: $0, in: geo) },
+            onResize: { updateResizePreview(for: object, translation: $0) },
+            onResizeEnded: { commitResize(for: object, in: geo) },
+            onToggleExpandedSize: { toggleExpandedSize(for: object, in: geo) }
+        )
+        .modifier(CanvasObjectPositionModifier(
+            object: object,
+            viewportOrigin: viewportOrigin,
+            canvasScale: canvasScale,
+            size: size,
+            dragOffset: isDragging ? activeDrag?.translation ?? .zero : .zero,
+            isDragging: isDragging
+        ))
+        .gesture(objectDragGesture(for: object, in: geo))
+        .zIndex(zIndex(for: object, isSelected: isSelected, isDragging: isDragging))
+    }
+
+    private func positionedImageObject(_ object: CanvasObject, clip: Clip, in geo: GeometryProxy) -> some View {
+        let isDragging = activeDrag?.objectIDs.contains(object.id) == true
+        let isSelected = selectedObjectIDs.contains(object.id)
+        let size = displaySize(for: object)
+
+        return CanvasImageObjectView(
+            clip: clip,
+            isSelected: isSelected,
+            showsContent: canvasScale >= 0.25 || isSelected || isDragging,
+            onTap: { handleTap(for: object, in: geo) },
+            onDoubleTap: { handleDoubleTap(for: object, in: geo) },
             onResize: { updateResizePreview(for: object, translation: $0) },
             onResizeEnded: { commitResize(for: object, in: geo) },
             onToggleExpandedSize: { toggleExpandedSize(for: object, in: geo) }
@@ -181,7 +211,7 @@ struct CanvasView: View {
             textCommand: noteTextCommand,
             onCommitEditing: { commitObjectText($0, object: object) },
             onExitEditing: { editingObjectID = nil },
-            onEditorSizeChange: { _ in },
+            onEditorSizeChange: { resizeEditingObject(object, editorContentSize: $0, in: geo) },
             onResize: { updateResizePreview(for: object, translation: $0) },
             onResizeEnded: { commitResize(for: object, in: geo) },
             onToggleExpandedSize: { toggleExpandedSize(for: object, in: geo) }
@@ -420,6 +450,9 @@ struct CanvasView: View {
             if editingObjectID == object.id { return }
             selectedObjectIDs = [object.id]
             beginEditing(object, in: geo)
+        } else if mode == .edit, isImageObject(object) {
+            selectedObjectIDs = [object.id]
+            alignImageForEditSelection(object, in: geo)
         } else {
             toggleExpandedSize(for: object, in: geo)
         }
@@ -443,14 +476,94 @@ struct CanvasView: View {
     }
 
     private func alignObjectForEditSelection(_ object: CanvasObject, in geo: GeometryProxy) {
-        let viewport = viewportRect(in: geo)
-        // Position note top ~8pt below the canvas topbar (which ends ~122pt from screen top including safe area)
-        let topBarHeight: CGFloat = 130
-        let targetY = viewport.minY + topBarHeight / max(canvasScale, 0.001)
+        let targetFrame = editingFrame(for: object, measuredContentHeight: nil, in: geo)
+        let bounds = canvasBounds(viewportSize: geo.size)
+        let clampedFrame = CGRect(
+            origin: bounds.clampedTopLeft(targetFrame.origin, size: targetFrame.size),
+            size: targetFrame.size
+        )
+        let revealedOrigin = CanvasViewportFitting.origin(
+            revealing: clampedFrame,
+            currentOrigin: viewportOrigin,
+            viewportSize: geo.size,
+            scale: canvasScale,
+            bounds: bounds,
+            margin: editingRevealMargin
+        )
         withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
-            object.y = targetY
-            clampObject(object, in: geo)
+            object.frame = clampedFrame
+            viewportOrigin = revealedOrigin
         }
+    }
+
+    private var editingRevealMargin: CGFloat { 0 }
+
+    private func resizeEditingObject(_ object: CanvasObject, editorContentSize: CGSize, in geo: GeometryProxy) {
+        guard editingObjectID == object.id else { return }
+        let targetFrame = editingFrame(for: object, measuredContentHeight: editorContentSize.height, in: geo)
+        let nextHeight = targetFrame.height
+        guard abs(nextHeight - object.height) > 0.5 else {
+            revealEditingCaret(for: object, in: geo)
+            return
+        }
+
+        object.height = nextHeight
+        revealEditingCaret(for: object, in: geo)
+        object.markUpdated()
+    }
+
+    private func editingFrame(for object: CanvasObject, measuredContentHeight: CGFloat?, in geo: GeometryProxy) -> CGRect {
+        let viewport = viewportRect(in: geo)
+        let safeScale = max(canvasScale, 0.001)
+        let visibleWidth = geo.size.width / safeScale
+        let visibleHeight = geo.size.height / safeScale
+        let horizontalMargin = 16 / safeScale
+        let width = max(CanvasPlacementSizing.minimumSize.width, visibleWidth - horizontalMargin * 2)
+        let measured = measuredContentHeight.map {
+            CGSize(width: width, height: $0 + CanvasPlacementSizing.contentChrome.height + 16)
+        } ?? editingMeasuredSize(for: object, width: width)
+        let topInset = 112 / safeScale
+        let toolbarOffset = max(keyboardHeight - 32, 0) + 92
+        let bottomInset = toolbarOffset / safeScale
+        let maxHeight = max(CanvasPlacementSizing.minimumSize.height, visibleHeight - topInset - bottomInset)
+        let height = snappedEditingHeight(min(max(CanvasPlacementSizing.minimumSize.height, measured.height), maxHeight))
+
+        return CGRect(
+            x: viewport.minX + (visibleWidth - width) / 2,
+            y: viewport.minY + topInset,
+            width: width,
+            height: height
+        )
+    }
+
+    private func editingMeasuredSize(for object: CanvasObject, width: CGFloat) -> CGSize {
+        let content = object.clip?.content.isEmpty == false ? (object.clip?.content ?? "") : object.text
+        let lines = CGFloat(CanvasPlacementSizing.textLineCount(for: content, width: width))
+        return CGSize(
+            width: width,
+            height: CanvasPlacementSizing.contentChrome.height + lines * CanvasPlacementSizing.lineHeight + 24
+        )
+    }
+
+    private func snappedEditingHeight(_ value: CGFloat) -> CGFloat {
+        let contentHeight = max(value - CanvasPlacementSizing.contentChrome.height, CanvasPlacementSizing.lineHeight)
+        return CanvasPlacementSizing.contentChrome.height
+            + (contentHeight / CanvasPlacementSizing.lineHeight).rounded(.up) * CanvasPlacementSizing.lineHeight
+    }
+
+    private func revealEditingCaret(for object: CanvasObject, in geo: GeometryProxy) {
+        let bounds = canvasBounds(viewportSize: geo.size)
+        let origin = CanvasViewportFitting.origin(
+            revealing: object.frame,
+            currentOrigin: viewportOrigin,
+            viewportSize: geo.size,
+            scale: canvasScale,
+            bounds: bounds,
+            margin: editingRevealMargin
+        )
+        let verticalOnlyOrigin = CGPoint(x: viewportOrigin.x, y: origin.y)
+        guard verticalOnlyOrigin != viewportOrigin else { return }
+        viewportOrigin = verticalOnlyOrigin
     }
 
     private func canEditText(_ object: CanvasObject) -> Bool {
@@ -462,6 +575,66 @@ struct CanvasView: View {
         default:
             return false
         }
+    }
+
+    private func isImageObject(_ object: CanvasObject) -> Bool {
+        object.kind == .image || object.clip?.type == .image
+    }
+
+    private func alignImageForEditSelection(_ object: CanvasObject, in geo: GeometryProxy) {
+        let frame = imageEditFrame(for: object, in: geo)
+        let bounds = canvasBounds(viewportSize: geo.size)
+        let clampedFrame = CGRect(
+            origin: bounds.clampedTopLeft(frame.origin, size: frame.size),
+            size: frame.size
+        )
+        let origin = CanvasViewportFitting.origin(
+            revealing: clampedFrame,
+            currentOrigin: viewportOrigin,
+            viewportSize: geo.size,
+            scale: canvasScale,
+            bounds: bounds,
+            margin: 0
+        )
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+            object.frame = clampedFrame
+            viewportOrigin = origin
+        }
+    }
+
+    private func imageEditFrame(for object: CanvasObject, in geo: GeometryProxy) -> CGRect {
+        let viewport = viewportRect(in: geo)
+        let safeScale = max(canvasScale, 0.001)
+        let visibleWidth = geo.size.width / safeScale
+        let visibleHeight = geo.size.height / safeScale
+        let horizontalMargin = 16 / safeScale
+        let topInset = 112 / safeScale
+        let toolbarOffset = max(keyboardHeight - 32, 0) + 92
+        let bottomInset = toolbarOffset / safeScale
+        let maxWidth = max(120, visibleWidth - horizontalMargin * 2)
+        let maxHeight = max(120, visibleHeight - topInset - bottomInset)
+        let aspect = imageAspectRatio(for: object) ?? max(object.width / max(object.height, 1), 1)
+        var width = maxWidth
+        var height = width / aspect
+        if height > maxHeight {
+            height = maxHeight
+            width = height * aspect
+        }
+        return CGRect(
+            x: viewport.minX + (visibleWidth - width) / 2,
+            y: viewport.minY + topInset,
+            width: width,
+            height: height
+        )
+    }
+
+    private func imageAspectRatio(for object: CanvasObject) -> CGFloat? {
+        guard let data = object.clip?.imageData,
+              let image = PlatformImage(data: data),
+              image.size.height > 0 else {
+            return nil
+        }
+        return image.size.width / image.size.height
     }
 
     private func commitObjectText(_ text: String, object: CanvasObject) {
@@ -557,6 +730,9 @@ struct CanvasView: View {
                 selectedObjectIDs = [object.id]
                 alignObjectForEditSelection(object, in: geo)
             }
+        } else if mode == .edit, isImageObject(object) {
+            selectedObjectIDs = [object.id]
+            alignImageForEditSelection(object, in: geo)
         } else {
             if selectedObjectIDs.contains(object.id) {
                 selectedObjectIDs.remove(object.id)

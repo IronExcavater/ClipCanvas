@@ -13,7 +13,6 @@ struct WorkspaceRowView: View {
 
     @FocusState private var focused: Bool
 
-    private var cardCount: Int { workspace.canvasObjects.filter(\.isVisible).count }
     private var tint: Color { workspace.isActive ? Color.accentColor : Color.secondary }
 
     var body: some View {
@@ -29,9 +28,9 @@ struct WorkspaceRowView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     HStack(alignment: .center, spacing: 8) {
                         Image(systemName: workspace.isActive ? "checkmark" : "folder.fill")
-                            .font(.system(size: workspace.isActive ? 11 : 12, weight: .bold))
+                            .font(.system(size: workspace.isActive ? 12 : 14, weight: .bold))
                             .foregroundStyle(workspace.isActive ? .white : .primary.opacity(0.7))
-                            .frame(width: 22, height: 22)
+                            .frame(width: 28, height: 28)
                             .background(workspace.isActive ? Color.accentColor : Color.primary.opacity(0.10), in: Circle())
 
                         nameContent
@@ -43,18 +42,11 @@ struct WorkspaceRowView: View {
                             .foregroundStyle(.primary.opacity(0.58))
                     }
 
-                    Text(cardCount == 0 ? "Empty canvas" : "\(cardCount) card\(cardCount == 1 ? "" : "s") on canvas")
-                        .font(.caption)
-                        .foregroundStyle(.primary.opacity(0.72))
-
-                    HStack(spacing: 12) {
-                        wsStat("square.grid.2x2", value: "\(cardCount)")
-                        if workspace.isActive {
-                            wsStat("dot.radiowaves.left.and.right", label: "Active")
-                        }
+                    if workspace.isActive {
+                        Label("Active workspace", systemImage: "dot.radiowaves.left.and.right")
+                            .font(.caption.weight(.semibold))
+                            .foregroundStyle(Color.accentColor)
                     }
-                    .padding(.top, 4)
-                    .foregroundStyle(.primary.opacity(0.56))
                 }
             }
         }
@@ -89,23 +81,9 @@ struct WorkspaceRowView: View {
                 .onDisappear(perform: onCommitRename)
         } else {
             Text(workspace.name)
-                .font(.subheadline.weight(.semibold))
+                .font(.headline.weight(.semibold))
                 .foregroundStyle(.primary)
                 .lineLimit(1)
-        }
-    }
-
-    private func wsStat(_ icon: String, value: String) -> some View {
-        HStack(spacing: 2) {
-            Image(systemName: icon).font(.system(size: 11, weight: .semibold))
-            Text(value).font(.caption2.weight(.semibold).monospacedDigit())
-        }
-    }
-
-    private func wsStat(_ icon: String, label: String) -> some View {
-        HStack(spacing: 2) {
-            Image(systemName: icon).font(.system(size: 11, weight: .semibold))
-            Text(label).font(.caption2.weight(.semibold))
         }
     }
 }

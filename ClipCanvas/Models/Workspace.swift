@@ -74,14 +74,20 @@ final class Workspace: SoftDeletable, Identifiable {
         let p = CanvasPlacement(clip: clip, x: pos.x, y: pos.y)
         p.workspace = self
         placements.append(p)
+        let isImage = clip.type == .image
+        let size = isImage
+            ? CGSize(width: 260, height: 190)
+            : CanvasPlacementSizing.defaultSize
+        p.width = size.width
+        p.height = size.height
         let object = CanvasObject(
-            kind: .clipNote,
+            kind: isImage ? .image : .clipNote,
             workspace: self,
             clip: clip,
             x: p.x,
             y: p.y,
-            width: p.width,
-            height: p.height
+            width: size.width,
+            height: size.height
         )
         object.sourcePlacementID = p.id
         object.zIndex = Double(canvasObjects.count)

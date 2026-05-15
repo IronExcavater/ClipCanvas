@@ -291,14 +291,18 @@ struct NoteTextEditor: UIViewRepresentable {
         tv.backgroundColor = .clear
         tv.font = .systemFont(ofSize: fontSize)
         tv.textColor = .label
-        tv.isScrollEnabled = false
+        tv.isScrollEnabled = true
         tv.isEditable = true
         tv.text = initialText
         tv.textContainerInset = .zero
         tv.textContainer.lineFragmentPadding = 0
         tv.setContentHuggingPriority(.defaultLow, for: .horizontal)
         tv.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
-        DispatchQueue.main.async { tv.becomeFirstResponder() }
+        DispatchQueue.main.async {
+            tv.becomeFirstResponder()
+            context.coordinator.reportSize(tv)
+            context.coordinator.scrollCaretIntoView(tv)
+        }
         return tv
     }
 
@@ -334,6 +338,7 @@ struct NoteTextEditor: UIViewRepresentable {
             text = textView.text ?? ""
             onCommit(text)
             reportSize(textView)
+            scrollCaretIntoView(textView)
         }
 
         func textViewDidEndEditing(_ textView: UITextView) {
@@ -360,6 +365,7 @@ struct NoteTextEditor: UIViewRepresentable {
             text = textView.text ?? ""
             onCommit(text)
             reportSize(textView)
+            scrollCaretIntoView(textView)
         }
 
         private func wrapSelection(
@@ -397,6 +403,12 @@ struct NoteTextEditor: UIViewRepresentable {
         func reportSize(_ textView: UITextView) {
             let size = textView.sizeThatFits(CGSize(width: textView.bounds.width, height: .greatestFiniteMagnitude))
             onSizeChange(size)
+        }
+
+        func scrollCaretIntoView(_ textView: UITextView) {
+            let length = (textView.text as NSString?)?.length ?? 0
+            guard textView.selectedRange.location <= length else { return }
+            textView.scrollRangeToVisible(textView.selectedRange)
         }
     }
 }

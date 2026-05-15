@@ -7,6 +7,7 @@ struct SidebarView: View {
     let onClose: (() -> Void)?
     var isOpen = true
     var onOpenAIChat: ((AIChat) -> Void)?
+    @State private var iCloudStatus: ICloudProfileStatus = .checking
 
     @Query(
         filter: #Predicate<Workspace> { $0.deletedAt == nil },
@@ -29,18 +30,22 @@ struct SidebarView: View {
             sidebarHeader
 
             List {
-                if workspaceChats.isEmpty {
-                    ContentUnavailableView(
-                        "No AI Chats",
-                        systemImage: "sparkles",
-                        description: Text("Chats for the current workspace appear here.")
-                    )
-                    .appEmptyStateRow()
-                } else {
-                    ForEach(workspaceChats) { chat in
-                        sidebarChatRow(chat)
-                            .appListItemRowInsets(vertical: 3)
+                Section {
+                    if workspaceChats.isEmpty {
+                        ContentUnavailableView(
+                            "No AI Chats",
+                            systemImage: "sparkles",
+                            description: Text("Chats for the current workspace appear here.")
+                        )
+                        .appEmptyStateRow()
+                    } else {
+                        ForEach(workspaceChats) { chat in
+                            sidebarChatRow(chat)
+                                .appListItemRowInsets(vertical: 3)
+                        }
                     }
+                } header: {
+                    sidebarSectionTitle("AI Chats")
                 }
             }
             .listStyle(.plain)
@@ -60,6 +65,9 @@ struct SidebarView: View {
         .appHideNavigationBarIfAvailable()
         .ignoresSafeArea(.container, edges: .bottom)
         .ignoresSafeArea(.keyboard, edges: .bottom)
+        .onAppear {
+            refreshICloudStatus()
+        }
     }
 
     private var sidebarHeader: some View {
@@ -77,10 +85,10 @@ struct SidebarView: View {
 
                 Button(action: createChat) {
                     Image(systemName: "sparkles")
-                        .font(.system(size: 15, weight: .semibold))
-                        .frame(width: 38, height: 38)
+                        .font(.system(size: 18, weight: .semibold))
+                        .frame(width: 46, height: 46)
                 }
-                .buttonStyle(BlendedIconButtonStyle(size: 38))
+                .buttonStyle(BlendedIconButtonStyle())
                 .accessibilityLabel("New AI Chat")
 
                 if onClose != nil {
@@ -88,47 +96,60 @@ struct SidebarView: View {
                         Image(systemName: AppSymbol.sidebar)
                             .font(.system(size: 18, weight: .semibold))
                     }
-                    .buttonStyle(BlendedIconButtonStyle(size: 38))
+                    .buttonStyle(BlendedIconButtonStyle())
                     .accessibilityLabel("Collapse Sidebar")
                 }
             }
 
-            HStack(spacing: 8) {
+            Text("Active workspace")
+                .font(.caption.weight(.bold))
+                .textCase(.uppercase)
+                .foregroundStyle(.secondary)
+                .padding(.top, 4)
+
+            VStack(alignment: .leading, spacing: 10) {
                 Text(activeWorkspace?.name ?? "Choose a workspace")
-                    .font(.headline.weight(.semibold))
+                    .font(.title2.weight(.bold))
                     .foregroundStyle(.primary)
-                    .lineLimit(1)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.82)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                Menu {
-                    ForEach(workspaces) { workspace in
-                        Button {
-                            activateWorkspace(workspace)
-                        } label: {
-                            Label(
-                                workspace.name,
-                                systemImage: workspace.id == activeWorkspace?.id ? "checkmark" : "folder"
-                            )
+                HStack(spacing: 8) {
+                    Menu {
+                        ForEach(workspaces) { workspace in
+                            Button {
+                                activateWorkspace(workspace)
+                            } label: {
+                                Label(
+                                    workspace.name,
+                                    systemImage: workspace.id == activeWorkspace?.id ? "checkmark" : "folder"
+                                )
+                            }
                         }
+                    } label: {
+                        Label("Switch", systemImage: "rectangle.stack")
+                            .font(.callout.weight(.semibold))
+                            .padding(.horizontal, 12)
+                            .frame(height: 40)
+                            .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground), in: Capsule())
+                            .shadow(color: .black.opacity(0.10), radius: 8, y: 3)
                     }
-                } label: {
-                    Image(systemName: "rectangle.stack")
-                        .font(.system(size: 14, weight: .semibold))
-                        .frame(width: 34, height: 34)
-                }
-                .buttonStyle(BlendedIconButtonStyle(size: 34))
-                .accessibilityLabel("Switch Workspace")
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Switch Workspace")
 
-                NavigationLink(destination: WorkspacesPage()) {
-                    HStack(spacing: 3) {
+                    NavigationLink(destination: WorkspacesPage()) {
                         Text("View all")
-                        Image(systemName: "chevron.right")
-                            .font(.system(size: 10, weight: .bold))
+                            .font(.callout.weight(.semibold))
+                            .padding(.horizontal, 12)
+                            .frame(height: 40)
+                            .background(Color.accentColor.opacity(0.14), in: Capsule())
                     }
-                    .font(.caption.weight(.semibold))
+                    .buttonStyle(.plain)
                     .foregroundStyle(Color.accentColor)
+
+                    Spacer(minLength: 0)
                 }
-                .buttonStyle(.plain)
             }
         }
         .padding(.top, 4)
@@ -138,6 +159,15 @@ struct SidebarView: View {
     }
 
     // MARK: - Chats
+
+    private func sidebarSectionTitle(_ title: String) -> some View {
+        Text(title)
+            .font(.caption.weight(.bold))
+            .textCase(.uppercase)
+            .foregroundStyle(.secondary)
+            .padding(.leading, 4)
+            .padding(.top, 8)
+    }
 
     private func sidebarChatRow(_ chat: AIChat) -> some View {
         Button {
@@ -216,33 +246,86 @@ struct SidebarView: View {
     // MARK: - Bottom nav
 
     private var bottomNav: some View {
-        HStack(spacing: 0) {
-            NavigationLink(destination: HistoryPage()) {
-                Image(systemName: "doc.on.clipboard")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.primary)
-            }
-            .buttonStyle(BlendedIconButtonStyle())
-            Spacer()
-            NavigationLink(destination: TrashPage()) {
-                Image(systemName: "trash")
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.primary)
-            }
-            .buttonStyle(BlendedIconButtonStyle())
-            Spacer()
+        HStack(spacing: 12) {
             NavigationLink(destination: SettingsPage()) {
-                Image(systemName: AppSymbol.settings)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.primary)
+                iCloudProfile
             }
-            .buttonStyle(BlendedIconButtonStyle())
+            .buttonStyle(.plain)
+            .accessibilityLabel("iCloud profile")
+
+            Spacer(minLength: 10)
+
+            sidebarNavButton(destination: HistoryPage(), systemImage: "clipboard")
+            sidebarNavButton(destination: TrashPage(), systemImage: "trash")
+            sidebarNavButton(destination: SettingsPage(), systemImage: AppSymbol.settings)
         }
-        .padding(.horizontal, 20)
+        .padding(.horizontal, 16)
         .padding(.top, 2)
         .padding(.bottom, 24)
         .ignoresSafeArea(.container, edges: .bottom)
         .ignoresSafeArea(.keyboard, edges: .bottom)
+    }
+
+    private var iCloudProfile: some View {
+        HStack(spacing: 10) {
+            ZStack(alignment: .bottomTrailing) {
+                Image(systemName: "person.crop.circle.fill")
+                    .font(.system(size: 34, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+                    .frame(width: 46, height: 46)
+                    .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground), in: Circle())
+                    .shadow(color: .black.opacity(0.14), radius: 10, y: 5)
+
+                Circle()
+                    .fill(iCloudStatusColor)
+                    .frame(width: 11, height: 11)
+                    .overlay(Circle().stroke(Color.platformSystemBackground, lineWidth: 2))
+                    .offset(x: -2, y: -2)
+            }
+
+            VStack(alignment: .leading, spacing: 1) {
+                Text("iCloud")
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(.primary)
+                Text(iCloudStatusText)
+                    .font(.caption2.weight(.medium))
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .contentShape(Capsule())
+    }
+
+    private func sidebarNavButton<Destination: View>(destination: Destination, systemImage: String) -> some View {
+        NavigationLink(destination: destination) {
+            Image(systemName: systemImage)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.primary)
+        }
+        .buttonStyle(BlendedIconButtonStyle())
+    }
+
+    private var iCloudStatusText: String {
+        switch iCloudStatus {
+        case .available:
+            return "Sync on"
+        case .noAccount:
+            return "Sign in"
+        case .unavailable:
+            return "Unavailable"
+        case .checking:
+            return "Checking"
+        }
+    }
+
+    private var iCloudStatusColor: Color {
+        switch iCloudStatus {
+        case .available:
+            return .green
+        case .noAccount:
+            return .orange
+        case .unavailable, .checking:
+            return .secondary
+        }
     }
 
     @ViewBuilder
@@ -269,4 +352,15 @@ struct SidebarView: View {
         let chat = AIChatService.createChat(in: context, workspace: activeWorkspace)
         onOpenAIChat?(chat)
     }
+
+    private func refreshICloudStatus() {
+        iCloudStatus = FileManager.default.ubiquityIdentityToken == nil ? .noAccount : .available
+    }
+}
+
+private enum ICloudProfileStatus {
+    case checking
+    case available
+    case noAccount
+    case unavailable
 }

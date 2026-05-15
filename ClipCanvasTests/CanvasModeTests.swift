@@ -14,8 +14,6 @@ import Testing
 
         #expect(configuration.items == [
             .paste,
-            .newNote,
-            .askAI,
             .divider,
             .mode(.pan),
             .mode(.edit),
@@ -28,8 +26,7 @@ import Testing
 
         #expect(configuration.items == [
             .closeMode,
-            .newNote,
-            .color
+            .newNote
         ])
     }
 
@@ -39,6 +36,16 @@ import Testing
         #expect(configuration.items == [
             .arrangeSelection,
             .details,
+            .askAI,
+            .delete
+        ])
+    }
+
+    @Test func panMultiSelectionOmitsSingleItemDetails() {
+        let configuration = CanvasToolbarConfiguration.make(selectedCount: 2, mode: .pan)
+
+        #expect(configuration.items == [
+            .arrangeSelection,
             .askAI,
             .delete
         ])
@@ -56,13 +63,24 @@ import Testing
     }
 
     @Test func editSelectionToolbarShowsEditTagsAndDelete() {
-        let configuration = CanvasToolbarConfiguration.make(selectedCount: 1, mode: .edit)
+        let configuration = CanvasToolbarConfiguration.make(selectedCount: 1, mode: .edit, selectionKind: .text)
 
         #expect(configuration.items == [
             .closeMode,
             .editContent,
             .color,
             .manageTags,
+            .details,
+            .delete
+        ])
+    }
+
+    @Test func editImageSelectionShowsImageActionsOnly() {
+        let configuration = CanvasToolbarConfiguration.make(selectedCount: 1, mode: .edit, selectionKind: .image)
+
+        #expect(configuration.items == [
+            .closeMode,
+            .arrangeSelection,
             .details,
             .delete
         ])

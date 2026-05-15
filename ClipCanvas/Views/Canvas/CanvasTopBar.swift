@@ -79,7 +79,7 @@ struct CanvasTopBar: View {
     private var title: some View {
         if isRenaming {
             TextField("Workspace name", text: $renameText)
-                .font(.title3.weight(.semibold))
+                .font(.title2.weight(.bold))
                 .multilineTextAlignment(.center)
                 .textFieldStyle(.plain)
                 .focused(renameFocused)
@@ -112,7 +112,7 @@ struct CanvasTopBar: View {
                 Button("Rename", systemImage: "pencil", action: onBeginRename)
             } label: {
                 Text(workspaceName)
-                    .font(.title3.weight(.semibold))
+                    .font(.title2.weight(.bold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
                     .truncationMode(.tail)
@@ -128,8 +128,8 @@ struct CanvasTopBar: View {
 
     private func titleWidth(for text: String) -> CGFloat {
         let visibleCharacters = min(max(text.count, 6), WorkspaceNamePolicy.maximumLength)
-        let estimated = CGFloat(visibleCharacters) * 12 + 18
-        return min(max(estimated, 82), 176)
+        let estimated = CGFloat(visibleCharacters) * 15 + 24
+        return min(max(estimated, 120), 260)
     }
 }
 
