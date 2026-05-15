@@ -203,50 +203,6 @@ struct AppListItemContainer<Content: View>: View {
     }
 }
 
-struct AppListSelectionControl<Actions: View>: View {
-    let isSelecting: Bool
-    let selectedCount: Int
-    let selectTitle: String
-    let onToggle: () -> Void
-    @ViewBuilder var actions: Actions
-
-    var body: some View {
-        HStack(spacing: 10) {
-            if isSelecting {
-                Text("\(selectedCount) selected")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .transition(.opacity.combined(with: .move(edge: .leading)))
-            }
-
-            Spacer(minLength: 8)
-
-            if isSelecting {
-                actions
-                    .transition(.opacity.combined(with: .scale(scale: 0.95)))
-            }
-
-            if isSelecting {
-                Button(action: onToggle) {
-                    Label("Done", systemImage: "checkmark")
-                        .font(.subheadline.weight(.semibold))
-                }
-                .appSelectionButtonStyle()
-            } else {
-                Button(action: onToggle) {
-                    Image(systemName: "checklist")
-                        .font(.system(size: 16, weight: .semibold))
-                }
-                .appSelectionIconButtonStyle()
-            }
-        }
-        .padding(.horizontal, 2)
-        .frame(minHeight: 36)
-        .animation(.easeInOut(duration: 0.18), value: isSelecting)
-        .animation(.easeInOut(duration: 0.18), value: selectedCount)
-    }
-}
-
 struct AppSearchSelectionBar<Actions: View>: View {
     @Binding var search: String
     let prompt: String
@@ -474,26 +430,5 @@ extension View {
             .listRowInsets(EdgeInsets(top: 20, leading: 18, bottom: 20, trailing: 18))
             .listRowSeparator(.hidden)
             .listRowBackground(Color.clear)
-    }
-
-    @ViewBuilder
-    func appSelectionButtonStyle() -> some View {
-        self
-            .buttonStyle(.plain)
-            .foregroundStyle(.primary)
-            .padding(.horizontal, 12)
-            .frame(height: 36)
-            .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground), in: Capsule())
-            .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
-    }
-
-    @ViewBuilder
-    func appSelectionIconButtonStyle() -> some View {
-        self
-            .buttonStyle(.plain)
-            .foregroundStyle(.primary)
-            .frame(width: 36, height: 36)
-            .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground), in: Circle())
-            .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
     }
 }
