@@ -459,20 +459,6 @@ struct CanvasContainerView: View {
         showFeedback(objects.count == 1 ? "Attached 1 card" : "Attached \(objects.count) cards")
     }
 
-    private func performWorkspaceAction<T: Encodable>(
-        _ name: WorkspaceActionName,
-        arguments: T
-    ) -> Bool {
-        guard let argumentsData = try? JSONEncoder().encode(arguments) else { return false }
-        let request = WorkspaceActionRequest(
-            name: name,
-            workspaceID: workspace.id,
-            argumentsData: argumentsData,
-            source: .user
-        )
-        return WorkspaceActionRegistry.perform(request, in: context).success
-    }
-
     private var selectedClips: [Clip] {
         workspace.canvasObjects
             .filter { selectedObjectIDs.contains($0.id) }
