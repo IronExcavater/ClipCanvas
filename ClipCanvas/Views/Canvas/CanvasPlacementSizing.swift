@@ -21,9 +21,6 @@ enum CanvasPlacementSizing {
         height: contentChrome.height + maximumTextLines * lineHeight
     )
 
-    static var estimatedCharacterWidth: CGFloat { characterWidth }
-    static var estimatedLineHeight: CGFloat { lineHeight }
-
     static func toggledSize(for placement: CanvasPlacement, availableScreenWidth: CGFloat? = nil) -> CGSize {
         if isExpanded(placement) { return minimumSize }
         return expandedSize(for: placement.clip, availableScreenWidth: availableScreenWidth)
