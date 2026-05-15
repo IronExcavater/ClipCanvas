@@ -107,7 +107,7 @@ struct SidebarView: View {
                 .foregroundStyle(.secondary)
                 .padding(.top, 4)
 
-            VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .center, spacing: 8) {
                 Text(activeWorkspace?.name ?? "Choose a workspace")
                     .font(.title2.weight(.bold))
                     .foregroundStyle(.primary)
@@ -115,41 +115,33 @@ struct SidebarView: View {
                     .minimumScaleFactor(0.82)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                HStack(spacing: 8) {
-                    Menu {
-                        ForEach(workspaces) { workspace in
-                            Button {
-                                activateWorkspace(workspace)
-                            } label: {
-                                Label(
-                                    workspace.name,
-                                    systemImage: workspace.id == activeWorkspace?.id ? "checkmark" : "folder"
-                                )
-                            }
+                Menu {
+                    ForEach(workspaces) { workspace in
+                        Button {
+                            activateWorkspace(workspace)
+                        } label: {
+                            Label(
+                                workspace.name,
+                                systemImage: workspace.id == activeWorkspace?.id ? "checkmark" : "folder"
+                            )
                         }
-                    } label: {
-                        Label("Switch", systemImage: "rectangle.stack")
-                            .font(.callout.weight(.semibold))
-                            .padding(.horizontal, 12)
-                            .frame(height: 40)
-                            .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground), in: Capsule())
-                            .shadow(color: .black.opacity(0.10), radius: 8, y: 3)
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel("Switch Workspace")
-
-                    NavigationLink(destination: WorkspacesPage()) {
-                        Text("View all")
-                            .font(.callout.weight(.semibold))
-                            .padding(.horizontal, 12)
-                            .frame(height: 40)
-                            .background(Color.accentColor.opacity(0.14), in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-                    .foregroundStyle(Color.accentColor)
-
-                    Spacer(minLength: 0)
+                } label: {
+                    Image(systemName: "rectangle.stack")
+                        .font(.system(size: 16, weight: .semibold))
+                        .frame(width: 36, height: 36)
                 }
+                .buttonStyle(BlendedIconButtonStyle())
+                .accessibilityLabel("Switch Workspace")
+
+                NavigationLink(destination: WorkspacesPage()) {
+                    Image(systemName: "square.grid.2x2")
+                        .font(.system(size: 16, weight: .semibold))
+                        .frame(width: 36, height: 36)
+                }
+                .buttonStyle(BlendedIconButtonStyle())
+                .foregroundStyle(.primary)
+                .accessibilityLabel("View All Workspaces")
             }
         }
         .padding(.top, 4)

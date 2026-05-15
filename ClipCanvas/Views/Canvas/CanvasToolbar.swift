@@ -74,7 +74,7 @@ struct CanvasToolbar: View {
         case .manageTags:
             toolButton("tag", action: onManageTags)
         case .arrangeSelection:
-            toolButton("rectangle.3.group", action: onArrangeSelection)
+            toolButton("square.grid.2x2", action: onArrangeSelection)
         case .color:
             toolButton("paintpalette", action: onColor)
         case .formatBold:

@@ -43,9 +43,9 @@ struct CanvasObjectView: View {
         .background {
             if usesStickySurface {
                 ZStack {
-                    StickyNoteShape()
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .fill(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground))
-                    StickyNoteShape()
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .fill(fillColor.opacity(0.20))
                 }
             } else {
@@ -55,8 +55,10 @@ struct CanvasObjectView: View {
         }
         .overlay {
             if usesStickySurface {
-                StickyNoteShape()
-                    .stroke(isSelected ? Color.accentColor : strokeColor, lineWidth: isSelected ? 2.5 : 1)
+                if isSelected {
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .stroke(Color.accentColor, lineWidth: 2)
+                }
             } else {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .stroke(isSelected ? Color.accentColor : strokeColor, lineWidth: isSelected ? 2.5 : 1)

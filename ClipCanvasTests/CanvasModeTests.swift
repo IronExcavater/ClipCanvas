@@ -9,13 +9,12 @@ import Testing
         #expect(!CanvasMode.draw.allowsCanvasPan)
     }
 
-    @Test func emptyToolbarShowsAIAndAllModes() {
+    @Test func emptyToolbarShowsAIAndEditModeSwitchers() {
         let configuration = CanvasToolbarConfiguration.make(selectedCount: 0, mode: .pan)
 
         #expect(configuration.items == [
             .askAI,
             .divider,
-            .mode(.pan),
             .mode(.edit),
             .mode(.draw)
         ])
@@ -36,9 +35,9 @@ import Testing
         let configuration = CanvasToolbarConfiguration.make(selectedCount: 1, mode: .pan)
 
         #expect(configuration.items == [
-            .arrangeSelection,
-            .details,
             .askAI,
+            .details,
+            .arrangeSelection,
             .delete
         ])
     }
@@ -47,8 +46,8 @@ import Testing
         let configuration = CanvasToolbarConfiguration.make(selectedCount: 2, mode: .pan)
 
         #expect(configuration.items == [
-            .arrangeSelection,
             .askAI,
+            .arrangeSelection,
             .delete
         ])
     }

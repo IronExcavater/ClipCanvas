@@ -127,17 +127,17 @@ nonisolated struct CanvasToolbarConfiguration: Equatable {
 
         case .pan:
             if selectedCount > 0 {
-                var items: [CanvasToolbarItem] = [.arrangeSelection]
+                var items: [CanvasToolbarItem] = [.askAI]
                 if selectedCount == 1 {
                     items.append(.details)
                 }
-                items.append(contentsOf: [.askAI, .delete])
+                items.append(contentsOf: [.arrangeSelection, .delete])
                 return CanvasToolbarConfiguration(items: items)
             }
             return CanvasToolbarConfiguration(items: [
                 .askAI,
                 .divider,
-                .mode(.pan), .mode(.edit), .mode(.draw)
+                .mode(.edit), .mode(.draw)
             ])
         }
     }

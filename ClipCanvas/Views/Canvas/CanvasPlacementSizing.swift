@@ -120,9 +120,8 @@ enum CanvasPlacementSizing {
 
     static func fontSizeForContent(_ text: String, width: CGFloat) -> CGFloat {
         let chars = CGFloat(text.trimmingCharacters(in: .whitespacesAndNewlines).count)
-        let widthNorm = (width / minimumSize.width).clamped(to: 0.8...2.5)
         let base: CGFloat = chars <= 0 ? 28 : 15.0 + 13.0 / (1.0 + chars / 20.0)
-        return (base * widthNorm).clamped(to: 13...32)
+        return base.clamped(to: 13...32)
     }
 
     static func isExpanded(width: Double, height: Double) -> Bool {

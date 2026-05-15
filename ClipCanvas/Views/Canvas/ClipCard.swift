@@ -51,15 +51,16 @@ struct ClipCard: View {
         }
         .background {
             cardSurface
-                .clipShape(StickyNoteShape())
+                .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         }
-        .overlay(
-            StickyNoteShape()
-                .stroke(isSelected ? Color.accentColor : Color.primary.opacity(0.08),
-                        lineWidth: isSelected ? 2.5 : 1)
-        )
+        .overlay {
+            if isSelected {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .stroke(Color.accentColor, lineWidth: 2)
+            }
+        }
         .shadow(color: .black.opacity(isSelected ? 0.16 : 0.09), radius: isSelected ? 10 : 6, y: isSelected ? 4 : 2)
-        .contentShape(StickyNoteShape())
+        .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .gesture(tapGesture)
         .animation(.spring(response: 0.18, dampingFraction: 0.8), value: isSelected)
     }
@@ -164,7 +165,6 @@ struct ClipCard: View {
         ZStack {
             Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground)
             (fillColor ?? primaryColor).opacity(0.18)
-            StickyNoteFoldOverlay()
         }
     }
 
@@ -191,64 +191,6 @@ struct CanvasNoteTagFooter: View {
     }
 }
 
-struct StickyNoteShape: InsettableShape {
-    var foldSize: CGFloat = 18
-    var cornerRadius: CGFloat = 10
-    var insetAmount: CGFloat = 0
-
-    func path(in rect: CGRect) -> Path {
-        let rect = rect.insetBy(dx: insetAmount, dy: insetAmount)
-        let fold = min(foldSize, rect.width * 0.20, rect.height * 0.20)
-        let r = min(cornerRadius, rect.width * 0.12, rect.height * 0.12)
-        var path = Path()
-        // Start bottom-left, go clockwise
-        path.move(to: CGPoint(x: rect.minX + r, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.maxX - r, y: rect.maxY))
-        path.addQuadCurve(to: CGPoint(x: rect.maxX, y: rect.maxY - r),
-                          control: CGPoint(x: rect.maxX, y: rect.maxY))
-        path.addLine(to: CGPoint(x: rect.maxX, y: rect.minY + fold))
-        // Fold corner — straight lines to preserve the classic sticky note look
-        path.addLine(to: CGPoint(x: rect.maxX - fold, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.minX + r, y: rect.minY))
-        path.addQuadCurve(to: CGPoint(x: rect.minX, y: rect.minY + r),
-                          control: CGPoint(x: rect.minX, y: rect.minY))
-        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY - r))
-        path.addQuadCurve(to: CGPoint(x: rect.minX + r, y: rect.maxY),
-                          control: CGPoint(x: rect.minX, y: rect.maxY))
-        path.closeSubpath()
-        return path
-    }
-
-    func inset(by amount: CGFloat) -> StickyNoteShape {
-        var shape = self
-        shape.insetAmount += amount
-        return shape
-    }
-}
-
-struct StickyNoteFoldOverlay: View {
-    var foldSize: CGFloat = 18
-
-    var body: some View {
-        GeometryReader { geo in
-            let fold = min(foldSize, geo.size.width * 0.20, geo.size.height * 0.20)
-            Path { path in
-                let x = geo.size.width - fold
-                path.move(to: CGPoint(x: x, y: 0))
-                path.addLine(to: CGPoint(x: geo.size.width, y: fold))
-                path.addLine(to: CGPoint(x: x, y: fold))
-                path.closeSubpath()
-            }
-            .fill(Color.black.opacity(0.06))
-            Path { path in
-                let x = geo.size.width - fold
-                path.move(to: CGPoint(x: x, y: 0))
-                path.addLine(to: CGPoint(x: geo.size.width, y: fold))
-            }
-            .stroke(Color.primary.opacity(0.08), lineWidth: 0.5)
-        }
-    }
-}
 
 #if canImport(UIKit)
 struct NoteTextEditor: UIViewRepresentable {
