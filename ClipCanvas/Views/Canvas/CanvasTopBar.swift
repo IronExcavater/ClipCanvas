@@ -79,7 +79,7 @@ struct CanvasTopBar: View {
     private var title: some View {
         if isRenaming {
             TextField("Workspace name", text: $renameText)
-                .font(.title2.weight(.bold))
+                .font(.title3.weight(.semibold))
                 .multilineTextAlignment(.center)
                 .textFieldStyle(.plain)
                 .focused(renameFocused)
@@ -92,7 +92,7 @@ struct CanvasTopBar: View {
                 .onDisappear {
                     if isRenaming { onCommitRename() }
                 }
-                .frame(width: titleWidth(for: renameText))
+                .frame(maxWidth: 180)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
                 .background { WorkspaceTitleBackdrop() }
@@ -112,13 +112,13 @@ struct CanvasTopBar: View {
                 Button("Rename", systemImage: "pencil", action: onBeginRename)
             } label: {
                 Text(workspaceName)
-                    .font(.title2.weight(.bold))
+                    .font(.title3.weight(.semibold))
                     .foregroundStyle(.primary)
                     .lineLimit(1)
                     .truncationMode(.tail)
-                    .frame(width: titleWidth(for: workspaceName))
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
+                    .frame(maxWidth: 200)
                     .background { WorkspaceTitleBackdrop() }
             }
             .buttonStyle(.plain)
@@ -126,11 +126,6 @@ struct CanvasTopBar: View {
         }
     }
 
-    private func titleWidth(for text: String) -> CGFloat {
-        let visibleCharacters = min(max(text.count, 6), WorkspaceNamePolicy.maximumLength)
-        let estimated = CGFloat(visibleCharacters) * 15 + 24
-        return min(max(estimated, 120), 260)
-    }
 }
 
 private struct CanvasTopBarFade: View {

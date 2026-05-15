@@ -105,10 +105,13 @@ struct WorkspacesPage: View {
 
     @ViewBuilder
     private var toolbarActions: some View {
-        AppToolbarCircleButton(systemImage: "plus", action: createWorkspace)
-            .accessibilityLabel("New Workspace")
-            .opacity(isSelecting ? 0 : 1)
-            .disabled(isSelecting)
+        Button(action: createWorkspace) {
+            AppCircleIconLabel(systemImage: "plus")
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("New Workspace")
+        .opacity(isSelecting ? 0 : 1)
+        .disabled(isSelecting)
     }
 
     private func activateWorkspace(_ ws: Workspace) {

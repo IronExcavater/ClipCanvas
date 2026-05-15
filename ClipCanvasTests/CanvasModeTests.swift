@@ -9,11 +9,11 @@ import Testing
         #expect(!CanvasMode.draw.allowsCanvasPan)
     }
 
-    @Test func emptyToolbarShowsPasteAndAllModes() {
+    @Test func emptyToolbarShowsAIAndAllModes() {
         let configuration = CanvasToolbarConfiguration.make(selectedCount: 0, mode: .pan)
 
         #expect(configuration.items == [
-            .paste,
+            .askAI,
             .divider,
             .mode(.pan),
             .mode(.edit),
@@ -21,12 +21,14 @@ import Testing
         ])
     }
 
-    @Test func editEmptyToolbarAddsVisibleNewNoteAction() {
+    @Test func editEmptyToolbarShowsCreationTools() {
         let configuration = CanvasToolbarConfiguration.make(selectedCount: 0, mode: .edit)
 
         #expect(configuration.items == [
             .closeMode,
-            .newNote
+            .paste,
+            .newNote,
+            .insertImage,
         ])
     }
 

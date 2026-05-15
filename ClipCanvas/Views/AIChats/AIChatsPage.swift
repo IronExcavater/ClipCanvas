@@ -104,14 +104,22 @@ struct AIChatsPage: View {
         .sheet(item: $activeChat) { chat in
             AIChatDetailSheet(chat: chat)
         }
+        .onChange(of: activeChat) { old, new in
+            if new == nil, let old, old.messages.isEmpty {
+                context.delete(old)
+            }
+        }
     }
 
     @ViewBuilder
     private var toolbarActions: some View {
-        AppToolbarCircleButton(systemImage: "sparkles", action: createChat)
-            .accessibilityLabel("New Chat")
-            .opacity(isSelecting ? 0 : 1)
-            .disabled(isSelecting)
+        Button(action: createChat) {
+            AppCircleIconLabel(systemImage: "sparkles")
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("New Chat")
+        .opacity(isSelecting ? 0 : 1)
+        .disabled(isSelecting)
     }
 
     private func handleTap(_ chat: AIChat) {
@@ -197,12 +205,6 @@ private struct AIChatRow: View {
                             .font(.subheadline.weight(.semibold))
                             .foregroundStyle(.primary)
                             .lineLimit(1)
-
-                        Spacer(minLength: 8)
-
-                        RelativeAgeText(date: chat.updatedAt, prefix: "Updated ", suffix: " ago")
-                            .font(.caption2.weight(.medium))
-                            .foregroundStyle(.primary.opacity(0.68))
                     }
 
                     Text(description)
@@ -216,6 +218,10 @@ private struct AIChatRow: View {
                         stat("square.on.square", value: "\(attachmentCount)")
                         statLabel(chat.mode == .thinking ? "brain" : "bolt.fill",
                                   label: chat.mode == .thinking ? "Deep" : "Quick")
+                        Spacer(minLength: 0)
+                        RelativeAgeText(date: chat.updatedAt, suffix: " ago")
+                            .font(.caption2.weight(.medium))
+                            .foregroundStyle(.primary.opacity(0.52))
                     }
                     .padding(.top, 4)
                     .foregroundStyle(.primary.opacity(0.62))

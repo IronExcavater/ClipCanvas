@@ -151,7 +151,7 @@ struct HistoryPage: View {
             }
             .disabled(clips.isEmpty)
         } label: {
-            AppToolbarCircleLabel(systemImage: AppSymbol.options, size: 36, symbolSize: 18)
+            AppCircleIconLabel(systemImage: AppSymbol.options)
         }
         .accessibilityLabel("History options")
     }

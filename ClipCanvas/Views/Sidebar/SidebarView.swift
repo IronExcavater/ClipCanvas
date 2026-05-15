@@ -185,12 +185,6 @@ struct SidebarView: View {
                         .font(.subheadline.weight(.semibold))
                         .foregroundStyle(.primary)
                         .lineLimit(1)
-
-                    Spacer(minLength: 6)
-
-                    RelativeAgeText(date: chat.updatedAt, suffix: " ago")
-                        .font(.caption2)
-                        .foregroundStyle(.primary.opacity(0.58))
                 }
 
                 Text(chat.preview)
@@ -204,6 +198,10 @@ struct SidebarView: View {
                     chatStat("\(attachCount)", icon: "square.on.square")
                     chatStat(chat.mode == .thinking ? "Deep" : "Quick",
                              icon: chat.mode == .thinking ? "brain" : "bolt")
+                    Spacer(minLength: 0)
+                    RelativeAgeText(date: chat.updatedAt, suffix: " ago")
+                        .font(.caption2)
+                        .foregroundStyle(.primary.opacity(0.52))
                 }
                 .padding(.top, 3)
             }

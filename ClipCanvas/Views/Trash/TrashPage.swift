@@ -163,7 +163,7 @@ struct TrashPage: View {
                 confirmingDeleteAll = true
             }
         } label: {
-            AppToolbarCircleLabel(systemImage: AppSymbol.options, size: 36, symbolSize: 18)
+            AppCircleIconLabel(systemImage: AppSymbol.options)
         }
         .accessibilityLabel("Recently deleted options")
         .opacity(isSelecting ? 0 : 1)

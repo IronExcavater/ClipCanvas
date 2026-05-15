@@ -112,7 +112,8 @@ struct CanvasContainerView: View {
                     isEditing: editingObjectID != nil,
                     onPaste: paste,
                     onCreateNote: createNoteAtViewCenter,
-                    onAskAI: askAIAboutCurrentContext,
+                    onAskAI: openRecentOrNewAIChat,
+                    onInsertImage: insertImageFromLibrary,
                     onDetails: showSelectedDetails,
                     onEditContent: editSelectedContent,
                     onManageTags: showSelectedTags,
@@ -219,6 +220,11 @@ struct CanvasContainerView: View {
         }
         .sheet(item: $activeAIChat) { chat in
             AIChatDetailSheet(chat: chat)
+        }
+        .onChange(of: activeAIChat) { old, new in
+            if new == nil, let old, old.messages.isEmpty {
+                context.delete(old)
+            }
         }
     }
 
@@ -482,6 +488,19 @@ struct CanvasContainerView: View {
         activeAIChat = chat
         showFeedback(objects.count == 1 ? "Attached 1 card" : "Attached \(objects.count) cards")
     }
+
+    private func openRecentOrNewAIChat() {
+        let recent = workspace.chats
+            .filter { !$0.messages.isEmpty }
+            .sorted { $0.updatedAt > $1.updatedAt }
+            .first
+        activeAIChat = recent ?? AIChatService.createChat(in: context, workspace: workspace)
+    }
+
+    private func insertImageFromLibrary() {
+        showFeedback("Image picker coming soon")
+    }
+
 
     private var selectedClips: [Clip] {
         workspace.canvasObjects

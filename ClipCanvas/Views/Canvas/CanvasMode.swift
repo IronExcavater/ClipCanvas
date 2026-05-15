@@ -27,6 +27,7 @@ enum ZoomCommand: Equatable {
 nonisolated enum CanvasToolbarItem: Equatable {
     case paste
     case newNote
+    case insertImage
     case askAI
     case details
     case editContent
@@ -119,7 +120,9 @@ nonisolated struct CanvasToolbarConfiguration: Equatable {
             }
             return CanvasToolbarConfiguration(items: [
                 .closeMode,
+                .paste,
                 .newNote,
+                .insertImage,
             ])
 
         case .pan:
@@ -132,7 +135,7 @@ nonisolated struct CanvasToolbarConfiguration: Equatable {
                 return CanvasToolbarConfiguration(items: items)
             }
             return CanvasToolbarConfiguration(items: [
-                .paste,
+                .askAI,
                 .divider,
                 .mode(.pan), .mode(.edit), .mode(.draw)
             ])

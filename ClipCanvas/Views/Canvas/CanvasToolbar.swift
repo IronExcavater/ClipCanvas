@@ -8,6 +8,7 @@ struct CanvasToolbar: View {
     let onPaste: () -> Void
     let onCreateNote: () -> Void
     let onAskAI: () -> Void
+    var onInsertImage: () -> Void = {}
     let onDetails: () -> Void
     let onEditContent: () -> Void
     let onManageTags: () -> Void
@@ -34,25 +35,19 @@ struct CanvasToolbar: View {
     }
     private let buttonSize: CGFloat = 46
     private let iconSize: CGFloat = 18
-    private let stableToolbarWidth: CGFloat = 326
 
     var body: some View {
-        HStack {
-            Spacer(minLength: 0)
-            HStack(spacing: 2) {
-                ForEach(Array(configuration.items.enumerated()), id: \.offset) { _, item in
-                    toolbarItem(item)
-                }
+        HStack(spacing: 2) {
+            ForEach(Array(configuration.items.enumerated()), id: \.offset) { _, item in
+                toolbarItem(item)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 6)
-            .frame(width: stableToolbarWidth)
-            .background { toolbarBackground }
-            .shadow(color: .black.opacity(0.18), radius: 20, y: 8)
-            .contentShape(Capsule())
-            .onTapGesture {}
-            Spacer(minLength: 0)
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
+        .background { toolbarBackground }
+        .shadow(color: .black.opacity(0.18), radius: 20, y: 8)
+        .contentShape(Capsule())
+        .onTapGesture {}
         .padding(.horizontal, 20)
         .padding(.bottom, 24)
         .ignoresSafeArea(.container, edges: .bottom)
@@ -65,7 +60,9 @@ struct CanvasToolbar: View {
         case .paste:
             toolButton("clipboard", action: onPaste)
         case .newNote:
-            toolButton("note.text.badge.plus", action: onCreateNote)
+            toolButton("square.and.pencil", action: onCreateNote)
+        case .insertImage:
+            toolButton("photo.badge.plus", action: onInsertImage)
         case .askAI:
             toolButton("sparkles", action: onAskAI)
         case .details:

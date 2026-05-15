@@ -45,9 +45,10 @@ struct ClipDetailSheet: View {
             .appInlineNavigationTitleDisplayMode()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    AppToolbarCircleButton(systemImage: "xmark", size: 36, symbolSize: 14) {
-                        dismiss()
+                    Button(action: { dismiss() }) {
+                        AppCircleIconLabel(systemImage: "xmark", size: 36, symbolSize: 14)
                     }
+                    .buttonStyle(.plain)
                     .accessibilityLabel("Close")
                 }
             }
