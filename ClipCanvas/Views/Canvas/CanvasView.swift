@@ -43,7 +43,11 @@ struct CanvasView: View {
                 )
                 .contentShape(Rectangle())
                 .onTapGesture {
-                    selectedObjectIDs.removeAll()
+                    if editingObjectID != nil {
+                        editingObjectID = nil
+                    } else {
+                        selectedObjectIDs.removeAll()
+                    }
                 }
                 .gesture(mode.allowsCanvasPan ? canvasPanGesture(in: geo) : nil)
                 .zIndex(0)
@@ -125,11 +129,12 @@ struct CanvasView: View {
             clip: clip,
             isSelected: isSelected,
             showsContent: canvasScale >= 0.34 || isSelected || isDragging,
-            onTap: { toggleSelection(for: object) },
+            onTap: { handleTap(for: object) },
             onDoubleTap: { handleDoubleTap(for: object, in: geo) },
             isEditing: editingObjectID == object.id,
             editingText: clip.content,
             onCommitEditing: { commitClipText($0, clip: clip, object: object) },
+            onExitEditing: { editingObjectID = nil },
             onResize: { updateResizePreview(for: object, translation: $0) },
             onResizeEnded: { commitResize(for: object, in: geo) },
             onToggleExpandedSize: { toggleExpandedSize(for: object, in: geo) }
@@ -155,11 +160,12 @@ struct CanvasView: View {
             object: object,
             isSelected: isSelected,
             showsContent: canvasScale >= 0.34 || isSelected || isDragging,
-            onTap: { toggleSelection(for: object) },
+            onTap: { handleTap(for: object) },
             onDoubleTap: { handleDoubleTap(for: object, in: geo) },
             isEditing: editingObjectID == object.id,
             editingText: object.text,
             onCommitEditing: { commitObjectText($0, object: object) },
+            onExitEditing: { editingObjectID = nil },
             onResize: { updateResizePreview(for: object, translation: $0) },
             onResizeEnded: { commitResize(for: object, in: geo) },
             onToggleExpandedSize: { toggleExpandedSize(for: object, in: geo) }
@@ -466,6 +472,20 @@ struct CanvasView: View {
 
         if fitAfter { fitContent(in: geo) }
         updateVisibleObjectIDs(in: geo)
+    }
+
+    private func handleTap(for object: CanvasObject) {
+        bringToFront(object.id)
+        if mode == .edit, canEditText(object) {
+            selectedObjectIDs = [object.id]
+            editingObjectID = object.id
+        } else {
+            if selectedObjectIDs.contains(object.id) {
+                selectedObjectIDs.remove(object.id)
+            } else {
+                selectedObjectIDs.insert(object.id)
+            }
+        }
     }
 
     private func toggleSelection(for object: CanvasObject) {

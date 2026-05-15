@@ -9,6 +9,7 @@ struct CanvasObjectView: View {
     var isEditing = false
     var editingText = ""
     let onCommitEditing: (String) -> Void
+    var onExitEditing: () -> Void = {}
     let onResize: (CGSize) -> Void
     let onResizeEnded: () -> Void
     let onToggleExpandedSize: () -> Void
@@ -49,6 +50,14 @@ struct CanvasObjectView: View {
         .contentShape(Rectangle())
         .onTapGesture(count: 2, perform: onDoubleTap)
         .onTapGesture(perform: onTap)
+        .gesture(
+            isEditing ? DragGesture(minimumDistance: 20)
+                .onEnded { value in
+                    if value.translation.height > 40 && abs(value.translation.width) < 80 {
+                        onExitEditing()
+                    }
+                } : nil
+        )
         .animation(.spring(response: 0.18, dampingFraction: 0.8), value: isSelected)
     }
 
@@ -57,7 +66,7 @@ struct CanvasObjectView: View {
         if !showsContent {
             Color.clear
         } else if isEditing, usesEditableText {
-            InlineNoteEditor(text: editingText, onCommit: onCommitEditing)
+            NoteTextEditor(initialText: editingText, onCommit: onCommitEditing, onExitEditing: onExitEditing)
         } else {
             switch object.kind {
             case .image:

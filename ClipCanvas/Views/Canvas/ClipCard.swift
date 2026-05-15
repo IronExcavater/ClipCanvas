@@ -10,6 +10,7 @@ struct ClipCard: View {
     var isEditing = false
     var editingText = ""
     let onCommitEditing: (String) -> Void
+    var onExitEditing: () -> Void = {}
     let onResize: (CGSize) -> Void
     let onResizeEnded: () -> Void
     let onToggleExpandedSize: () -> Void
@@ -35,6 +36,14 @@ struct ClipCard: View {
         .contentShape(StickyNoteShape())
         .onTapGesture(count: 2, perform: onDoubleTap)
         .onTapGesture(perform: onTap)
+        .gesture(
+            isEditing ? DragGesture(minimumDistance: 20)
+                .onEnded { value in
+                    if value.translation.height > 40 && abs(value.translation.width) < 80 {
+                        onExitEditing()
+                    }
+                } : nil
+        )
         .animation(.spring(response: 0.18, dampingFraction: 0.8), value: isSelected)
     }
 
@@ -43,7 +52,7 @@ struct ClipCard: View {
             if !showsContent {
                 Color.clear
             } else if isEditing, clip.type != .image {
-                InlineNoteEditor(text: editingText, onCommit: onCommitEditing)
+                NoteTextEditor(initialText: editingText, onCommit: onCommitEditing, onExitEditing: onExitEditing)
             } else if clip.type == .image, let data = clip.imageData, let uiImage = UIImage(data: data) {
                 Image(uiImage: uiImage)
                     .resizable()
@@ -107,39 +116,60 @@ struct StickyNoteShape: InsettableShape {
     }
 }
 
-struct InlineNoteEditor: View {
-    let text: String
+struct NoteTextEditor: UIViewRepresentable {
+    let initialText: String
+    var fontSize: CGFloat = 15
     let onCommit: (String) -> Void
+    var onExitEditing: () -> Void = {}
 
-    @State private var draft = ""
-    @FocusState private var focused: Bool
-
-    var body: some View {
-        TextField("Note", text: $draft, axis: .vertical)
-            .font(.system(size: 15))
-            .foregroundStyle(.primary)
-            .lineLimit(3...14)
-            .textFieldStyle(.plain)
-            .submitLabel(.return)
-            .focused($focused)
-            // "Done" / checkmark key dismisses the keyboard — saving is handled by
-            // the onChange(of: focused) below so we never double-commit.
-            .onSubmit { focused = false }
-            .onAppear {
-                draft = text
-                focused = true
-            }
-            .onDisappear(perform: commit)
-            .onChange(of: text) { _, newValue in
-                if !focused { draft = newValue }
-            }
-            .onChange(of: focused) { _, isFocused in
-                if !isFocused { commit() }
-            }
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: initialText, onCommit: onCommit, onExitEditing: onExitEditing)
     }
 
-    private func commit() {
-        onCommit(draft)
+    func makeUIView(context: Context) -> UITextView {
+        let tv = UITextView()
+        tv.delegate = context.coordinator
+        context.coordinator.textView = tv
+        tv.backgroundColor = .clear
+        tv.font = .systemFont(ofSize: fontSize)
+        tv.textColor = .label
+        tv.isScrollEnabled = false
+        tv.text = initialText
+        tv.textContainerInset = .zero
+        tv.textContainer.lineFragmentPadding = 0
+        DispatchQueue.main.async { tv.becomeFirstResponder() }
+        return tv
+    }
+
+    func updateUIView(_ uiView: UITextView, context: Context) {
+        uiView.font = .systemFont(ofSize: fontSize)
+    }
+
+    final class Coordinator: NSObject, UITextViewDelegate {
+        var text: String
+        let onCommit: (String) -> Void
+        let onExitEditing: () -> Void
+        weak var textView: UITextView?
+        private var hasExited = false
+
+        init(text: String, onCommit: @escaping (String) -> Void, onExitEditing: @escaping () -> Void) {
+            self.text = text
+            self.onCommit = onCommit
+            self.onExitEditing = onExitEditing
+        }
+
+        func textViewDidChange(_ textView: UITextView) {
+            text = textView.text ?? ""
+            onCommit(text)
+        }
+
+        func textViewDidEndEditing(_ textView: UITextView) {
+            textView.contentOffset = .zero
+            onCommit(text)
+            guard !hasExited else { return }
+            hasExited = true
+            onExitEditing()
+        }
     }
 }
 
