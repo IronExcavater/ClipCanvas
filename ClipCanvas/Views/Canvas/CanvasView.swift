@@ -570,15 +570,6 @@ struct CanvasView: View {
         selectedObjectIDs.contains(object.id) ? selectedObjectIDs : [object.id]
     }
 
-    private func toggleSelection(for object: CanvasObject) {
-        bringToFront(object.id)
-        if selectedObjectIDs.contains(object.id) {
-            selectedObjectIDs.remove(object.id)
-        } else {
-            selectedObjectIDs.insert(object.id)
-        }
-    }
-
     private func bringToFront(_ id: UUID) {
         zOrder[id] = nextZOrder
         nextZOrder += 1
