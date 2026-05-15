@@ -19,30 +19,23 @@ struct ClipRowView: View {
     ) private var workspaces: [Workspace]
 
     var body: some View {
-        AppListItemContainer(tint: primaryTagColor, opacity: 0.20) {
+        AppListItemContainer(tint: primaryTagColor, opacity: 0.12) {
             HStack(alignment: .top, spacing: 10) {
                 if isSelecting {
                     Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 19, weight: .semibold))
+                        .font(.system(size: 20, weight: .semibold))
                         .foregroundStyle(isSelected ? Color.accentColor : .secondary)
-                        .padding(.top, 2)
+                        .padding(.top, 3)
                 }
 
-                textContent
-
-                if clip.isPrivateContent {
-                    privateRevealButton
-                        .padding(.top, -1)
-                }
-
-                if clip.isPinned {
-                    Image(systemName: "pin.fill")
-                        .font(.caption2)
-                        .foregroundStyle(primaryTagColor)
-                        .accessibilityLabel("Pinned")
+                VStack(alignment: .leading, spacing: 4) {
+                    rowHeader
+                    if isExpanded {
+                        expandedContent
                     }
+                    rowFooter
+                }
             }
-            .frame(minHeight: compact ? 42 : (isExpanded ? 112 : 68))
         }
         .onTapGesture(perform: primaryAction)
         .accessibilityAddTraits(.isButton)
@@ -130,21 +123,53 @@ struct ClipRowView: View {
         activeWorkspace?.place(clip: clip)
     }
 
-    private var textContent: some View {
-        VStack(alignment: .leading, spacing: 2) {
+    private var rowHeader: some View {
+        HStack(alignment: .center, spacing: 8) {
+            Image(systemName: clip.type.icon)
+                .font(.system(size: 12, weight: .bold))
+                .foregroundStyle(.white)
+                .frame(width: 22, height: 22)
+                .background(primaryTagColor, in: Circle())
+
             Text(displayPreview)
                 .font(.subheadline.weight(.medium))
-                .lineLimit(compact ? 1 : (isExpanded ? 8 : 3))
+                .lineLimit(compact ? 1 : 2)
                 .foregroundStyle(.primary)
-                .fixedSize(horizontal: false, vertical: true)
 
-            HStack(spacing: 5) {
-                Text(ClipTag.builtInName(for: clip.type)).font(.caption2)
-                Spacer()
-                RelativeAgeText(date: clip.updatedAt, prefix: "Updated ", suffix: " ago")
-                    .font(.caption2)
+            Spacer(minLength: 8)
+
+            if clip.isPinned {
+                Image(systemName: "pin.fill")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundStyle(primaryTagColor)
             }
-            .foregroundStyle(.primary.opacity(0.66))
+
+            RelativeAgeText(date: clip.updatedAt, suffix: " ago")
+                .font(.caption2.weight(.medium))
+                .foregroundStyle(.primary.opacity(0.58))
+        }
+    }
+
+    private var expandedContent: some View {
+        Text(displayPreview)
+            .font(.callout)
+            .foregroundStyle(.primary.opacity(0.78))
+            .lineLimit(6)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .transition(.opacity.combined(with: .move(edge: .top)))
+    }
+
+    private var rowFooter: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 12) {
+                clipStat(clip.type.icon, label: ClipTag.builtInName(for: clip.type))
+                clipStat("character.cursor.ibeam", label: "\(clip.content.count)")
+                if clip.isPrivateContent {
+                    privateRevealButton
+                }
+            }
+            .foregroundStyle(.primary.opacity(0.56))
+            .padding(.top, 2)
 
             if !clip.tags.isEmpty {
                 HStack(spacing: 5) {
@@ -158,22 +183,30 @@ struct ClipRowView: View {
                         )
                     }
                 }
-                .padding(.top, 4)
             }
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .layoutPriority(1)
+    }
+
+    private func clipStat(_ icon: String, label: String) -> some View {
+        HStack(spacing: 2) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .semibold))
+            Text(label)
+                .font(.caption2.weight(.semibold))
+        }
     }
 
     private var privateRevealButton: some View {
         Button {
             revealStore.toggle(clip)
         } label: {
-            Image(systemName: isRevealed ? "eye.slash.fill" : "eye.fill")
-                .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(.primary)
-                .frame(width: 32, height: 32)
-                .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground).opacity(0.86), in: Circle())
+            HStack(spacing: 2) {
+                Image(systemName: isRevealed ? "eye.slash.fill" : "eye.fill")
+                    .font(.system(size: 11, weight: .semibold))
+                Text(isRevealed ? "Hide" : "Reveal")
+                    .font(.caption2.weight(.semibold))
+            }
+            .foregroundStyle(.primary.opacity(0.56))
         }
         .buttonStyle(.plain)
         .accessibilityLabel(isRevealed ? "Hide sensitive content" : "Reveal sensitive content")
