@@ -211,12 +211,14 @@ private struct AIChatRow: View {
                         .lineLimit(2)
                         .frame(maxWidth: .infinity, alignment: .leading)
 
-                    HStack(spacing: 14) {
-                        stat("bubble.left", value: chat.messages.count)
-                        stat("paperclip", value: attachmentCount)
-                        stat("hammer", value: toolEventCount)
+                    HStack(spacing: 12) {
+                        stat("bubble.left.fill", value: "\(chat.messages.count)")
+                        stat("square.on.square", value: "\(attachmentCount)")
+                        statLabel(chat.mode == .thinking ? "brain" : "bolt.fill",
+                                  label: chat.mode == .thinking ? "Deep" : "Quick")
                     }
-                    .foregroundStyle(.primary.opacity(0.66))
+                    .padding(.top, 4)
+                    .foregroundStyle(.primary.opacity(0.62))
                 }
             }
         }
@@ -255,16 +257,21 @@ private struct AIChatRow: View {
         chat.sortedMessages.reduce(0) { $0 + $1.attachments.count }
     }
 
-    private var toolEventCount: Int {
-        chat.sortedMessages.reduce(0) { $0 + $1.toolEvents.count }
-    }
-
-    private func stat(_ icon: String, value: Int) -> some View {
-        HStack(spacing: 3) {
+    private func stat(_ icon: String, value: String) -> some View {
+        HStack(spacing: 2) {
             Image(systemName: icon)
                 .font(.system(size: 11, weight: .semibold))
-            Text("\(value)")
+            Text(value)
                 .font(.caption2.weight(.semibold).monospacedDigit())
+        }
+    }
+
+    private func statLabel(_ icon: String, label: String) -> some View {
+        HStack(spacing: 2) {
+            Image(systemName: icon)
+                .font(.system(size: 11, weight: .semibold))
+            Text(label)
+                .font(.caption2.weight(.semibold))
         }
     }
 }
