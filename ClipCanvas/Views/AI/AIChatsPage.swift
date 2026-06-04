@@ -10,8 +10,7 @@ struct AIChatsPage: View {
     ) private var workspaces: [Workspace]
 
     @State private var search = ""
-    @State private var isSelecting = false
-    @State private var selection = Set<UUID>()
+    @State private var chatSelection = SelectionState<UUID>()
     @State private var confirmingDelete = false
     @State private var activeChat: AIChat?
     @State private var renamingChat: AIChat?
@@ -19,42 +18,26 @@ struct AIChatsPage: View {
     @State private var showRenameAlert = false
 
     private var filteredChats: [AIChat] {
-        guard !search.isEmpty else { return chats }
-        return chats.filter {
-            $0.title.localizedCaseInsensitiveContains(search)
-            || $0.preview.localizedCaseInsensitiveContains(search)
-        }
-    }
-
-    private var selectedChats: [AIChat] {
-        chats.filter { selection.contains($0.id) }
+        search.isEmpty ? chats
+                       : chats.filter { $0.title.localizedCaseInsensitiveContains(search)
+                                       || $0.preview.localizedCaseInsensitiveContains(search) }
     }
 
     var body: some View {
-        let searchBinding = Binding(
-            get: { search },
-            set: { newValue in
-                withAnimation(.easeInOut(duration: 0.18)) {
-                    search = newValue
-                }
-            }
-        )
         List {
             AppSearchSelectionBar(
-                search: searchBinding,
+                search: $search.withListAnimation,
                 prompt: "Search chats",
-                isSelecting: isSelecting,
-                selectedCount: selection.count,
-                onBeginSelection: beginSelection,
-                onEndSelection: endSelection
+                isSelecting: chatSelection.isActive,
+                selectedCount: chatSelection.count,
+                onBeginSelection: { chatSelection.begin() },
+                onEndSelection: { chatSelection.end() }
             ) {
-                Button(role: .destructive) {
-                    confirmingDelete = true
-                } label: {
+                Button(role: .destructive) { confirmingDelete = true } label: {
                     AppToolbarCircleLabel(systemImage: "trash", size: 40, symbolSize: 15)
                 }
                 .buttonStyle(.plain)
-                .disabled(selection.isEmpty)
+                .disabled(chatSelection.isEmpty)
             }
             .appListItemRowInsets(horizontal: 14, vertical: 4)
 
@@ -72,8 +55,8 @@ struct AIChatsPage: View {
                 ForEach(filteredChats) { chat in
                     AIChatRow(
                         chat: chat,
-                        isSelecting: isSelecting,
-                        isSelected: selection.contains(chat.id),
+                        isSelecting: chatSelection.isActive,
+                        isSelected: chatSelection.contains(chat.id),
                         onTap: { handleTap(chat) },
                         onRename: { beginRename(chat) },
                         onDelete: { context.delete(chat) }
@@ -82,9 +65,7 @@ struct AIChatsPage: View {
                 }
             }
         }
-        .listStyle(.plain)
-        .scrollContentBackground(.hidden)
-        .contentMargins(.top, 0, for: .scrollContent)
+        .appPageListStyle()
         .navigationTitle("AI Chats")
         .animation(.easeInOut(duration: 0.18), value: search.isEmpty)
         .alert("Delete selected chats?", isPresented: $confirmingDelete) {
@@ -118,29 +99,18 @@ struct AIChatsPage: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("New Chat")
-        .opacity(isSelecting ? 0 : 1)
-        .disabled(isSelecting)
+        .opacity(chatSelection.isActive ? 0 : 1)
+        .disabled(chatSelection.isActive)
     }
 
     private func handleTap(_ chat: AIChat) {
-        if isSelecting {
-            toggle(chat)
-        } else {
-            activeChat = chat
-        }
-    }
-
-    private func toggle(_ chat: AIChat) {
-        if selection.contains(chat.id) {
-            selection.remove(chat.id)
-        } else {
-            selection.insert(chat.id)
-        }
+        if chatSelection.isActive { chatSelection.toggle(chat.id) }
+        else { activeChat = chat }
     }
 
     private func createChat() {
         search = ""
-        endSelection()
+        chatSelection.end()
         activeChat = AIChatService.createChat(in: context, workspaces: workspaces)
     }
 
@@ -160,18 +130,8 @@ struct AIChatsPage: View {
     }
 
     private func deleteSelected() {
-        selectedChats.forEach { context.delete($0) }
-        endSelection()
-    }
-
-    private func beginSelection() {
-        selection.removeAll()
-        isSelecting = true
-    }
-
-    private func endSelection() {
-        selection.removeAll()
-        isSelecting = false
+        chats.filter { chatSelection.contains($0.id) }.forEach { context.delete($0) }
+        chatSelection.end()
     }
 }
 

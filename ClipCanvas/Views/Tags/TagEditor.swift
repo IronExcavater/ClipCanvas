@@ -33,7 +33,7 @@ struct ClipTagEditor: View {
 
             tagGrid
 
-            NewTagComposer(
+            TagComposer(
                 name: $newTagName,
                 selectedColor: $selectedColor,
                 presets: presets,
@@ -82,7 +82,7 @@ struct ClipTagEditor: View {
                 state: selectionState(for: tag),
                 isApplyingToClips: appliesToClips,
                 isEditing: editingTagID == tag.id,
-                showsDeleteButton: !appliesToClips,
+                showsDeleteButton: !appliesToClips && editingTagID != tag.id,
                 fillsAvailableWidth: fillsAvailableWidth,
                 onToggle: { toggle(tag) },
                 onBeginRename: { editingTagID = tag.id },

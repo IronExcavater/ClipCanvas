@@ -8,6 +8,7 @@ struct SidebarView: View {
     var isOpen = true
     var onOpenAIChat: ((AIChat) -> Void)?
     @State private var iCloudStatus: ICloudProfileStatus = .checking
+    @State private var navigatesToSettings = false
 
     @Query(
         filter: #Predicate<Workspace> { $0.deletedAt == nil },
@@ -40,7 +41,7 @@ struct SidebarView: View {
                         .appEmptyStateRow()
                     } else {
                         ForEach(workspaceChats) { chat in
-                            sidebarChatRow(chat)
+                            AIChatPreviewRow(chat: chat, onOpen: { onOpenAIChat?(chat) })
                                 .appListItemRowInsets(vertical: 3)
                         }
                     }
@@ -161,87 +162,24 @@ struct SidebarView: View {
             .padding(.top, 8)
     }
 
-    private func sidebarChatRow(_ chat: AIChat) -> some View {
-        Button {
-            onOpenAIChat?(chat)
-        } label: {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .center, spacing: 8) {
-                    Image(systemName: chat.mode == .thinking ? "brain" : "bolt.fill")
-                        .font(.system(size: 12, weight: .bold))
-                        .foregroundStyle(Color.accentColor)
-                        .frame(width: 22, height: 22)
-                        .background(Color.accentColor.opacity(0.14), in: Circle())
-
-                    Text(chat.title)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.primary)
-                        .lineLimit(1)
-                }
-
-                Text(chat.preview)
-                    .font(.callout)
-                    .foregroundStyle(.primary.opacity(0.78))
-                    .lineLimit(2)
-
-                HStack(spacing: 10) {
-                    chatStat("\(chat.sortedMessages.count)", icon: "bubble.left.fill")
-                    let attachCount = chat.sortedMessages.flatMap(\.sortedAttachments).count
-                    chatStat("\(attachCount)", icon: "square.on.square")
-                    chatStat(chat.mode == .thinking ? "Deep" : "Quick",
-                             icon: chat.mode == .thinking ? "brain" : "bolt")
-                    Spacer(minLength: 0)
-                    RelativeAgeText(date: chat.updatedAt, suffix: " ago")
-                        .font(.caption2)
-                        .foregroundStyle(.primary.opacity(0.52))
-                }
-                .padding(.top, 3)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 11)
-            .background {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground).opacity(0.78))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 18, style: .continuous)
-                            .stroke(Color.primary.opacity(0.06), lineWidth: 1)
-                    }
-            }
-        }
-        .buttonStyle(.plain)
-        .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            Button(role: .destructive) {
-                context.delete(chat)
-            } label: {
-                Label("Delete", systemImage: "trash")
-            }
-        }
-        .contextMenu {
-            Button("Delete", systemImage: "trash", role: .destructive) {
-                context.delete(chat)
-            }
-        }
-    }
-
-    private func chatStat(_ value: String, icon: String) -> some View {
-        HStack(spacing: 2) {
-            Image(systemName: icon)
-            Text(value)
-        }
-        .font(.caption2.weight(.semibold))
-        .foregroundStyle(.primary.opacity(0.52))
-    }
-
     // MARK: - Bottom nav
 
     private var bottomNav: some View {
         HStack(spacing: 12) {
-            NavigationLink(destination: SettingsPage()) {
+            Button {
+                if iCloudStatus == .noAccount {
+                    UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
+                } else {
+                    navigatesToSettings = true
+                }
+            } label: {
                 iCloudProfile
             }
             .buttonStyle(.plain)
             .accessibilityLabel("iCloud profile")
+            .navigationDestination(isPresented: $navigatesToSettings) {
+                SettingsPage()
+            }
 
             Spacer(minLength: 10)
 
@@ -318,16 +256,8 @@ struct SidebarView: View {
         }
     }
 
-    @ViewBuilder
     private var sidebarBackground: some View {
-        if #available(iOS 26, *) {
-            Rectangle()
-                .fill(Color.clear)
-                .glassEffect(.regular, in: .rect(cornerRadius: 0))
-        } else {
-            Rectangle()
-                .fill(.regularMaterial)
-        }
+        Rectangle().glassPanel(cornerRadius: 0, shadow: false)
     }
 
     private func closeSidebar() {
