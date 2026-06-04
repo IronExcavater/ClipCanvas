@@ -51,6 +51,22 @@ extension View {
     }
 }
 
+// MARK: - Markdown text rendering
+
+/// Renders a string with inline markdown (bold, italic, code) into a Text view.
+/// Falls back to plain Text if parsing fails.
+@ViewBuilder
+func MarkdownText(_ content: String) -> some View {
+    if let attributed = try? AttributedString(
+        markdown: content,
+        options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+    ) {
+        Text(attributed)
+    } else {
+        Text(content)
+    }
+}
+
 // MARK: - Color
 
 #if canImport(UIKit)

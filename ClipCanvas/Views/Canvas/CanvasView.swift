@@ -8,6 +8,7 @@ struct CanvasView: View {
     let workspace: Workspace
     let mode: CanvasMode
     let keyboardHeight: CGFloat
+    let topBarContentHeight: CGFloat
     @Binding var zoomCommand: ZoomCommand?
     @Binding var selectedObjectIDs: Set<UUID>
     @Binding var editingObjectID: UUID?
@@ -17,6 +18,7 @@ struct CanvasView: View {
     @Binding var activeDrawing: PKDrawing
     @Binding var noteTextCommand: NoteTextCommand?
     var drawingTool: PKTool
+    var canvasSearch: String = ""
 
     @Query private var allClips: [Clip]
     @State private var viewportOrigin: CGPoint = .zero
@@ -54,6 +56,14 @@ struct CanvasView: View {
                 .gesture(canvasTapGesture(in: geo))
                 .simultaneousGesture(mode.allowsCanvasPan && editingObjectID == nil ? canvasPanGesture(in: geo) : nil)
                 .zIndex(0)
+
+                if !canvasSearch.isEmpty {
+                    Color.black.opacity(0.38)
+                        .ignoresSafeArea()
+                        .allowsHitTesting(false)
+                        .zIndex(0.5)
+                        .transition(.opacity)
+                }
 
                 if mode == .draw {
                     CanvasDrawingLayer(drawing: $activeDrawing, activeTool: drawingTool)
@@ -123,12 +133,83 @@ struct CanvasView: View {
     @ViewBuilder
     private func positionedObject(_ object: CanvasObject, in geo: GeometryProxy) -> some View {
         if object.kind == .image || object.clip?.type == .image, let clip = object.clip {
-            positionedImageObject(object, clip: clip, in: geo)
+            canvasPlacement(for: object, in: geo) { isSelected, isDragging in
+                CanvasImageObjectView(
+                    clip: clip,
+                    isSelected: isSelected,
+                    showsContent: canvasScale >= 0.25 || isSelected || isDragging,
+                    onTap: { handleTap(for: object, in: geo) },
+                    onDoubleTap: { handleDoubleTap(for: object, in: geo) },
+                    onResize: { updateResizePreview(for: object, translation: $0) },
+                    onResizeEnded: { commitResize(for: object, in: geo) },
+                    onToggleExpandedSize: { toggleExpandedSize(for: object, in: geo) }
+                )
+            }
         } else if object.kind == .clipNote, let clip = object.clip {
-            positionedClipObject(object, clip: clip, in: geo)
+            canvasPlacement(for: object, in: geo) { isSelected, isDragging in
+                ClipCard(
+                    clip: clip,
+                    fillColor: Color(hex: object.style.fillHex),
+                    isSelected: isSelected,
+                    showsContent: canvasScale >= 0.34 || isSelected || isDragging,
+                    onTap: { handleTap(for: object, in: geo) },
+                    onDoubleTap: { handleDoubleTap(for: object, in: geo) },
+                    isEditing: false,
+                    editingText: clip.content,
+                    fontSize: CanvasPlacementSizing.fontSizeForContent(clip.content, width: object.width),
+                    textCommand: nil,
+                    onCommitEditing: { _ in },
+                    onExitEditing: {},
+                    onEditorSizeChange: { _ in },
+                    onResize: { updateResizePreview(for: object, translation: $0) },
+                    onResizeEnded: { commitResize(for: object, in: geo) },
+                    onToggleExpandedSize: { toggleExpandedSize(for: object, in: geo) }
+                )
+            }
         } else {
-            positionedCardObject(object, in: geo)
+            canvasPlacement(for: object, in: geo) { isSelected, isDragging in
+                CanvasObjectView(
+                    object: object,
+                    isSelected: isSelected,
+                    showsContent: canvasScale >= 0.34 || isSelected || isDragging,
+                    onTap: { handleTap(for: object, in: geo) },
+                    onDoubleTap: { handleDoubleTap(for: object, in: geo) },
+                    isEditing: false,
+                    editingText: object.text,
+                    textCommand: nil,
+                    onCommitEditing: { _ in },
+                    onExitEditing: {},
+                    onEditorSizeChange: { _ in },
+                    onResize: { updateResizePreview(for: object, translation: $0) },
+                    onResizeEnded: { commitResize(for: object, in: geo) },
+                    onToggleExpandedSize: { toggleExpandedSize(for: object, in: geo) }
+                )
+            }
         }
+    }
+
+    /// Applies the shared canvas positioning + interaction modifiers to any object view.
+    private func canvasPlacement<Content: View>(
+        for object: CanvasObject,
+        in geo: GeometryProxy,
+        @ViewBuilder content: (Bool, Bool) -> Content  // (isSelected, isDragging)
+    ) -> some View {
+        let isDragging = activeDrag?.objectIDs.contains(object.id) == true
+        let isSelected = selectedObjectIDs.contains(object.id)
+        let isOverlaid = mode == .edit && selectedObjectIDs == [object.id]
+        return content(isSelected, isDragging)
+            .modifier(CanvasObjectPositionModifier(
+                object: object,
+                viewportOrigin: viewportOrigin,
+                canvasScale: canvasScale,
+                size: displaySize(for: object),
+                dragOffset: isDragging ? activeDrag?.translation ?? .zero : .zero,
+                isDragging: isDragging
+            ))
+            .opacity(isOverlaid ? 0 : searchOpacity(for: object))
+            .allowsHitTesting(!isOverlaid)
+            .gesture(objectDragGesture(for: object, in: geo))
+            .zIndex(zIndex(for: object, isSelected: isSelected, isDragging: isDragging))
     }
 
     private func renderedCanvasObjects(in geo: GeometryProxy) -> [CanvasObject] {
@@ -143,108 +224,20 @@ struct CanvasView: View {
         }
     }
 
-    private func positionedClipObject(_ object: CanvasObject, clip: Clip, in geo: GeometryProxy) -> some View {
-        let isDragging = activeDrag?.objectIDs.contains(object.id) == true
-        let isSelected = selectedObjectIDs.contains(object.id)
-        let isOverlaid = mode == .edit && selectedObjectIDs == [object.id]
-        let size = displaySize(for: object)
-
-        return ClipCard(
-            clip: clip,
-            fillColor: Color(hex: object.style.fillHex),
-            isSelected: isSelected,
-            showsContent: canvasScale >= 0.34 || isSelected || isDragging,
-            onTap: { handleTap(for: object, in: geo) },
-            onDoubleTap: { handleDoubleTap(for: object, in: geo) },
-            isEditing: false,
-            editingText: clip.content,
-            fontSize: CanvasPlacementSizing.fontSizeForContent(clip.content, width: object.width),
-            textCommand: nil,
-            onCommitEditing: { _ in },
-            onExitEditing: {},
-            onEditorSizeChange: { _ in },
-            onResize: { updateResizePreview(for: object, translation: $0) },
-            onResizeEnded: { commitResize(for: object, in: geo) },
-            onToggleExpandedSize: { toggleExpandedSize(for: object, in: geo) }
-        )
-        .modifier(CanvasObjectPositionModifier(
-            object: object,
-            viewportOrigin: viewportOrigin,
-            canvasScale: canvasScale,
-            size: size,
-            dragOffset: isDragging ? activeDrag?.translation ?? .zero : .zero,
-            isDragging: isDragging
-        ))
-        .opacity(isOverlaid ? 0 : 1)
-        .allowsHitTesting(!isOverlaid)
-        .gesture(objectDragGesture(for: object, in: geo))
-        .zIndex(zIndex(for: object, isSelected: isSelected, isDragging: isDragging))
+    private func matchesSearch(_ object: CanvasObject) -> Bool {
+        guard !canvasSearch.isEmpty else { return true }
+        let query = canvasSearch.lowercased()
+        if object.text.lowercased().contains(query) { return true }
+        if let clip = object.clip {
+            if clip.content.lowercased().contains(query) { return true }
+            if clip.tags.contains(where: { $0.name.lowercased().contains(query) }) { return true }
+        }
+        return false
     }
 
-    private func positionedImageObject(_ object: CanvasObject, clip: Clip, in geo: GeometryProxy) -> some View {
-        let isDragging = activeDrag?.objectIDs.contains(object.id) == true
-        let isSelected = selectedObjectIDs.contains(object.id)
-        let isOverlaid = mode == .edit && selectedObjectIDs == [object.id]
-        let size = displaySize(for: object)
-
-        return CanvasImageObjectView(
-            clip: clip,
-            isSelected: isSelected,
-            showsContent: canvasScale >= 0.25 || isSelected || isDragging,
-            onTap: { handleTap(for: object, in: geo) },
-            onDoubleTap: { handleDoubleTap(for: object, in: geo) },
-            onResize: { updateResizePreview(for: object, translation: $0) },
-            onResizeEnded: { commitResize(for: object, in: geo) },
-            onToggleExpandedSize: { toggleExpandedSize(for: object, in: geo) }
-        )
-        .modifier(CanvasObjectPositionModifier(
-            object: object,
-            viewportOrigin: viewportOrigin,
-            canvasScale: canvasScale,
-            size: size,
-            dragOffset: isDragging ? activeDrag?.translation ?? .zero : .zero,
-            isDragging: isDragging
-        ))
-        .opacity(isOverlaid ? 0 : 1)
-        .allowsHitTesting(!isOverlaid)
-        .gesture(objectDragGesture(for: object, in: geo))
-        .zIndex(zIndex(for: object, isSelected: isSelected, isDragging: isDragging))
-    }
-
-    private func positionedCardObject(_ object: CanvasObject, in geo: GeometryProxy) -> some View {
-        let isDragging = activeDrag?.objectIDs.contains(object.id) == true
-        let isSelected = selectedObjectIDs.contains(object.id)
-        let isOverlaid = mode == .edit && selectedObjectIDs == [object.id]
-        let size = displaySize(for: object)
-
-        return CanvasObjectView(
-            object: object,
-            isSelected: isSelected,
-            showsContent: canvasScale >= 0.34 || isSelected || isDragging,
-            onTap: { handleTap(for: object, in: geo) },
-            onDoubleTap: { handleDoubleTap(for: object, in: geo) },
-            isEditing: false,
-            editingText: object.text,
-            textCommand: nil,
-            onCommitEditing: { _ in },
-            onExitEditing: {},
-            onEditorSizeChange: { _ in },
-            onResize: { updateResizePreview(for: object, translation: $0) },
-            onResizeEnded: { commitResize(for: object, in: geo) },
-            onToggleExpandedSize: { toggleExpandedSize(for: object, in: geo) }
-        )
-        .modifier(CanvasObjectPositionModifier(
-            object: object,
-            viewportOrigin: viewportOrigin,
-            canvasScale: canvasScale,
-            size: size,
-            dragOffset: isDragging ? activeDrag?.translation ?? .zero : .zero,
-            isDragging: isDragging
-        ))
-        .opacity(isOverlaid ? 0 : 1)
-        .allowsHitTesting(!isOverlaid)
-        .gesture(objectDragGesture(for: object, in: geo))
-        .zIndex(zIndex(for: object, isSelected: isSelected, isDragging: isDragging))
+    private func searchOpacity(for object: CanvasObject) -> CGFloat {
+        guard !canvasSearch.isEmpty else { return 1 }
+        return matchesSearch(object) ? 1 : 0.12
     }
 
     // MARK: - Gestures
@@ -503,7 +496,7 @@ struct CanvasView: View {
     // MARK: - Edit Mode Overlay
 
     private func editScreenFrame(in geo: GeometryProxy) -> CGRect {
-        let topInset = geo.safeAreaInsets.top + 62
+        let topInset = geo.safeAreaInsets.top + topBarContentHeight
         let bottomInset = max(keyboardHeight - 32, 0) + 58 + geo.safeAreaInsets.bottom
         let sideInset: CGFloat = 16
         let width = geo.size.width - sideInset * 2

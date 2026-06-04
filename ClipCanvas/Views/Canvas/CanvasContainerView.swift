@@ -9,7 +9,7 @@ struct CanvasContainerView: View {
     let workspace: Workspace
     let onToggleSidebar: () -> Void
 
-    @Environment(\.modelContext) private var context
+    @Environment(\.modelContext) var context
     @Environment(\.undoManager) private var undoManager
     @Environment(\.scenePhase) private var scenePhase
     @Query(
@@ -17,34 +17,37 @@ struct CanvasContainerView: View {
         sort: \Workspace.sortIndex
     ) private var workspaces: [Workspace]
 
-    @State private var mode: CanvasMode = .pan
-    @State private var feedback: String?
-    @State private var feedbackToken = UUID()
-    @State private var zoomCommand: ZoomCommand?
-    @State private var visibleScale: CGFloat = 1
-    @State private var visibleViewportCenter: CGPoint = .zero
-    @State private var selectedObjectIDs: Set<UUID> = []
-    @State private var visibleObjectIDs: Set<UUID> = []
-    @State private var editingObjectID: UUID?
-    @State private var noteTextCommand: NoteTextCommand?
-    @State private var detailClip: Clip?
-    @State private var activeAIChat: AIChat?
-    @State private var tagEditSelection: ClipTagEditSelection?
-    @State private var colorEditSelection: CanvasObjectColorSelection?
-    @State private var isRenaming = false
-    @State private var renameText = ""
-    @State private var activeDrawing: PKDrawing = PKDrawing()
-    @State private var activeDrawTool: CanvasDrawTool = .pen
-    @State private var drawToolSettings: CanvasDrawTool?
-    @State private var keyboardHeight: CGFloat = 0
-    @State private var penColor: PlatformColor = .label
-    @State private var penWidth: CGFloat = 3
-    @State private var highlighterColor: PlatformColor = .systemYellow.withAlphaComponent(0.5)
-    @State private var highlighterWidth: CGFloat = 20
-    @State private var eraserWidth: CGFloat = 34
-    @State private var clipboardWatcherTask: Task<Void, Never>?
-    @State private var lastClipboardFingerprint: String?
-    @FocusState private var renameFocused: Bool
+    @State var mode: CanvasMode = .pan
+    @State var feedback: String?
+    @State var feedbackToken = UUID()
+    @State var zoomCommand: ZoomCommand?
+    @State var visibleScale: CGFloat = 1
+    @State var visibleViewportCenter: CGPoint = .zero
+    @State var selectedObjectIDs: Set<UUID> = []
+    @State var visibleObjectIDs: Set<UUID> = []
+    @State var editingObjectID: UUID?
+    @State var noteTextCommand: NoteTextCommand?
+    @State var detailClip: Clip?
+    @State var activeAIChat: AIChat?
+    @State var tagClips: [Clip]?
+    @State var colorObjects: [CanvasObject]?
+    @State var isRenaming = false
+    @State var renameText = ""
+    @State var activeDrawing: PKDrawing = PKDrawing()
+    @State var activeDrawTool: CanvasDrawTool = .pen
+    @State var drawToolSettings: CanvasDrawTool?
+    @State var keyboardHeight: CGFloat = 0
+    @State var penColor: PlatformColor = .label
+    @State var penWidth: CGFloat = 3
+    @State var highlighterColor: PlatformColor = .systemYellow.withAlphaComponent(0.5)
+    @State var highlighterWidth: CGFloat = 20
+    @State var eraserWidth: CGFloat = 34
+    @State var clipboardWatcherTask: Task<Void, Never>?
+    @State var lastClipboardFingerprint: String?
+    @State var canvasSearch = ""
+    @State var isCanvasSearchActive = false
+    @FocusState var renameFocused: Bool
+    @FocusState var searchFocused: Bool
 
     var body: some View {
         ZStack {
@@ -52,16 +55,18 @@ struct CanvasContainerView: View {
                     workspace: workspace,
                     mode: mode,
                     keyboardHeight: keyboardHeight,
+                    topBarContentHeight: topBarContentHeight,
                     zoomCommand: $zoomCommand,
-                selectedObjectIDs: $selectedObjectIDs,
-                editingObjectID: $editingObjectID,
-                visibleScale: $visibleScale,
-                visibleViewportCenter: $visibleViewportCenter,
-                visibleObjectIDs: $visibleObjectIDs,
-                activeDrawing: $activeDrawing,
-                noteTextCommand: $noteTextCommand,
-                drawingTool: pencilTool
-            )
+                    selectedObjectIDs: $selectedObjectIDs,
+                    editingObjectID: $editingObjectID,
+                    visibleScale: $visibleScale,
+                    visibleViewportCenter: $visibleViewportCenter,
+                    visibleObjectIDs: $visibleObjectIDs,
+                    activeDrawing: $activeDrawing,
+                    noteTextCommand: $noteTextCommand,
+                    drawingTool: pencilTool,
+                    canvasSearch: canvasSearch
+                )
             .ignoresSafeArea()
 
             VStack(spacing: 0) {
@@ -81,8 +86,41 @@ struct CanvasContainerView: View {
                     onAskAI: askAIAboutCurrentContext,
                     onClearAll: clearAll,
                     onArrangeAll: { zoomCommand = .arrangeAll },
-                    onFitContent: { zoomCommand = .fitContent }
+                    onFitContent: { zoomCommand = .fitContent },
+                    onSearch: toggleCanvasSearch
                 )
+
+                if isCanvasSearchActive {
+                    HStack(spacing: 10) {
+                        Image(systemName: "magnifyingglass")
+                            .font(.system(size: 14, weight: .semibold))
+                            .foregroundStyle(.secondary)
+
+                        TextField("Search canvas", text: $canvasSearch)
+                            .font(.subheadline.weight(.medium))
+                            .textFieldStyle(.plain)
+                            .focused($searchFocused)
+                            .submitLabel(.search)
+                            .onSubmit { searchFocused = false }
+
+                        if !canvasSearch.isEmpty {
+                            Button { canvasSearch = "" } label: {
+                                Image(systemName: "xmark.circle.fill")
+                                    .foregroundStyle(.secondary)
+                            }
+                            .buttonStyle(.plain)
+                        }
+
+                        Button("Done") { closeCanvasSearch() }
+                            .font(.subheadline.weight(.semibold))
+                            .foregroundStyle(Color.accentColor)
+                            .buttonStyle(.plain)
+                    }
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 10)
+                    .background { Rectangle().glassPanel(cornerRadius: 0, shadow: false) }
+                    .transition(.move(edge: .top).combined(with: .opacity))
+                }
 
                 Spacer()
 
@@ -135,8 +173,14 @@ struct CanvasContainerView: View {
             .ignoresSafeArea(.container, edges: .bottom)
 
             if let tool = drawToolSettings {
-                VStack {
-                    Spacer()
+                VStack(spacing: 0) {
+                    Color.clear
+                        .contentShape(Rectangle())
+                        .onTapGesture {
+                            withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
+                                drawToolSettings = nil
+                            }
+                        }
                     CanvasDrawToolSettingsPanel(
                         tool: tool,
                         color: drawColor(for: tool),
@@ -152,22 +196,16 @@ struct CanvasContainerView: View {
                 .ignoresSafeArea(.container, edges: .bottom)
             }
 
-            if let selection = tagEditSelection {
-                CanvasTagPanel(
-                    clips: selection.clips,
-                    onDismiss: { tagEditSelection = nil }
-                )
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .zIndex(8)
+            if let clips = tagClips {
+                CanvasTagPanel(clips: clips, onDismiss: { tagClips = nil })
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(8)
             }
 
-            if let selection = colorEditSelection {
-                CanvasColorPanel(
-                    objects: selection.objects,
-                    onDismiss: { colorEditSelection = nil }
-                )
-                .transition(.move(edge: .bottom).combined(with: .opacity))
-                .zIndex(9)
+            if let objects = colorObjects {
+                CanvasColorPanel(objects: objects, onDismiss: { colorObjects = nil })
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                    .zIndex(9)
             }
 
             VStack {
@@ -192,7 +230,11 @@ struct CanvasContainerView: View {
             stopClipboardListening()
         }
         .onChange(of: mode) { _, newMode in
-            if newMode != .edit { editingObjectID = nil }
+            if newMode != .edit {
+                editingObjectID = nil
+                tagClips = nil
+                colorObjects = nil
+            }
             if newMode != .draw { drawToolSettings = nil }
         }
         .onChange(of: scenePhase) { _, phase in
@@ -205,6 +247,10 @@ struct CanvasContainerView: View {
         // Tapping the canvas background deselects everything — also exit inline editing
         // so the keyboard dismisses instead of staying up with no selected card.
         .onChange(of: selectedObjectIDs) { _, newIDs in
+            if newIDs.isEmpty {
+                tagClips = nil
+                colorObjects = nil
+            }
             if let editing = editingObjectID, !newIDs.contains(editing) {
                 editingObjectID = nil
             }
@@ -228,323 +274,16 @@ struct CanvasContainerView: View {
         }
     }
 
-    private var pencilTool: PKTool {
-        switch activeDrawTool {
-        case .pen:
-            return PKInkingTool(.pen, color: penColor, width: penWidth)
-        case .highlighter:
-            return PKInkingTool(.marker, color: highlighterColor, width: highlighterWidth)
-        case .eraser:
-            return PKEraserTool(.fixedWidthBitmap, width: eraserWidth)
-        case .lasso:
-            return PKLassoTool()
-        }
+    var topBarContentHeight: CGFloat {
+        60 + (isCanvasSearchActive ? 44 : 0)
     }
 
-    private func leaveMode() {
-        withAnimation(.spring(response: 0.24, dampingFraction: 0.86)) {
-            mode = .pan
-            editingObjectID = nil
-            drawToolSettings = nil
-        }
-    }
-
-    private func closeToolbarMode() {
-        if editingObjectID == nil {
-            leaveMode()
-        } else {
-            exitEditing()
-        }
-    }
-
-    private func selectDrawTool(_ tool: CanvasDrawTool) {
-        activeDrawTool = tool
-        if drawToolSettings != nil {
-            drawToolSettings = tool.supportsSettings ? tool : nil
-        }
-    }
-
-    private func toggleDrawToolSettings(_ tool: CanvasDrawTool) {
-        drawToolSettings = drawToolSettings == tool ? nil : tool
-    }
-
-    private func drawColor(for tool: CanvasDrawTool) -> PlatformColor? {
-        switch tool {
-        case .pen:
-            return penColor
-        case .highlighter:
-            return highlighterColor
-        case .eraser, .lasso:
-            return nil
-        }
-    }
-
-    private func drawWidth(for tool: CanvasDrawTool) -> CGFloat {
-        switch tool {
-        case .pen:
-            return penWidth
-        case .highlighter:
-            return highlighterWidth
-        case .eraser:
-            return eraserWidth
-        case .lasso:
-            return 0
-        }
-    }
-
-    private func setDrawColor(_ color: PlatformColor, for tool: CanvasDrawTool) {
-        switch tool {
-        case .pen:
-            penColor = color
-        case .highlighter:
-            highlighterColor = color.withAlphaComponent(0.5)
-        case .eraser, .lasso:
-            break
-        }
-    }
-
-    private func setDrawWidth(_ width: CGFloat, for tool: CanvasDrawTool) {
-        switch tool {
-        case .pen:
-            penWidth = width
-        case .highlighter:
-            highlighterWidth = width
-        case .eraser:
-            eraserWidth = width
-        case .lasso:
-            break
-        }
-    }
-
-    private var selectedCanvasKind: CanvasSelectionKind {
+    var selectedCanvasKind: CanvasSelectionKind {
         let objects = orderedCanvasObjects(matching: selectedObjectIDs)
         guard !objects.isEmpty else { return .none }
         let kinds = Set(objects.map(canvasSelectionKind(for:)))
         return kinds.count == 1 ? (kinds.first ?? .none) : .mixed
     }
-
-    private func canvasSelectionKind(for object: CanvasObject) -> CanvasSelectionKind {
-        if object.kind == .image || object.clip?.type == .image {
-            return .image
-        }
-        if object.kind == .stickyNote || object.kind == .clipNote {
-            return .text
-        }
-        return .mixed
-    }
-
-    // MARK: - Clipboard
-
-    private func paste() {
-        guard let content = ClipboardService.readContent() else {
-            showFeedback("Clipboard is empty")
-            return
-        }
-        let (clip, isNew) = Clip.findOrMake(from: content, origin: .clipboard, in: context)
-        if isNew { context.insert(clip) }
-        workspace.place(clip: clip, at: workspace.nextPosition(around: visibleViewportCenter))
-        showFeedback("Pasted")
-    }
-
-    private func startClipboardListening() {
-        guard clipboardWatcherTask == nil else { return }
-        lastClipboardFingerprint = ClipboardService.readContent()?.fingerprint
-        clipboardWatcherTask = Task {
-            while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(1.0))
-                guard !Task.isCancelled, let content = ClipboardService.readContent() else { continue }
-                guard content.fingerprint != lastClipboardFingerprint else { continue }
-                lastClipboardFingerprint = content.fingerprint
-                guard !ClipboardService.wasRecentlyImported(content) else { continue }
-                captureClipboardContent(content)
-            }
-        }
-    }
-
-    private func stopClipboardListening() {
-        clipboardWatcherTask?.cancel()
-        clipboardWatcherTask = nil
-    }
-
-    private func captureClipboardContent(_ content: ClipboardContent) {
-        let (clip, isNew) = Clip.findOrMake(from: content, origin: .clipboard, in: context)
-        if isNew { context.insert(clip) }
-        showFeedback(isNew ? "Captured from clipboard" : "Clipboard already saved")
-    }
-
-    // MARK: - Rename
-
-    private func beginRename() {
-        renameText = WorkspaceNamePolicy.limitedEditingText(workspace.name)
-        isRenaming = true
-        renameFocused = true
-    }
-
-    private func commitRename() {
-        WorkspaceActionService.rename(workspace, to: renameText)
-        isRenaming = false
-        renameFocused = false
-    }
-
-    private func toggleSidebar() {
-        if isRenaming { commitRename() }
-        onToggleSidebar()
-    }
-
-    // MARK: - Workspace actions
-
-    private func clearAll() {
-        let objects = Array(workspace.canvasObjects)
-        let placements = Array(workspace.placements)
-        objects.forEach { context.delete($0) }
-        placements.forEach { context.delete($0) }
-        workspace.updatedAt = Date()
-        selectedObjectIDs.removeAll()
-        showFeedback(objects.count + placements.count == 0 ? "Canvas is already empty" : "Canvas cleared")
-    }
-
-    private func showSelectedDetails() {
-        detailClip = selectedClips.first
-    }
-
-    private func showSelectedTags() {
-        let clips = selectedClips
-        guard !clips.isEmpty else { return }
-        if tagEditSelection != nil {
-            tagEditSelection = nil
-            return
-        }
-        colorEditSelection = nil
-        tagEditSelection = ClipTagEditSelection(clips: clips)
-    }
-
-    private func showSelectedColors() {
-        let objects = orderedCanvasObjects(matching: selectedObjectIDs)
-            .filter { $0.kind != .image && $0.kind != .drawing && $0.kind != .group && $0.kind != .connector }
-        if colorEditSelection != nil {
-            colorEditSelection = nil
-            return
-        }
-        guard !objects.isEmpty else {
-            showFeedback("Select a note to color")
-            return
-        }
-        tagEditSelection = nil
-        colorEditSelection = CanvasObjectColorSelection(objects: objects)
-    }
-
-    private func editSelectedContent() {
-        guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first else { return }
-        editingObjectID = id
-    }
-
-    private func exitEditing() {
-        editingObjectID = nil
-    }
-
-    private func deleteSelected() {
-        let selected = workspace.canvasObjects.filter { selectedObjectIDs.contains($0.id) }
-        let sourcePlacementIDs = Set(selected.compactMap(\.sourcePlacementID))
-        let legacyPlacements = workspace.placements.filter { sourcePlacementIDs.contains($0.id) }
-        selected.forEach { context.delete($0) }
-        legacyPlacements.forEach { context.delete($0) }
-        selectedObjectIDs.removeAll()
-        showFeedback(selected.count == 1 ? "Deleted 1 card" : "Deleted \(selected.count) cards")
-    }
-
-    private func createNoteAtViewCenter() {
-        let note = workspace.createNote(centeredAt: visibleViewportCenter, size: CanvasPlacementSizing.defaultSize)
-        context.insert(note)
-        selectedObjectIDs = [note.id]
-        editingObjectID = note.id
-        showFeedback("New note")
-    }
-
-    private func askAIAboutCurrentContext() {
-        if selectedObjectIDs.isEmpty {
-            askAIAboutVisibleCards()
-        } else {
-            askAIAboutSelection()
-        }
-    }
-
-    private func askAIAboutSelection() {
-        let objects = orderedCanvasObjects(matching: selectedObjectIDs)
-        openAIChat(attaching: objects)
-    }
-
-    private func askAIAboutVisibleCards() {
-        openAIChat(attaching: orderedCanvasObjects(matching: visibleObjectIDs))
-    }
-
-    private func openAIChat(attaching objects: [CanvasObject]) {
-        guard !objects.isEmpty else {
-            showFeedback("No cards to attach")
-            return
-        }
-
-        let chat = AIChatService.createChat(in: context, workspace: workspace)
-        AIChatService.attachObjects(objects, to: chat, in: context)
-        activeAIChat = chat
-        showFeedback(objects.count == 1 ? "Attached 1 card" : "Attached \(objects.count) cards")
-    }
-
-    private func openRecentOrNewAIChat() {
-        let recent = workspace.chats
-            .filter { !$0.messages.isEmpty }
-            .sorted { $0.updatedAt > $1.updatedAt }
-            .first
-        activeAIChat = recent ?? AIChatService.createChat(in: context, workspace: workspace)
-    }
-
-    private func insertImageFromLibrary() {
-        showFeedback("Image picker coming soon")
-    }
-
-
-    private var selectedClips: [Clip] {
-        workspace.canvasObjects
-            .filter { selectedObjectIDs.contains($0.id) }
-            .compactMap(\.clip)
-    }
-
-    private func orderedCanvasObjects(matching ids: Set<UUID>) -> [CanvasObject] {
-        workspace.canvasObjects
-            .filter { ids.contains($0.id) && $0.isVisible }
-            .sorted { lhs, rhs in
-                if lhs.zIndex == rhs.zIndex { return lhs.createdAt < rhs.createdAt }
-                return lhs.zIndex < rhs.zIndex
-            }
-    }
-
-    // MARK: - Feedback
-
-    private func showFeedback(_ msg: String) {
-        let token = UUID()
-        feedbackToken = token
-        withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
-            feedback = msg
-        }
-        Task {
-            try? await Task.sleep(for: .seconds(1.7))
-            await MainActor.run {
-                guard feedbackToken == token else { return }
-                withAnimation(.easeInOut(duration: 0.18)) {
-                    feedback = nil
-                }
-            }
-        }
-    }
-}
-
-private struct ClipTagEditSelection: Identifiable {
-    let id = UUID()
-    let clips: [Clip]
-}
-
-private struct CanvasObjectColorSelection: Identifiable {
-    let id = UUID()
-    let objects: [CanvasObject]
 }
 
 private struct CanvasKeyboardHeightModifier: ViewModifier {

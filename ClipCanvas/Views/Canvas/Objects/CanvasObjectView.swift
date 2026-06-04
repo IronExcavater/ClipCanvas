@@ -120,7 +120,7 @@ struct CanvasObjectView: View {
                     .foregroundStyle(textColor)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             default:
-                Text(object.displayText.isEmpty ? " " : object.displayText)
+                MarkdownText(object.displayText.isEmpty ? " " : object.displayText)
                     .font(.system(size: usesStickySurface ? noteFontSize : object.style.fontSize))
                     .foregroundStyle(textColor)
                     .lineLimit(nil)

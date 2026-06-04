@@ -8,6 +8,20 @@ struct CanvasTagPanel: View {
         VStack {
             Spacer()
             VStack(alignment: .leading, spacing: 10) {
+                HStack {
+                    Text(clips.count > 1 ? "\(clips.count) clips selected" : "Tags")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.primary)
+                    Spacer()
+                    Button(action: onDismiss) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 22))
+                            .foregroundStyle(.secondary)
+                    }
+                    .buttonStyle(.plain)
+                }
+                .padding(.horizontal, 6)
+
                 ScrollView {
                     ClipTagEditor(clips: clips, layout: .twoColumns)
                         .padding(.horizontal, 6)
@@ -18,17 +32,7 @@ struct CanvasTagPanel: View {
                 .appScrollDismissesKeyboardInteractively()
             }
             .padding(12)
-            .background {
-                if #available(iOS 26, *) {
-                    RoundedRectangle(cornerRadius: 26, style: .continuous)
-                        .fill(Color.clear)
-                        .glassEffect(.regular, in: .rect(cornerRadius: 26))
-                } else {
-                    RoundedRectangle(cornerRadius: 26, style: .continuous)
-                        .fill(.regularMaterial)
-                }
-            }
-            .shadow(color: .black.opacity(0.16), radius: 22, y: 10)
+            .glassPanel(cornerRadius: 26)
             .padding(.horizontal, 18)
             .padding(.bottom, 92)
             .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))

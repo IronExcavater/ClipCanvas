@@ -17,6 +17,7 @@ struct CanvasTopBar: View {
     let onClearAll: () -> Void
     let onArrangeAll: () -> Void
     let onFitContent: () -> Void
+    var onSearch: (() -> Void)? = nil
 
     @State private var confirmingClear = false
 
@@ -41,6 +42,9 @@ struct CanvasTopBar: View {
                 Button(askAITitle, systemImage: "sparkles", action: onAskAI)
                     .disabled(selectedCount == 0 && visibleCount == 0)
                 Divider()
+                if let onSearch {
+                    Button("Search", systemImage: "magnifyingglass", action: onSearch)
+                }
                 Button("Rename", systemImage: "pencil", action: onBeginRename)
                 Button("Fit", systemImage: "arrow.up.left.and.arrow.down.right", action: onFitContent)
                 Button("Grid", systemImage: "square.grid.2x2", action: onArrangeAll)
@@ -166,17 +170,6 @@ private struct CanvasTopBarFade: View {
 
 private struct WorkspaceTitleBackdrop: View {
     var body: some View {
-        if #available(iOS 26, *) {
-            Capsule()
-                .fill(Color.clear)
-                .glassEffect(.regular, in: .capsule)
-        } else {
-            Capsule()
-                .fill(.ultraThinMaterial)
-                .overlay {
-                    Capsule().stroke(Color.primary.opacity(0.10), lineWidth: 1)
-                }
-                .shadow(color: .black.opacity(0.10), radius: 12, y: 4)
-        }
+        Color.clear.glassCapsule()
     }
 }

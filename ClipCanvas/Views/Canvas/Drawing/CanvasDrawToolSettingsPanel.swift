@@ -60,7 +60,7 @@ struct CanvasDrawToolSettingsPanel: View {
         }
         .padding(.horizontal, 16)
         .padding(.vertical, 14)
-        .background { panelBackground }
+        .glassCapsule()
         .padding(.horizontal, 20)
         .frame(maxWidth: 380)
         .allowsHitTesting(true)
@@ -87,16 +87,6 @@ struct CanvasDrawToolSettingsPanel: View {
         #endif
     }
 
-    @ViewBuilder
-    private var panelBackground: some View {
-        if #available(iOS 26, *) {
-            Capsule()
-                .fill(Color.clear)
-                .glassEffect(.regular, in: .capsule)
-        } else {
-            Capsule().fill(.regularMaterial)
-        }
-    }
 }
 
 private struct DrawColorPreset: Hashable {
