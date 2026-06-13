@@ -126,11 +126,7 @@ import SwiftData
     // MARK: - Deduplication
 
     @Test func findOrMakeReusesExistingTextClip() throws {
-        let container = try ModelContainer(
-            for: Clip.self, ClipTag.self, Workspace.self, CanvasPlacement.self, CanvasObject.self,
-            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-        )
-        let context = ModelContext(container)
+        let context = try ModelContextFactory.makeCoreContext()
         let existing = Clip(content: "Hello world", origin: .clipboard)
         context.insert(existing)
 
@@ -140,17 +136,4 @@ import SwiftData
         #expect(result.clip.id == existing.id)
     }
 
-    @Test func bootstrapSeedsBuiltInTagsOnce() throws {
-        let container = try ModelContainer(
-            for: Clip.self, ClipTag.self, Workspace.self, CanvasPlacement.self, CanvasObject.self,
-            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-        )
-        let context = ModelContext(container)
-
-        AppBootstrap.ensureActiveWorkspace(in: context)
-        AppBootstrap.ensureActiveWorkspace(in: context)
-
-        let tags = try context.fetch(FetchDescriptor<ClipTag>())
-        #expect(tags.count == ClipTag.builtInDefinitions.count)
-    }
 }

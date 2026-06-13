@@ -1,7 +1,7 @@
 import Testing
 @testable import ClipCanvas
 
-@Suite struct SensitivityServiceTests {
+@Suite struct ClipClassificationServiceTests {
 
     @Test func normalText() {
         #expect(ClipClassificationService.detectSensitivity("Buy oat milk") == .normal)

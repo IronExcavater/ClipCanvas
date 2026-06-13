@@ -4,7 +4,7 @@ import Testing
 
 @Suite struct WorkspaceActionServiceTests {
     @Test func createdWorkspaceSortsBeforeExistingWorkspaces() throws {
-        let context = try makeContext()
+        let context = try ModelContextFactory.makeContext()
         let first = Workspace(name: "First", sortIndex: 0, isActive: true)
         let second = Workspace(name: "Second", sortIndex: 1)
         context.insert(first)
@@ -27,14 +27,5 @@ import Testing
         #expect(workspace.name.count == WorkspaceNamePolicy.maximumLength)
         #expect(!workspace.name.hasPrefix(" "))
         #expect(!workspace.name.hasSuffix(" "))
-    }
-
-    private func makeContext() throws -> ModelContext {
-        let container = try ModelContainer(
-            for: Clip.self, ClipTag.self, Workspace.self, CanvasPlacement.self, CanvasObject.self,
-            AIChat.self, ChatMessage.self, ChatAttachment.self, AIToolEvent.self,
-            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-        )
-        return ModelContext(container)
     }
 }
