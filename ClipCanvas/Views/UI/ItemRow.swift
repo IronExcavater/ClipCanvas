@@ -15,14 +15,9 @@ struct ItemRow<Content: View>: View {
 
     var body: some View {
         let card = AppListItemContainer(tint: tint, opacity: opacity) {
-            HStack(alignment: .top, spacing: 10) {
-                if isSelecting {
-                    SelectionIndicator(isSelected: isSelected)
-                }
-                VStack(alignment: .leading, spacing: 4) {
-                    content
-                }
-            }
+            content
+                .environment(\.appListRowIsSelecting, isSelecting)
+                .environment(\.appListRowIsSelected, isSelected)
         }
         .listRowSeparator(.hidden)
         .listRowBackground(Color.clear)
@@ -33,6 +28,26 @@ struct ItemRow<Content: View>: View {
         } else {
             card
         }
+    }
+}
+
+private struct AppListRowIsSelectingKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+private struct AppListRowIsSelectedKey: EnvironmentKey {
+    static let defaultValue = false
+}
+
+extension EnvironmentValues {
+    var appListRowIsSelecting: Bool {
+        get { self[AppListRowIsSelectingKey.self] }
+        set { self[AppListRowIsSelectingKey.self] = newValue }
+    }
+
+    var appListRowIsSelected: Bool {
+        get { self[AppListRowIsSelectedKey.self] }
+        set { self[AppListRowIsSelectedKey.self] = newValue }
     }
 }
 

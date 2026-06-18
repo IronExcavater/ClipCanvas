@@ -48,6 +48,9 @@ struct CanvasObjectView: View {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .fill(fillColor.opacity(0.20))
                 }
+            } else if object.kind == .text {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(Color.clear)
             } else {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .fill(fillColor)
@@ -59,12 +62,19 @@ struct CanvasObjectView: View {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .stroke(Color.accentColor, lineWidth: 2)
                 }
+            } else if object.kind == .text {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
             } else {
                 RoundedRectangle(cornerRadius: 10, style: .continuous)
                     .stroke(isSelected ? Color.accentColor : strokeColor, lineWidth: isSelected ? 2.5 : 1)
             }
         }
-        .shadow(color: .black.opacity(isSelected ? 0.16 : 0.08), radius: isSelected ? 10 : 5, y: isSelected ? 4 : 2)
+        .shadow(
+            color: .black.opacity(object.kind == .text ? 0 : (isSelected ? 0.16 : 0.08)),
+            radius: object.kind == .text ? 0 : (isSelected ? 10 : 5),
+            y: object.kind == .text ? 0 : (isSelected ? 4 : 2)
+        )
         .contentShape(Rectangle())
         .gesture(tapGesture)
         .animation(.spring(response: 0.18, dampingFraction: 0.8), value: isSelected)
@@ -120,7 +130,7 @@ struct CanvasObjectView: View {
                     .foregroundStyle(textColor)
                     .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .center)
             default:
-                MarkdownText(object.displayText.isEmpty ? " " : object.displayText)
+                MarkdownPreview(text: object.displayText.isEmpty ? " " : object.displayText)
                     .font(.system(size: usesStickySurface ? noteFontSize : object.style.fontSize))
                     .foregroundStyle(textColor)
                     .lineLimit(nil)
@@ -184,7 +194,7 @@ struct CanvasObjectView: View {
     }
 
     private var usesEditableText: Bool {
-        object.kind == .stickyNote
+        object.kind == .stickyNote || object.kind == .text
     }
 
     private var noteTags: [ClipTag] {

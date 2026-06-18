@@ -57,14 +57,7 @@ extension View {
 /// Falls back to plain Text if parsing fails.
 @ViewBuilder
 func MarkdownText(_ content: String) -> some View {
-    if let attributed = try? AttributedString(
-        markdown: content,
-        options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-    ) {
-        Text(attributed)
-    } else {
-        Text(content)
-    }
+    MarkdownPreview(text: content)
 }
 
 // MARK: - Color

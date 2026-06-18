@@ -5,12 +5,21 @@ import Testing
 
 @Suite struct CanvasPlacementSizingTests {
     @Test func doubleTapResizeExpandsThenCollapses() {
-        let placement = CanvasPlacement(clip: Clip(content: String(repeating: "Long content ", count: 40), origin: .clipboard), x: 0, y: 0)
-        let first = CanvasPlacementSizing.toggledSize(for: placement)
-        placement.width = Double(first.width)
-        placement.height = Double(first.height)
+        let clip = Clip(content: String(repeating: "Long content ", count: 40), origin: .clipboard)
+        let object = CanvasObject(
+            kind: .clipNote,
+            clip: clip,
+            x: 0,
+            y: 0,
+            width: CanvasPlacementSizing.defaultSize.width,
+            height: CanvasPlacementSizing.defaultSize.height
+        )
 
-        let second = CanvasPlacementSizing.toggledSize(for: placement)
+        let first = CanvasPlacementSizing.toggledSize(for: object)
+        object.width = Double(first.width)
+        object.height = Double(first.height)
+
+        let second = CanvasPlacementSizing.toggledSize(for: object)
 
         #expect(first.height > CanvasPlacementSizing.defaultSize.height)
         #expect(second == CanvasPlacementSizing.defaultSize)

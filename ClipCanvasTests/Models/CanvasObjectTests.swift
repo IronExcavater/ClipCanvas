@@ -35,6 +35,19 @@ import Testing
         #expect(workspace.canvasObjects.map(\.id).contains(object.id))
     }
 
+    @Test func workspaceCreatesFreeTextObjectAtCenter() {
+        let workspace = Workspace(name: "Board")
+
+        let object = workspace.createText(centeredAt: CGPoint(x: 300, y: 220), text: "Standalone heading")
+
+        #expect(object.kind == .text)
+        #expect(object.text == "Standalone heading")
+        #expect(object.frame.midX == 300)
+        #expect(object.frame.midY == 220)
+        #expect(object.style == .freeText)
+        #expect(workspace.canvasObjects.map(\.id).contains(object.id))
+    }
+
     @Test func clipBackedObjectReferencesClipWithoutCopyingContent() {
         let clip = Clip(content: "Original clipboard text", origin: .clipboard)
         let object = CanvasObject(
@@ -117,17 +130,16 @@ import Testing
         #expect(workspace.canvasObjects.first?.id == object.id)
     }
 
-    @Test func workspacePlaceCreatesClipNoteCanvasObjectForCompatibility() {
+    @Test func placeCreatesClipNoteCanvasObjectAtPosition() {
         let workspace = Workspace(name: "Board")
         let clip = Clip(content: "Dropped from history", origin: .clipboard)
 
-        let placement = workspace.place(clip: clip, at: CGPoint(x: 120, y: 180))
+        let object = workspace.place(clip: clip, at: CGPoint(x: 120, y: 180))
 
-        #expect(workspace.placements.count == 1)
         #expect(workspace.canvasObjects.count == 1)
-        #expect(workspace.canvasObjects[0].kind == .clipNote)
-        #expect(workspace.canvasObjects[0].clip?.id == clip.id)
-        #expect(workspace.canvasObjects[0].sourcePlacementID == placement.id)
-        #expect(workspace.canvasObjects[0].frame == placement.frame)
+        #expect(object.kind == .clipNote)
+        #expect(object.clip?.id == clip.id)
+        #expect(object.frame.origin == CGPoint(x: 120, y: 180))
+        #expect(object.frame.size == CanvasPlacementSizing.defaultSize)
     }
 }

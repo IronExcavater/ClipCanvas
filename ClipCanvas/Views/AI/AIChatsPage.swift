@@ -3,7 +3,11 @@ import SwiftData
 
 struct AIChatsPage: View {
     @Environment(\.modelContext) private var context
-    @Query(sort: \AIChat.updatedAt, order: .reverse) private var chats: [AIChat]
+    @Query(
+        filter: #Predicate<AIChat> { $0.deletedAt == nil },
+        sort: \AIChat.updatedAt,
+        order: .reverse
+    ) private var chats: [AIChat]
     @Query(
         filter: #Predicate<Workspace> { $0.deletedAt == nil },
         sort: \Workspace.sortIndex
@@ -15,7 +19,6 @@ struct AIChatsPage: View {
     @State private var activeChat: AIChat?
     @State private var renamingChat: AIChat?
     @State private var renameText = ""
-    @State private var showRenameAlert = false
 
     private var filteredChats: [AIChat] {
         search.isEmpty ? chats
@@ -39,27 +42,36 @@ struct AIChatsPage: View {
                 .buttonStyle(.plain)
                 .disabled(chatSelection.isEmpty)
             }
-            .appListItemRowInsets(horizontal: 14, vertical: 4)
+            .appListItemRowInsets(vertical: 4)
 
             if chats.isEmpty {
-                ContentUnavailableView(
-                    "No Chats Yet",
+                AppListEmptyState(
+                    isSourceEmpty: true,
+                    searchText: search,
+                    title: "No Chats Yet",
                     systemImage: "bubble.left.and.bubble.right",
-                    description: Text("Chats will appear here when AI features are available.")
+                    description: "No chat history."
                 )
-                .appEmptyStateRow()
             } else if filteredChats.isEmpty {
-                ContentUnavailableView.search(text: search)
-                    .appEmptyStateRow()
+                AppListEmptyState(
+                    isSourceEmpty: false,
+                    searchText: search,
+                    title: "No Chats Yet",
+                    systemImage: "bubble.left.and.bubble.right",
+                    description: "No chat history."
+                )
             } else {
                 ForEach(filteredChats) { chat in
                     AIChatRow(
                         chat: chat,
+                        isRenaming: renamingChat?.id == chat.id,
+                        editingTitle: $renameText,
                         isSelecting: chatSelection.isActive,
                         isSelected: chatSelection.contains(chat.id),
                         onTap: { handleTap(chat) },
                         onRename: { beginRename(chat) },
-                        onDelete: { context.delete(chat) }
+                        onCommitRename: { commitRename() },
+                        onDelete: { chat.softDelete() }
                     )
                     .appListItemRowInsets(vertical: 3)
                 }
@@ -68,14 +80,19 @@ struct AIChatsPage: View {
         .appPageListStyle()
         .navigationTitle("AI Chats")
         .animation(.easeInOut(duration: 0.18), value: search.isEmpty)
-        .alert("Delete selected chats?", isPresented: $confirmingDelete) {
-            Button("Cancel", role: .cancel) {}
-            Button("Delete", role: .destructive, action: deleteSelected)
-        }
-        .alert("Rename Chat", isPresented: $showRenameAlert) {
-            TextField("Chat name", text: $renameText)
-            Button("Save") { commitRename() }
-            Button("Cancel", role: .cancel) { renamingChat = nil }
+        .overlay {
+            if confirmingDelete {
+                AppConfirmationOverlay(
+                    title: "Delete selected chats?",
+                    message: "The selected chats will move to Recently Deleted.",
+                    destructiveTitle: "Delete",
+                    onConfirm: {
+                        deleteSelected()
+                        confirmingDelete = false
+                    },
+                    onCancel: { confirmingDelete = false }
+                )
+            }
         }
         .toolbar {
             ToolbarItemGroup(placement: .primaryAction) {
@@ -84,11 +101,6 @@ struct AIChatsPage: View {
         }
         .sheet(item: $activeChat) { chat in
             AIChatDetailSheet(chat: chat)
-        }
-        .onChange(of: activeChat) { old, new in
-            if new == nil, let old, old.messages.isEmpty {
-                context.delete(old)
-            }
         }
     }
 
@@ -117,7 +129,6 @@ struct AIChatsPage: View {
     private func beginRename(_ chat: AIChat) {
         renamingChat = chat
         renameText = chat.title
-        showRenameAlert = true
     }
 
     private func commitRename() {
@@ -130,114 +141,64 @@ struct AIChatsPage: View {
     }
 
     private func deleteSelected() {
-        chats.filter { chatSelection.contains($0.id) }.forEach { context.delete($0) }
+        chats.filter { chatSelection.contains($0.id) }.forEach { $0.softDelete() }
         chatSelection.end()
     }
 }
 
 private struct AIChatRow: View {
     let chat: AIChat
+    let isRenaming: Bool
+    @Binding var editingTitle: String
     let isSelecting: Bool
     let isSelected: Bool
     let onTap: () -> Void
     let onRename: () -> Void
+    let onCommitRename: () -> Void
     let onDelete: () -> Void
 
+    @FocusState private var focused: Bool
+
     var body: some View {
-        Button(action: onTap) {
-            HStack(alignment: .top, spacing: 10) {
-                if isSelecting {
-                    Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
-                        .font(.system(size: 20, weight: .semibold))
-                        .foregroundStyle(isSelected ? Color.accentColor : .secondary)
-                        .padding(.top, 3)
-                }
-
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack(spacing: 8) {
-                        Image(systemName: statusIcon)
-                            .font(.system(size: 13, weight: .bold))
-                            .foregroundStyle(.white)
-                            .frame(width: 24, height: 24)
-                            .background(statusTint, in: Circle())
-
-                        Text(chat.title)
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(.primary)
-                            .lineLimit(1)
-                    }
-
-                    Text(description)
-                        .font(.caption)
-                        .foregroundStyle(.primary.opacity(0.78))
-                        .lineLimit(2)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-
-                    HStack(spacing: 12) {
-                        stat("bubble.left.fill", value: "\(chat.messages.count)")
-                        stat("square.on.square", value: "\(attachmentCount)")
-                        statLabel(chat.mode == .thinking ? "brain" : "bolt.fill",
-                                  label: chat.mode == .thinking ? "Deep" : "Quick")
-                        Spacer(minLength: 0)
-                        RelativeAgeText(date: chat.updatedAt, suffix: " ago")
-                            .font(.caption2.weight(.medium))
-                            .foregroundStyle(.primary.opacity(0.52))
-                    }
-                    .padding(.top, 4)
-                    .foregroundStyle(.primary.opacity(0.62))
-                }
+        ItemRow(
+            tint: AIChatListRowStyle.statusTint(for: chat),
+            opacity: 0.035,
+            isSelecting: isSelecting,
+            isSelected: isSelected
+        ) {
+            if isRenaming {
+                renameField
+            } else {
+                AIChatListRowHeader(chat: chat)
             }
         }
-        .appListCard(tint: statusTint, opacity: 0.08)
+        .onTapGesture(perform: onTap)
+        .onChange(of: isRenaming) { _, newValue in
+            if newValue { focused = true }
+        }
+        .swipeActions(edge: .leading) {
+            Button(action: onRename) { Image(systemName: "pencil") }
+                .tint(.blue)
+                .accessibilityLabel("Rename")
+        }
+        .swipeActions(edge: .trailing) {
+            Button(role: .destructive, action: onDelete) { Image(systemName: "trash") }
+                .accessibilityLabel("Delete")
+        }
         .contextMenu {
             Button("Rename", systemImage: "pencil", action: onRename)
             Button("Delete", systemImage: "trash", role: .destructive, action: onDelete)
         }
     }
 
-    private var latestToolEvent: AIToolEvent? {
-        chat.sortedMessages.flatMap(\.sortedToolEvents).last
-    }
-
-    private var statusIcon: String {
-        if latestToolEvent?.status == .running || latestToolEvent?.status == .queued { return "waveform" }
-        if latestToolEvent?.status == .failed { return "exclamationmark" }
-        if chat.lastMessage?.status == .streaming { return "sparkles" }
-        return "sparkles"
-    }
-
-    private var statusTint: Color {
-        if latestToolEvent?.status == .failed { return .red }
-        if latestToolEvent?.status == .running || latestToolEvent?.status == .queued { return .orange }
-        return .accentColor
-    }
-
-    private var description: String {
-        if let event = latestToolEvent {
-            return event.summary
-        }
-        return chat.preview
-    }
-
-    private var attachmentCount: Int {
-        chat.sortedMessages.reduce(0) { $0 + $1.attachments.count }
-    }
-
-    private func stat(_ icon: String, value: String) -> some View {
-        HStack(spacing: 2) {
-            Image(systemName: icon)
-                .font(.system(size: 11, weight: .semibold))
-            Text(value)
-                .font(.caption2.weight(.semibold).monospacedDigit())
-        }
-    }
-
-    private func statLabel(_ icon: String, label: String) -> some View {
-        HStack(spacing: 2) {
-            Image(systemName: icon)
-                .font(.system(size: 11, weight: .semibold))
-            Text(label)
-                .font(.caption2.weight(.semibold))
-        }
+    private var renameField: some View {
+        TextField("Chat name", text: $editingTitle)
+            .font(.subheadline.weight(.semibold))
+            .lineLimit(1)
+            .submitLabel(.done)
+            .focused($focused)
+            .onSubmit(onCommitRename)
+            .onDisappear(perform: onCommitRename)
+            .frame(minHeight: 34)
     }
 }

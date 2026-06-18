@@ -43,6 +43,7 @@ final class AIChat: Identifiable {
     var isPinned: Bool = false
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
+    var deletedAt: Date?
 
     var workspace: Workspace?
 
@@ -64,7 +65,7 @@ final class AIChat: Identifiable {
         if let workspace {
             return "Ready for \(workspace.name)"
         }
-        return "Ready to help"
+        return "No messages"
     }
 
     var mode: AIChatMode {
@@ -79,6 +80,12 @@ final class AIChat: Identifiable {
             }
             return lhs.createdAt < rhs.createdAt
         }
+    }
+}
+
+extension AIChat: SoftDeletable {
+    func softDelete() {
+        deletedAt = Date()
     }
 }
 

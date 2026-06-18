@@ -14,6 +14,14 @@ nonisolated enum CanvasMode: Equatable, CaseIterable {
     }
 
     var allowsCanvasPan: Bool { self != .draw }
+
+    var label: String {
+        switch self {
+        case .pan: "Select"
+        case .edit: "Card"
+        case .draw: "Draw"
+        }
+    }
 }
 
 enum ZoomCommand: Equatable {
@@ -24,17 +32,20 @@ enum ZoomCommand: Equatable {
     case arrangeSelection
 }
 
-nonisolated enum CanvasToolbarItem: Equatable {
+nonisolated enum CanvasToolbarItem: Hashable {
     case paste
     case newNote
+    case newText
     case insertImage
     case askAI
     case details
     case editContent
     case manageTags
     case arrangeSelection
+    case duplicate
     case color
     case formatBold
+    case formatItalic
     case formatBullet
     case formatHighlight
     case delete
@@ -45,11 +56,40 @@ nonisolated enum CanvasToolbarItem: Equatable {
     case drawHighlighter
     case drawEraser
     case drawLasso
+
+    var label: String {
+        switch self {
+        case .paste: "Paste"
+        case .newNote: "Card"
+        case .newText: "Text"
+        case .insertImage: "Insert Image"
+        case .askAI: "Ask AI"
+        case .details: "Details"
+        case .editContent: "Edit"
+        case .manageTags: "Tags"
+        case .arrangeSelection: "Arrange"
+        case .duplicate: "Duplicate"
+        case .color: "Color"
+        case .formatBold: "Bold"
+        case .formatItalic: "Italic"
+        case .formatBullet: "Bullets"
+        case .formatHighlight: "Highlight"
+        case .delete: "Delete"
+        case .divider: "Divider"
+        case .mode(let mode): mode.label
+        case .closeMode: "Close"
+        case .drawPen: CanvasDrawTool.pen.displayName
+        case .drawHighlighter: CanvasDrawTool.highlighter.displayName
+        case .drawEraser: CanvasDrawTool.eraser.displayName
+        case .drawLasso: CanvasDrawTool.lasso.displayName
+        }
+    }
 }
 
 nonisolated enum CanvasSelectionKind: Equatable {
     case none
     case text
+    case clip
     case image
     case mixed
 }
@@ -69,6 +109,15 @@ nonisolated enum CanvasDrawTool: Equatable {
         }
     }
 
+    var displayName: String {
+        switch self {
+        case .pen: "Pen"
+        case .highlighter: "Highlighter"
+        case .eraser: "Eraser"
+        case .lasso: "Lasso"
+        }
+    }
+
     var supportsSettings: Bool {
         switch self {
         case .pen, .highlighter, .eraser: true
@@ -77,7 +126,7 @@ nonisolated enum CanvasDrawTool: Equatable {
     }
 }
 
-nonisolated struct CanvasToolbarConfiguration: Equatable {
+nonisolated struct CanvasToolbarConfiguration: Hashable {
     var items: [CanvasToolbarItem]
 
     static func make(
@@ -94,34 +143,19 @@ nonisolated struct CanvasToolbarConfiguration: Equatable {
             ])
 
         case .edit:
-            if selectedCount > 0 {
-                if isEditing {
-                    return CanvasToolbarConfiguration(items: [
-                        .closeMode,
-                        .formatBold,
-                        .formatBullet,
-                        .formatHighlight
-                    ])
-                }
-                if selectionKind == .image {
-                    return CanvasToolbarConfiguration(items: [
-                        .closeMode,
-                        .arrangeSelection,
-                        .details,
-                        .delete
-                    ])
-                }
+            if isEditing {
                 return CanvasToolbarConfiguration(items: [
                     .closeMode,
-                    .editContent,
-                    .color, .manageTags,
-                    .details, .delete
+                    .formatBold,
+                    .formatItalic,
+                    .formatBullet,
+                    .formatHighlight
                 ])
             }
             return CanvasToolbarConfiguration(items: [
                 .closeMode,
-                .paste,
                 .newNote,
+                .newText,
                 .insertImage,
             ])
 
@@ -129,20 +163,27 @@ nonisolated struct CanvasToolbarConfiguration: Equatable {
             if selectedCount > 0 {
                 var items: [CanvasToolbarItem] = [.askAI]
                 if selectedCount == 1 {
-                    items.append(.details)
+                    if selectionKind == .text || selectionKind == .clip {
+                        items.append(.editContent)
+                    }
+                    if selectionKind == .clip || selectionKind == .image {
+                        items.append(.details)
+                    }
                 }
-                items.append(contentsOf: [.arrangeSelection, .delete])
+                items.append(contentsOf: [.duplicate, .arrangeSelection, .delete])
                 return CanvasToolbarConfiguration(items: items)
             }
             return CanvasToolbarConfiguration(items: [
                 .askAI,
-                .divider,
-                .mode(.edit), .mode(.draw)
+                .newNote,
+                .newText,
+                .insertImage,
+                .mode(.draw)
             ])
         }
     }
 
     var preferredWidth: CGFloat {
-        CGFloat(items.count * 46 + max(items.count - 1, 0) * 2 + 20)
+        CGFloat(items.count * 44 + max(items.count - 1, 0) * 2 + 20)
     }
 }

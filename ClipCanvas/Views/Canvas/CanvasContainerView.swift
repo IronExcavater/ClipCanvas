@@ -1,4 +1,5 @@
 import PencilKit
+import PhotosUI
 import SwiftUI
 import SwiftData
 #if canImport(UIKit)
@@ -8,6 +9,7 @@ import UIKit
 struct CanvasContainerView: View {
     let workspace: Workspace
     let onToggleSidebar: () -> Void
+    var prefersInspector = false
 
     @Environment(\.modelContext) var context
     @Environment(\.undoManager) private var undoManager
@@ -18,8 +20,7 @@ struct CanvasContainerView: View {
     ) private var workspaces: [Workspace]
 
     @State var mode: CanvasMode = .pan
-    @State var feedback: String?
-    @State var feedbackToken = UUID()
+    @State var feedbackPresenter = FeedbackPresenter()
     @State var zoomCommand: ZoomCommand?
     @State var visibleScale: CGFloat = 1
     @State var visibleViewportCenter: CGPoint = .zero
@@ -42,85 +43,85 @@ struct CanvasContainerView: View {
     @State var highlighterColor: PlatformColor = .systemYellow.withAlphaComponent(0.5)
     @State var highlighterWidth: CGFloat = 20
     @State var eraserWidth: CGFloat = 34
+    @State private var measuredTopChromeHeight: CGFloat = 60
     @State var clipboardWatcherTask: Task<Void, Never>?
     @State var lastClipboardFingerprint: String?
     @State var canvasSearch = ""
     @State var isCanvasSearchActive = false
+    @State var isImagePickerPresented = false
+    @State var selectedPhotoItem: PhotosPickerItem?
+    @State private var confirmingClearCanvas = false
     @FocusState var renameFocused: Bool
     @FocusState var searchFocused: Bool
 
     var body: some View {
+        GeometryReader { proxy in
+            let usesInspector = shouldUseInspector(width: proxy.size.width)
+
+            HStack(spacing: 0) {
+                canvasContent(usesInspector: usesInspector)
+
+                if usesInspector {
+                    Divider()
+                    CanvasInspectorPanel(
+                        selectedObjects: selectedInspectorObjects,
+                        detailClip: detailClip,
+                        activeAIChat: activeAIChat,
+                        onCloseDetail: { detailClip = nil },
+                        onCloseChat: { activeAIChat = nil },
+                        onEdit: editSelectedContent,
+                        onDetails: showSelectedDetails,
+                        onTags: showSelectedTags,
+                        onColor: showSelectedColors,
+                        onDuplicate: duplicateSelected,
+                        onArrange: { zoomCommand = .arrangeSelection },
+                        onAskAI: askAIAboutSelection,
+                        onDelete: deleteSelected
+                    )
+                    .frame(width: inspectorWidth(for: proxy.size.width))
+                    .transition(.move(edge: .trailing).combined(with: .opacity))
+                }
+            }
+            .animation(.spring(response: 0.28, dampingFraction: 0.86), value: usesInspector)
+        }
+    }
+
+    private func canvasContent(usesInspector: Bool) -> some View {
         ZStack {
-                CanvasView(
-                    workspace: workspace,
-                    mode: mode,
-                    keyboardHeight: keyboardHeight,
-                    topBarContentHeight: topBarContentHeight,
-                    zoomCommand: $zoomCommand,
-                    selectedObjectIDs: $selectedObjectIDs,
-                    editingObjectID: $editingObjectID,
-                    visibleScale: $visibleScale,
-                    visibleViewportCenter: $visibleViewportCenter,
-                    visibleObjectIDs: $visibleObjectIDs,
-                    activeDrawing: $activeDrawing,
-                    noteTextCommand: $noteTextCommand,
-                    drawingTool: pencilTool,
-                    canvasSearch: canvasSearch
-                )
+            CanvasView(
+                workspace: workspace,
+                mode: mode,
+                keyboardHeight: keyboardHeight,
+                topBarContentHeight: measuredTopChromeHeight,
+                zoomCommand: $zoomCommand,
+                selectedObjectIDs: $selectedObjectIDs,
+                editingObjectID: $editingObjectID,
+                visibleScale: $visibleScale,
+                visibleViewportCenter: $visibleViewportCenter,
+                visibleObjectIDs: $visibleObjectIDs,
+                activeDrawing: $activeDrawing,
+                noteTextCommand: $noteTextCommand,
+                drawingTool: pencilTool,
+                canvasSearch: canvasSearch,
+                onShowDetails: { object in
+                    if let clip = object.clip {
+                        detailClip = clip
+                    }
+                },
+                onManageTags: { objects in
+                    let clips = objects.compactMap(\.clip)
+                    if !clips.isEmpty {
+                        tagClips = clips
+                    }
+                },
+                onAskAI: { objects in
+                    openAIChat(attaching: objects)
+                }
+            )
             .ignoresSafeArea()
 
             VStack(spacing: 0) {
-                CanvasTopBar(
-                    workspaceName: workspace.name,
-                    workspaces: workspaces,
-                    activeWorkspaceID: workspace.id,
-                    isRenaming: $isRenaming,
-                    renameText: $renameText,
-                    renameFocused: $renameFocused,
-                    onToggleSidebar: toggleSidebar,
-                    onBeginRename: beginRename,
-                    onCommitRename: commitRename,
-                    onSelectWorkspace: { WorkspaceActionService.activate($0, among: workspaces) },
-                    selectedCount: selectedObjectIDs.count,
-                    visibleCount: visibleObjectIDs.count,
-                    onAskAI: askAIAboutCurrentContext,
-                    onClearAll: clearAll,
-                    onArrangeAll: { zoomCommand = .arrangeAll },
-                    onFitContent: { zoomCommand = .fitContent },
-                    onSearch: toggleCanvasSearch
-                )
-
-                if isCanvasSearchActive {
-                    HStack(spacing: 10) {
-                        Image(systemName: "magnifyingglass")
-                            .font(.system(size: 14, weight: .semibold))
-                            .foregroundStyle(.secondary)
-
-                        TextField("Search canvas", text: $canvasSearch)
-                            .font(.subheadline.weight(.medium))
-                            .textFieldStyle(.plain)
-                            .focused($searchFocused)
-                            .submitLabel(.search)
-                            .onSubmit { searchFocused = false }
-
-                        if !canvasSearch.isEmpty {
-                            Button { canvasSearch = "" } label: {
-                                Image(systemName: "xmark.circle.fill")
-                                    .foregroundStyle(.secondary)
-                            }
-                            .buttonStyle(.plain)
-                        }
-
-                        Button("Done") { closeCanvasSearch() }
-                            .font(.subheadline.weight(.semibold))
-                            .foregroundStyle(Color.accentColor)
-                            .buttonStyle(.plain)
-                    }
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 10)
-                    .background { Rectangle().glassPanel(cornerRadius: 0, shadow: false) }
-                    .transition(.move(edge: .top).combined(with: .opacity))
-                }
+                topChrome
 
                 Spacer()
 
@@ -150,14 +151,17 @@ struct CanvasContainerView: View {
                     isEditing: editingObjectID != nil,
                     onPaste: paste,
                     onCreateNote: createNoteAtViewCenter,
+                    onCreateText: createTextAtViewCenter,
                     onAskAI: openRecentOrNewAIChat,
                     onInsertImage: insertImageFromLibrary,
                     onDetails: showSelectedDetails,
                     onEditContent: editSelectedContent,
                     onManageTags: showSelectedTags,
                     onArrangeSelection: { zoomCommand = .arrangeSelection },
+                    onDuplicate: duplicateSelected,
                     onColor: showSelectedColors,
                     onFormatBold: { noteTextCommand = NoteTextCommand(kind: .bold) },
+                    onFormatItalic: { noteTextCommand = NoteTextCommand(kind: .italic) },
                     onFormatBullet: { noteTextCommand = NoteTextCommand(kind: .bullet) },
                     onFormatHighlight: { noteTextCommand = NoteTextCommand(kind: .highlight) },
                     onDelete: deleteSelected,
@@ -189,7 +193,7 @@ struct CanvasContainerView: View {
                         onChangeWidth: { setDrawWidth($0, for: tool) },
                         onDismiss: { drawToolSettings = nil }
                     )
-                    .padding(.bottom, 98)
+                    .padding(.bottom, 82)
                 }
                 .transition(.move(edge: .bottom).combined(with: .opacity))
                 .zIndex(7)
@@ -208,20 +212,26 @@ struct CanvasContainerView: View {
                     .zIndex(9)
             }
 
-            VStack {
-                Spacer().frame(height: 70)
-                FeedbackBanner(message: feedback ?? "")
-                    .opacity(feedback == nil ? 0 : 1)
-                    .offset(y: feedback == nil ? -12 : 0)
-                    .scaleEffect(feedback == nil ? 0.96 : 1)
-                Spacer()
+            if confirmingClearCanvas {
+                AppConfirmationOverlay(
+                    title: "Clear this canvas?",
+                    message: "This removes every card from the current canvas.",
+                    destructiveTitle: "Clear",
+                    onConfirm: {
+                        clearAll()
+                        confirmingClearCanvas = false
+                    },
+                    onCancel: { confirmingClearCanvas = false }
+                )
+                .zIndex(30)
             }
-            .allowsHitTesting(false)
+
         }
-        .animation(.spring(response: 0.24, dampingFraction: 0.86), value: feedback)
+        .appFeedbackOverlay(feedbackPresenter, topPadding: 70)
         .animation(.spring(response: 0.25, dampingFraction: 0.82), value: selectedObjectIDs)
         .animation(.spring(response: 0.28, dampingFraction: 0.86), value: keyboardHeight)
         .animation(.spring(response: 0.28, dampingFraction: 0.86), value: editingObjectID)
+        .focusedSceneValue(\.canvasCommandActions, canvasCommandActions)
         .onAppear {
             context.undoManager = undoManager
             startClipboardListening()
@@ -244,7 +254,7 @@ struct CanvasContainerView: View {
                 stopClipboardListening()
             }
         }
-        // Tapping the canvas background deselects everything — also exit inline editing
+        // Tapping the canvas background deselects everything - also exit inline editing
         // so the keyboard dismisses instead of staying up with no selected card.
         .onChange(of: selectedObjectIDs) { _, newIDs in
             if newIDs.isEmpty {
@@ -261,21 +271,156 @@ struct CanvasContainerView: View {
             }
         }
         .modifier(CanvasKeyboardHeightModifier(isEditing: editingObjectID != nil, keyboardHeight: $keyboardHeight))
-        .sheet(item: $detailClip) { clip in
+        .photosPicker(
+            isPresented: $isImagePickerPresented,
+            selection: $selectedPhotoItem,
+            matching: .images
+        )
+        .onChange(of: selectedPhotoItem) { _, newItem in
+            Task { await importSelectedImage(newItem) }
+        }
+        .onPreferenceChange(CanvasTopChromeHeightPreferenceKey.self) { height in
+            let newHeight = CanvasTopChromeLayout.resolvedHeight(
+                measuredHeight: height,
+                expectedHeight: topBarContentHeight
+            )
+            guard abs(newHeight - measuredTopChromeHeight) > 0.5 else { return }
+            withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                measuredTopChromeHeight = newHeight
+            }
+        }
+        .sheet(item: detailSheetBinding(usesInspector: usesInspector)) { clip in
             ClipDetailSheet(clip: clip)
         }
-        .sheet(item: $activeAIChat) { chat in
+        .sheet(item: chatSheetBinding(usesInspector: usesInspector)) { chat in
             AIChatDetailSheet(chat: chat)
         }
-        .onChange(of: activeAIChat) { old, new in
-            if new == nil, let old, old.messages.isEmpty {
-                context.delete(old)
+    }
+
+    private var selectedInspectorObjects: [CanvasObject] {
+        orderedCanvasObjects(matching: selectedObjectIDs)
+            .filter { $0.kind != .connector }
+    }
+
+    private func shouldUseInspector(width: CGFloat) -> Bool {
+        prefersInspector
+            && width >= 760
+            && (activeAIChat != nil || detailClip != nil || !selectedInspectorObjects.isEmpty)
+    }
+
+    private func inspectorWidth(for width: CGFloat) -> CGFloat {
+        min(max(340, width * 0.34), 460)
+    }
+
+    private func detailSheetBinding(usesInspector: Bool) -> Binding<Clip?> {
+        Binding(
+            get: { usesInspector ? nil : detailClip },
+            set: { detailClip = $0 }
+        )
+    }
+
+    private func chatSheetBinding(usesInspector: Bool) -> Binding<AIChat?> {
+        Binding(
+            get: { usesInspector ? nil : activeAIChat },
+            set: { activeAIChat = $0 }
+        )
+    }
+
+    private var canvasCommandActions: CanvasCommandActions {
+        CanvasCommandActions(
+            canEditSelection: selectedObjectIDs.count == 1,
+            canDeleteSelection: !selectedObjectIDs.isEmpty,
+            canFormatText: editingObjectID != nil,
+            createNote: createNoteAtViewCenter,
+            paste: paste,
+            askAI: openRecentOrNewAIChat,
+            search: toggleCanvasSearch,
+            zoomIn: { zoomCommand = .zoomIn },
+            zoomOut: { zoomCommand = .zoomOut },
+            fitContent: { zoomCommand = .fitContent },
+            arrangeSelection: { zoomCommand = .arrangeSelection },
+            editSelection: editSelectedContent,
+            duplicateSelection: duplicateSelected,
+            deleteSelection: deleteSelected,
+            bold: { noteTextCommand = NoteTextCommand(kind: .bold) },
+            italic: { noteTextCommand = NoteTextCommand(kind: .italic) },
+            bullet: { noteTextCommand = NoteTextCommand(kind: .bullet) },
+            highlight: { noteTextCommand = NoteTextCommand(kind: .highlight) }
+        )
+    }
+
+    var topBarContentHeight: CGFloat {
+        CanvasTopChromeLayout.expectedHeight(searchActive: isCanvasSearchActive)
+    }
+
+    private var topChrome: some View {
+        VStack(spacing: 0) {
+            CanvasTopBar(
+                workspaceName: workspace.name,
+                workspaces: workspaces,
+                activeWorkspaceID: workspace.id,
+                isRenaming: $isRenaming,
+                renameText: $renameText,
+                renameFocused: $renameFocused,
+                onToggleSidebar: toggleSidebar,
+                onBeginRename: beginRename,
+                onCommitRename: commitRename,
+                onSelectWorkspace: { WorkspaceActionService.activate($0, among: workspaces) },
+                selectedCount: selectedObjectIDs.count,
+                visibleCount: visibleObjectIDs.count,
+                onAskAI: askAIAboutCurrentContext,
+                onClearAll: { confirmingClearCanvas = true },
+                onArrangeAll: { zoomCommand = .arrangeAll },
+                onFitContent: { zoomCommand = .fitContent },
+                onSearch: toggleCanvasSearch
+            )
+
+            if isCanvasSearchActive {
+                CanvasSearchPill(
+                    search: $canvasSearch,
+                    resultCount: canvasSearchResultCount,
+                    totalCount: visibleCanvasObjectCount,
+                    searchFocused: $searchFocused,
+                    onClose: closeCanvasSearch
+                )
+                .padding(.horizontal, 16)
+                .padding(.bottom, 10)
+                .transition(.move(edge: .top).combined(with: .opacity).combined(with: .scale(scale: 0.97, anchor: .top)))
+            }
+        }
+        .background {
+            GeometryReader { proxy in
+                Color.clear.preference(
+                    key: CanvasTopChromeHeightPreferenceKey.self,
+                    value: proxy.frame(in: .global).maxY
+                )
             }
         }
     }
 
-    var topBarContentHeight: CGFloat {
-        60 + (isCanvasSearchActive ? 44 : 0)
+    var visibleCanvasObjectCount: Int {
+        workspace.canvasObjects.filter { $0.isVisible && $0.kind != .connector }.count
+    }
+
+    var canvasSearchResultCount: Int {
+        let query = canvasSearch.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !query.isEmpty else { return visibleCanvasObjectCount }
+        return workspace.canvasObjects.filter { object in
+            object.isVisible
+            && object.kind != .connector
+            && canvasObject(object, matchesSearch: query)
+        }.count
+    }
+
+    private func canvasObject(_ object: CanvasObject, matchesSearch query: String) -> Bool {
+        if object.text.lowercased().contains(query) { return true }
+        if object.displayText.lowercased().contains(query) { return true }
+        if let clip = object.clip {
+            if clip.content.lowercased().contains(query) { return true }
+            if clip.preview.lowercased().contains(query) { return true }
+            if clip.tags.contains(where: { $0.name.lowercased().contains(query) }) { return true }
+        }
+        return false
     }
 
     var selectedCanvasKind: CanvasSelectionKind {
@@ -283,6 +428,64 @@ struct CanvasContainerView: View {
         guard !objects.isEmpty else { return .none }
         let kinds = Set(objects.map(canvasSelectionKind(for:)))
         return kinds.count == 1 ? (kinds.first ?? .none) : .mixed
+    }
+}
+
+private struct CanvasSearchPill: View {
+    @Binding var search: String
+    let resultCount: Int
+    let totalCount: Int
+    var searchFocused: FocusState<Bool>.Binding
+    let onClose: () -> Void
+
+    private var resultText: String {
+        let noun = totalCount == 1 ? "card" : "cards"
+        guard !search.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return "\(totalCount) \(noun)"
+        }
+        return "\(resultCount) of \(totalCount)"
+    }
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundStyle(.secondary)
+
+            TextField("Search canvas", text: $search)
+                .font(.subheadline.weight(.medium))
+                .textFieldStyle(.plain)
+                .focused(searchFocused)
+                .submitLabel(.search)
+                .onSubmit { searchFocused.wrappedValue = false }
+
+            HStack(spacing: 4) {
+                Image(systemName: "rectangle.stack")
+                    .font(.system(size: 10, weight: .bold))
+                Text(resultText)
+                    .font(.caption.weight(.semibold).monospacedDigit())
+            }
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
+            .padding(.horizontal, 8)
+            .padding(.vertical, 4)
+            .background(Color.primary.opacity(0.08), in: Capsule())
+
+        }
+        .padding(.leading, 14)
+        .padding(.trailing, 10)
+        .padding(.vertical, 9)
+        .frame(maxWidth: 430)
+        .glassCapsule(interactive: true)
+    }
+}
+
+private struct CanvasTopChromeHeightPreferenceKey: PreferenceKey {
+    static var defaultValue: CGFloat = 60
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = max(value, nextValue())
     }
 }
 

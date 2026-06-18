@@ -233,11 +233,7 @@ import Testing
     }
 
     private func makeWorkspace() throws -> (ModelContext, Workspace) {
-        let container = try ModelContainer(
-            for: Clip.self, ClipTag.self, Workspace.self, CanvasPlacement.self, CanvasObject.self,
-            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-        )
-        let context = ModelContext(container)
+        let context = try ModelContextFactory.makeCoreContext()
         let workspace = Workspace(name: "Actions", isActive: true)
         context.insert(workspace)
         return (context, workspace)

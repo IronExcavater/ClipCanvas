@@ -3,8 +3,22 @@ import SwiftUI
 struct ClipDetailSheet: View {
     let clip: Clip
     @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ClipDetailView(clip: clip, onClose: { dismiss() })
+            .appSheetPresentationDetents()
+    }
+}
+
+struct ClipDetailView: View {
+    let clip: Clip
+    @Environment(\.dismiss) private var dismiss
     @State private var isTransforming = false
+    @State private var isEditingContent = false
+    @State private var noteTextCommand: NoteTextCommand?
+    @State private var editorHeight: CGFloat = 180
     @ObservedObject private var revealStore = PrivateClipRevealStore.shared
+    var onClose: (() -> Void)?
 
     var body: some View {
         NavigationStack {
@@ -23,11 +37,26 @@ struct ClipDetailSheet: View {
                         onTransform: applyTransform,
                         onReveal: { revealStore.toggle(clip) },
                         onSensitive: { ClipActionService.toggleSensitive(clip) },
+                        onEdit: { isEditingContent.toggle() },
                         onDelete: {
                             ClipActionService.softDelete(clip)
-                            dismiss()
+                            close()
                         }
                     )
+
+                    ClipDetailSection("Content") {
+                        ClipContentPanel(
+                            clip: clip,
+                            isRevealed: revealStore.isRevealed(clip),
+                            isEditing: isEditingContent,
+                            command: noteTextCommand,
+                            editorHeight: editorHeight,
+                            onEditorHeightChange: { editorHeight = $0 },
+                            onCommit: updateClipContent,
+                            onExitEditing: { isEditingContent = false },
+                            onCommand: { noteTextCommand = NoteTextCommand(kind: $0) }
+                        )
+                    }
 
                     ClipDetailSection("Info") {
                         ClipInfoPanel(clip: clip)
@@ -45,7 +74,7 @@ struct ClipDetailSheet: View {
             .appInlineNavigationTitleDisplayMode()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(action: { dismiss() }) {
+                    Button(action: close) {
                         AppCircleIconLabel(systemImage: "xmark", size: 36, symbolSize: 14)
                     }
                     .buttonStyle(.plain)
@@ -53,6 +82,14 @@ struct ClipDetailSheet: View {
                 }
             }
             .appScrollDismissesKeyboardInteractively()
+        }
+    }
+
+    private func close() {
+        if let onClose {
+            onClose()
+        } else {
+            dismiss()
         }
     }
 }
@@ -80,7 +117,7 @@ private struct ClipInfoPanel: View {
     let clip: Clip
 
     var body: some View {
-        VStack(spacing: 9) {
+        VStack(spacing: 7) {
             ClipInfoRow("Type", value: ClipTag.builtInName(for: clip.type), icon: clip.type.icon)
             ClipInfoRow("Privacy", value: privacyLabel, icon: privacyIcon)
             if let expiresAt = clip.expiresAt, clip.isPrivateContent {
@@ -89,9 +126,7 @@ private struct ClipInfoPanel: View {
             ClipUpdatedRow(date: clip.updatedAt)
             ClipInfoRow("Created", value: clip.createdAt.formatted(date: .abbreviated, time: .shortened), icon: "calendar")
         }
-        .padding(16)
-        .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
-        .shadow(color: .black.opacity(0.06), radius: 8, y: 3)
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     private var privacyLabel: String {
@@ -107,6 +142,71 @@ private struct ClipInfoPanel: View {
 
     private var privacyIcon: String {
         clip.isPrivateContent ? "lock.fill" : "hand.raised"
+    }
+}
+
+private struct ClipContentPanel: View {
+    let clip: Clip
+    let isRevealed: Bool
+    let isEditing: Bool
+    let command: NoteTextCommand?
+    let editorHeight: CGFloat
+    let onEditorHeightChange: (CGFloat) -> Void
+    let onCommit: (String) -> Void
+    let onExitEditing: () -> Void
+    let onCommand: (NoteTextCommandKind) -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            if clip.type == .image {
+                Label("Image note", systemImage: "photo")
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(.secondary)
+            } else if isEditing {
+                formattingBar
+                NoteTextEditor(
+                    initialText: clip.content,
+                    fontSize: 16,
+                    command: command,
+                    onCommit: onCommit,
+                    onExitEditing: onExitEditing,
+                    onSizeChange: { size in
+                        onEditorHeightChange((size.height + 18).clamped(to: 140...420))
+                    }
+                )
+                .frame(minHeight: editorHeight, maxHeight: editorHeight)
+            } else {
+                MarkdownPreview(text: clip.displayPreview(isRevealed: isRevealed), emptyText: "No text")
+                    .font(.body)
+                    .foregroundStyle(.primary)
+                    .textSelection(.enabled)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private var formattingBar: some View {
+        HStack(spacing: 8) {
+            formatButton("bold", kind: .bold)
+            formatButton("italic", kind: .italic)
+            formatButton("list.bullet", kind: .bullet)
+            formatButton("highlighter", kind: .highlight)
+            Spacer(minLength: 0)
+            Button("Done", action: onExitEditing)
+                .font(.caption.weight(.semibold))
+                .buttonStyle(.bordered)
+        }
+    }
+
+    private func formatButton(_ icon: String, kind: NoteTextCommandKind) -> some View {
+        Button { onCommand(kind) } label: {
+            Image(systemName: icon)
+                .font(.system(size: 14, weight: .semibold))
+                .frame(width: 32, height: 32)
+        }
+        .buttonStyle(.plain)
+        .glassPanel(cornerRadius: 16, shadow: false, interactive: true)
+        .accessibilityLabel(kind.accessibilityName)
     }
 }
 
@@ -129,7 +229,7 @@ private struct ClipInfoRow: View {
             Label(title, systemImage: icon)
                 .foregroundStyle(.primary.opacity(0.68))
         }
-        .font(.body)
+        .font(.footnote)
     }
 }
 
@@ -144,7 +244,7 @@ private struct ClipUpdatedRow: View {
             Label("Last Updated", systemImage: "clock")
                 .foregroundStyle(.primary.opacity(0.68))
         }
-        .font(.body)
+        .font(.footnote)
     }
 }
 
@@ -161,38 +261,32 @@ private struct ClipDetailActionToolbar: View {
     let onTransform: (String) -> Void
     let onReveal: () -> Void
     let onSensitive: () -> Void
+    let onEdit: () -> Void
     let onDelete: () -> Void
 
     var body: some View {
-        HStack(spacing: 10) {
-            action("Copy", icon: "doc.on.doc", action: onCopy)
-            if canOpenLink {
-                action("Open", icon: "safari", action: onOpen)
+        ScrollView(.horizontal) {
+            HStack(spacing: 9) {
+                action("Copy", icon: "doc.on.doc", action: onCopy)
+                action("Edit", icon: "character.cursor.ibeam", action: onEdit)
+                if canOpenLink {
+                    action("Open", icon: "safari", action: onOpen)
+                }
+                transformMenu
+                if isPrivate {
+                    action(isRevealed ? "Hide" : "Reveal",
+                           icon: isRevealed ? "eye.slash" : "eye",
+                           action: onReveal)
+                }
+                action(isPinned ? "Unpin" : "Pin", icon: isPinned ? "pin.slash" : "pin", action: onPin)
+                action(isPrivate ? "Unmark" : "Sensitive",
+                       icon: isPrivate ? "lock.open" : "lock",
+                       action: onSensitive)
+                action("Delete", icon: "trash", destructive: true, action: onDelete)
             }
-            transformMenu
-            if isPrivate {
-                action(isRevealed ? "Hide" : "Reveal",
-                       icon: isRevealed ? "eye.slash" : "eye",
-                       action: onReveal)
-            }
-            action(isPinned ? "Unpin" : "Pin", icon: isPinned ? "pin.slash" : "pin", action: onPin)
-            action(isPrivate ? "Unmark" : "Sensitive",
-                   icon: isPrivate ? "lock.open" : "lock",
-                   action: onSensitive)
-            action("Delete", icon: "trash", destructive: true, action: onDelete)
+            .padding(.vertical, 2)
         }
-        .padding(8)
-        .background {
-            if #available(iOS 26, *) {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .fill(Color.clear)
-                    .glassEffect(.regular, in: .rect(cornerRadius: 26))
-            } else {
-                RoundedRectangle(cornerRadius: 26, style: .continuous)
-                    .fill(.regularMaterial)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .scrollIndicators(.hidden)
     }
 
     @ViewBuilder
@@ -218,8 +312,7 @@ private struct ClipDetailActionToolbar: View {
                     .minimumScaleFactor(0.8)
             }
             .foregroundStyle(.primary)
-            .frame(maxWidth: .infinity, minHeight: 58)
-            .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground).opacity(0.72), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+            .frame(width: 68, height: 58)
         }
         .buttonStyle(.plain)
         .disabled(!canTransform || isTransforming)
@@ -236,14 +329,22 @@ private struct ClipDetailActionToolbar: View {
                     .minimumScaleFactor(0.8)
             }
             .foregroundStyle(destructive ? .red : .primary)
-            .frame(maxWidth: .infinity, minHeight: 64)
-            .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground).opacity(0.86), in: RoundedRectangle(cornerRadius: 20, style: .continuous))
+            .frame(width: 68, height: 58)
         }
         .buttonStyle(.plain)
     }
 }
 
-private extension ClipDetailSheet {
+private extension ClipDetailView {
+    func updateClipContent(_ text: String) {
+        guard clip.content != text else { return }
+        let classification = ClipClassificationService.classifySensitivity(text)
+        clip.content = text
+        clip.type = Clip.detect(content: text, imageData: clip.imageData)
+        clip.updateSensitivity(classification.sensitivity, reason: classification.reason)
+        clip.updatedAt = Date()
+    }
+
     func applyTransform(_ skillID: String) {
         guard !isTransforming, clip.type != .image else { return }
         let input = TransformSkillInput(
@@ -265,6 +366,17 @@ private extension ClipDetailSheet {
             } catch {
                 // Keep the existing clip unchanged when a transform fails.
             }
+        }
+    }
+}
+
+private extension NoteTextCommandKind {
+    var accessibilityName: String {
+        switch self {
+        case .bold: "Bold"
+        case .italic: "Italic"
+        case .bullet: "Bullets"
+        case .highlight: "Highlight"
         }
     }
 }

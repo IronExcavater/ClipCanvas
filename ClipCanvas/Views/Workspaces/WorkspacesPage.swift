@@ -31,16 +31,16 @@ struct WorkspacesPage: View {
                 .buttonStyle(.plain)
                 .disabled(selection.isEmpty)
             }
-            .appListItemRowInsets(horizontal: 14, vertical: 4)
+            .appListItemRowInsets(vertical: 4)
 
             if filtered.isEmpty {
-                if workspaces.isEmpty {
-                    ContentUnavailableView("No Workspaces", systemImage: "rectangle.3.group",
-                                           description: Text("Create a workspace to get started."))
-                    .appEmptyStateRow()
-                } else {
-                    ContentUnavailableView.search(text: search).appEmptyStateRow()
-                }
+                AppListEmptyState(
+                    isSourceEmpty: workspaces.isEmpty,
+                    searchText: search,
+                    title: "No Workspaces",
+                    systemImage: "rectangle.3.group",
+                    description: "No saved workspaces."
+                )
             }
 
             ForEach(filtered) { ws in

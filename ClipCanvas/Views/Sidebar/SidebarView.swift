@@ -1,5 +1,8 @@
 import SwiftUI
 import SwiftData
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct SidebarView: View {
     @Environment(\.modelContext) private var context
@@ -15,7 +18,11 @@ struct SidebarView: View {
         sort: \Workspace.sortIndex
     ) private var workspaces: [Workspace]
 
-    @Query(sort: \AIChat.updatedAt, order: .reverse) private var chats: [AIChat]
+    @Query(
+        filter: #Predicate<AIChat> { $0.deletedAt == nil },
+        sort: \AIChat.updatedAt,
+        order: .reverse
+    ) private var chats: [AIChat]
 
     private var activeWorkspace: Workspace? {
         workspaces.first(where: \.isActive) ?? workspaces.first
@@ -24,6 +31,15 @@ struct SidebarView: View {
     private var workspaceChats: [AIChat] {
         guard let activeWorkspace else { return [] }
         return Array(chats.filter { $0.workspace?.id == activeWorkspace.id }.prefix(4))
+    }
+
+    private var activeWorkspaceChatCount: Int {
+        guard let activeWorkspace else { return 0 }
+        return chats.filter { $0.workspace?.id == activeWorkspace.id }.count
+    }
+
+    private var activeWorkspaceVisibleCardCount: Int {
+        activeWorkspace?.canvasObjects.filter { $0.isVisible && $0.kind != .connector }.count ?? 0
     }
 
     var body: some View {
@@ -35,8 +51,7 @@ struct SidebarView: View {
                     if workspaceChats.isEmpty {
                         ContentUnavailableView(
                             "No AI Chats",
-                            systemImage: "sparkles",
-                            description: Text("Chats for the current workspace appear here.")
+                            systemImage: "sparkles"
                         )
                         .appEmptyStateRow()
                     } else {
@@ -49,7 +64,7 @@ struct SidebarView: View {
                     sidebarSectionTitle("AI Chats")
                 }
             }
-            .listStyle(.plain)
+            .appSidebarListStyle()
             .scrollContentBackground(.hidden)
             .contentMargins(.top, 0, for: .scrollContent)
             .contentMargins(.bottom, 8, for: .scrollContent)
@@ -74,15 +89,11 @@ struct SidebarView: View {
     private var sidebarHeader: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 12) {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("ClipCanvas")
-                        .font(.title3.weight(.bold))
-                        .foregroundStyle(Color.accentColor)
-                    Text("Capture, arrange, and reuse ideas")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                Text("ClipCanvas")
+                    .font(.title3.weight(.bold))
+                    .foregroundStyle(Color.accentColor)
+                    .padding(.top, 9)
+                    .frame(maxWidth: .infinity, alignment: .leading)
 
                 Button(action: createChat) {
                     Image(systemName: "sparkles")
@@ -102,48 +113,27 @@ struct SidebarView: View {
                 }
             }
 
-            Text("Active workspace")
-                .font(.caption.weight(.bold))
-                .textCase(.uppercase)
-                .foregroundStyle(.secondary)
-                .padding(.top, 4)
-
-            HStack(alignment: .center, spacing: 8) {
-                Text(activeWorkspace?.name ?? "Choose a workspace")
-                    .font(.title2.weight(.bold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(2)
-                    .minimumScaleFactor(0.82)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-
-                Menu {
-                    ForEach(workspaces) { workspace in
-                        Button {
-                            activateWorkspace(workspace)
-                        } label: {
-                            Label(
-                                workspace.name,
-                                systemImage: workspace.id == activeWorkspace?.id ? "checkmark" : "folder"
-                            )
-                        }
+            Menu {
+                ForEach(workspaces) { workspace in
+                    Button {
+                        activateWorkspace(workspace)
+                    } label: {
+                        Label(
+                            workspace.name,
+                            systemImage: workspace.id == activeWorkspace?.id ? "checkmark" : "folder"
+                        )
                     }
-                } label: {
-                    Image(systemName: "rectangle.stack")
-                        .font(.system(size: 16, weight: .semibold))
-                        .frame(width: 36, height: 36)
                 }
-                .buttonStyle(BlendedIconButtonStyle())
-                .accessibilityLabel("Switch Workspace")
-
-                NavigationLink(destination: WorkspacesPage()) {
-                    Image(systemName: "square.grid.2x2")
-                        .font(.system(size: 16, weight: .semibold))
-                        .frame(width: 36, height: 36)
-                }
-                .buttonStyle(BlendedIconButtonStyle())
-                .foregroundStyle(.primary)
-                .accessibilityLabel("View All Workspaces")
+            } label: {
+                SidebarActiveWorkspaceSummary(
+                    name: activeWorkspace?.name ?? "Choose a workspace",
+                    cardCount: activeWorkspaceVisibleCardCount,
+                    chatCount: activeWorkspaceChatCount,
+                    updatedAt: activeWorkspace?.updatedAt
+                )
             }
+            .buttonStyle(.plain)
+            .accessibilityLabel("Switch Workspace")
         }
         .padding(.top, 4)
         .padding(.bottom, 10)
@@ -168,7 +158,11 @@ struct SidebarView: View {
         HStack(spacing: 12) {
             Button {
                 if iCloudStatus == .noAccount {
+                    #if canImport(UIKit)
                     UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
+                    #else
+                    navigatesToSettings = true
+                    #endif
                 } else {
                     navigatesToSettings = true
                 }
@@ -257,7 +251,18 @@ struct SidebarView: View {
     }
 
     private var sidebarBackground: some View {
-        Rectangle().glassPanel(cornerRadius: 0, shadow: false)
+        #if os(macOS)
+        Color.clear
+        #else
+        ZStack {
+            Color.platformSystemBackground
+            Color.platformSecondarySystemBackground.opacity(0.72)
+            AppGlassSurface(
+                shape: .rect(cornerRadius: 0),
+                tint: Color.platformSystemBackground.opacity(0.18)
+            )
+        }
+        #endif
     }
 
     private func closeSidebar() {
@@ -275,6 +280,47 @@ struct SidebarView: View {
 
     private func refreshICloudStatus() {
         iCloudStatus = FileManager.default.ubiquityIdentityToken == nil ? .noAccount : .available
+    }
+}
+
+private struct SidebarActiveWorkspaceSummary: View {
+    let name: String
+    let cardCount: Int
+    let chatCount: Int
+    let updatedAt: Date?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(alignment: .center, spacing: 10) {
+                AppIconBadge(systemImage: "folder.fill", size: 26, iconSize: 13, color: .accentColor)
+
+                Text(name)
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(.primary)
+                    .lineLimit(1)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+
+                Image(systemName: "chevron.down")
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundStyle(.secondary)
+            }
+
+            HStack(spacing: 12) {
+                Label("\(cardCount)", systemImage: "rectangle.stack")
+                Label("\(chatCount)", systemImage: "sparkles")
+                Spacer(minLength: 0)
+                if let updatedAt {
+                    RelativeAgeText(date: updatedAt, suffix: " ago")
+                }
+            }
+            .font(.caption2.weight(.semibold).monospacedDigit())
+            .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 11)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .glassPanel(cornerRadius: 16, shadow: false, interactive: true)
+        .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
 }
 

@@ -80,9 +80,6 @@ final class Clip: SoftDeletable, Identifiable {
     var updatedAt: Date = Date()
     var deletedAt: Date? = nil
 
-    @Relationship(deleteRule: .cascade, inverse: \CanvasPlacement.clip)
-    var placements: [CanvasPlacement] = []
-
     @Relationship(deleteRule: .nullify, inverse: \CanvasObject.clip)
     var canvasObjects: [CanvasObject] = []
 

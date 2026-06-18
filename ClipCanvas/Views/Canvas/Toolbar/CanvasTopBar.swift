@@ -19,45 +19,60 @@ struct CanvasTopBar: View {
     let onFitContent: () -> Void
     var onSearch: (() -> Void)? = nil
 
-    @State private var confirmingClear = false
+    private func titleMaxWidth(in totalWidth: CGFloat) -> CGFloat {
+        let horizontalPadding: CGFloat = 32
+        let sideControls: CGFloat = 46 * 2
+        let hStackSpacing: CGFloat = 12 * 2
+        let minimumSpacerRoom: CGFloat = 16
+        return max(82, min(180, totalWidth - horizontalPadding - sideControls - hStackSpacing - minimumSpacerRoom))
+    }
+
+    private var renamePillWidth: CGFloat {
+        let estimated = CGFloat(max(renameText.count, 6)) * 11 + 34
+        return min(max(estimated, 94), 180)
+    }
 
     var body: some View {
-        HStack(spacing: 12) {
-            Button(action: onToggleSidebar) {
-                Image(systemName: AppSymbol.sidebar)
-                    .font(.system(size: 18, weight: .semibold))
-                    .foregroundStyle(.primary)
-            }
-            .buttonStyle(BlendedIconButtonStyle())
+        GeometryReader { proxy in
+            ZStack {
+                HStack(spacing: 12) {
+                    Button(action: onToggleSidebar) {
+                        Image(systemName: AppSymbol.sidebar)
+                            .font(.system(size: 18, weight: .semibold))
+                            .foregroundStyle(.primary)
+                    }
+                    .buttonStyle(BlendedIconButtonStyle())
+                    .frame(width: 46)
 
-            Spacer()
+                    Spacer(minLength: 8)
 
-            title
-                .animation(.spring(response: 0.24, dampingFraction: 0.86), value: isRenaming)
-                .animation(.spring(response: 0.24, dampingFraction: 0.86), value: workspaceName)
+                    title(maxWidth: titleMaxWidth(in: proxy.size.width))
+                        .layoutPriority(1)
+                        .animation(.spring(response: 0.24, dampingFraction: 0.86), value: isRenaming)
+                        .animation(.spring(response: 0.24, dampingFraction: 0.86), value: workspaceName)
 
-            Spacer()
+                    Spacer(minLength: 8)
 
-            Menu {
-                Button(askAITitle, systemImage: "sparkles", action: onAskAI)
-                    .disabled(selectedCount == 0 && visibleCount == 0)
-                Divider()
-                if let onSearch {
-                    Button("Search", systemImage: "magnifyingglass", action: onSearch)
+                    Menu {
+                        Button(askAITitle, systemImage: "sparkles", action: onAskAI)
+                            .disabled(selectedCount == 0 && visibleCount == 0)
+                        if let onSearch {
+                            Button("Search Canvas", systemImage: "magnifyingglass", action: onSearch)
+                        }
+                        Button("Fit Content", systemImage: "arrow.up.left.and.arrow.down.right", action: onFitContent)
+                        Button("Arrange Grid", systemImage: "square.grid.2x2", action: onArrangeAll)
+                        Button("Rename Workspace", systemImage: "pencil", action: onBeginRename)
+                        Button("Clear Canvas", systemImage: "trash", role: .destructive, action: onClearAll)
+                    } label: {
+                        AppCircleIconLabel(systemImage: AppSymbol.options)
+                    }
+                    .buttonStyle(BlendedIconButtonStyle())
+                    .accessibilityLabel("Workspace options")
+                    .frame(width: 46)
                 }
-                Button("Rename", systemImage: "pencil", action: onBeginRename)
-                Button("Fit", systemImage: "arrow.up.left.and.arrow.down.right", action: onFitContent)
-                Button("Grid", systemImage: "square.grid.2x2", action: onArrangeAll)
-                Divider()
-                Button("Clear", systemImage: "trash", role: .destructive) {
-                    confirmingClear = true
-                }
-            } label: {
-                AppCircleIconLabel(systemImage: AppSymbol.options)
             }
-            .buttonStyle(BlendedIconButtonStyle())
-            .accessibilityLabel("Workspace options")
         }
+        .frame(height: 60)
         .padding(.horizontal, 16)
         .padding(.top, 4)
         .padding(.bottom, 10)
@@ -67,12 +82,6 @@ struct CanvasTopBar: View {
                 .ignoresSafeArea(.container, edges: .top)
                 .offset(y: -118)
         }
-        .alert("Clear all cards from this workspace?", isPresented: $confirmingClear) {
-            Button("Cancel", role: .cancel) {}
-            Button("Clear", role: .destructive, action: onClearAll)
-        } message: {
-            Text("This removes every card from the current canvas.")
-        }
     }
 
     private var askAITitle: String {
@@ -80,7 +89,7 @@ struct CanvasTopBar: View {
     }
 
     @ViewBuilder
-    private var title: some View {
+    private func title(maxWidth: CGFloat) -> some View {
         if isRenaming {
             TextField("Workspace name", text: $renameText)
                 .font(.title3.weight(.semibold))
@@ -96,7 +105,7 @@ struct CanvasTopBar: View {
                 .onDisappear {
                     if isRenaming { onCommitRename() }
                 }
-                .frame(maxWidth: 180)
+                .frame(width: min(renamePillWidth, maxWidth))
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
                 .background { WorkspaceTitleBackdrop() }
@@ -112,7 +121,6 @@ struct CanvasTopBar: View {
                         )
                     }
                 }
-                Divider()
                 Button("Rename", systemImage: "pencil", action: onBeginRename)
             } label: {
                 Text(workspaceName)
@@ -122,14 +130,13 @@ struct CanvasTopBar: View {
                     .truncationMode(.tail)
                     .padding(.horizontal, 14)
                     .padding(.vertical, 8)
-                    .frame(maxWidth: 200)
+                    .frame(maxWidth: maxWidth)
                     .background { WorkspaceTitleBackdrop() }
             }
             .buttonStyle(.plain)
             .simultaneousGesture(LongPressGesture(minimumDuration: 0.45).onEnded { _ in onBeginRename() })
         }
     }
-
 }
 
 private struct CanvasTopBarFade: View {

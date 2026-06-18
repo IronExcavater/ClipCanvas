@@ -475,7 +475,7 @@ private extension WorkspaceActionRegistry {
     }
 
     static func fetchChat(id: UUID, in context: ModelContext) -> AIChat? {
-        let descriptor = FetchDescriptor<AIChat>(predicate: #Predicate { $0.id == id })
+        let descriptor = FetchDescriptor<AIChat>(predicate: #Predicate { $0.id == id && $0.deletedAt == nil })
         return try? context.fetch(descriptor).first
     }
 

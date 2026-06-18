@@ -1,19 +1,6 @@
 import Foundation
 
-nonisolated struct TransformSkillOption: Identifiable, Equatable {
-    var id: String
-    var title: String
-    var systemImage: String
-}
-
 nonisolated enum TextTransformFallbacks {
-    static let manualEditingOptions: [TransformSkillOption] = [
-        TransformSkillOption(id: "clip.cleanUp", title: "Clean", systemImage: "sparkles"),
-        TransformSkillOption(id: "clip.distill", title: "Distill", systemImage: "text.badge.checkmark"),
-        TransformSkillOption(id: "clip.actionItems", title: "Actions", systemImage: "checklist"),
-        TransformSkillOption(id: "clip.rewrite", title: "Rewrite", systemImage: "pencil.and.scribble"),
-    ]
-
     static func text(for skillID: String, input: String) -> String? {
         switch skillID {
         case "clip.cleanUp":

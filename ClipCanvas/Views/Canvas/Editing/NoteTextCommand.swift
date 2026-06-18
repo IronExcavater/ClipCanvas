@@ -2,6 +2,7 @@ import Foundation
 
 nonisolated enum NoteTextCommandKind: Equatable {
     case bold
+    case italic
     case bullet
     case highlight
 }

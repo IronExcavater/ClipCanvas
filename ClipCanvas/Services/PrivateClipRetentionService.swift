@@ -29,7 +29,6 @@ enum PrivateClipRetentionService {
 
         for clip in clips where PrivateClipRetentionPolicy.isExpired(clip, at: now) {
             Array(clip.canvasObjects).forEach { context.delete($0) }
-            Array(clip.placements).forEach { context.delete($0) }
             context.delete(clip)
             deletedCount += 1
         }

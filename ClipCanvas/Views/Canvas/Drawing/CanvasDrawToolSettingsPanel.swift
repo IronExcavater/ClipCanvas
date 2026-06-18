@@ -18,7 +18,12 @@ struct CanvasDrawToolSettingsPanel: View {
     }
 
     var body: some View {
-        VStack(spacing: 8) {
+        CanvasOverlayPanel(
+            title: tool.displayName,
+            systemImage: tool.systemImage,
+            maxWidth: 390,
+            onDismiss: onDismiss
+        ) {
             if color != nil {
                 HStack(spacing: 10) {
                     ForEach(colorPresets, id: \.self) { preset in
@@ -56,14 +61,19 @@ struct CanvasDrawToolSettingsPanel: View {
                     in: widthRange
                 )
                 .tint(Color.accentColor)
+
+                Text(widthLabel)
+                    .font(.caption.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(.secondary)
+                    .frame(width: 34, alignment: .trailing)
             }
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 14)
-        .glassCapsule()
         .padding(.horizontal, 20)
-        .frame(maxWidth: 380)
         .allowsHitTesting(true)
+    }
+
+    private var widthLabel: String {
+        "\(Int(width.rounded()))"
     }
 
     private var colorPresets: [DrawColorPreset] {

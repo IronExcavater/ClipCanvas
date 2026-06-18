@@ -7,14 +7,17 @@ struct CanvasToolbar: View {
     var isEditing: Bool = false
     let onPaste: () -> Void
     let onCreateNote: () -> Void
+    let onCreateText: () -> Void
     let onAskAI: () -> Void
     var onInsertImage: () -> Void = {}
     let onDetails: () -> Void
     let onEditContent: () -> Void
     let onManageTags: () -> Void
     let onArrangeSelection: () -> Void
+    let onDuplicate: () -> Void
     let onColor: () -> Void
     let onFormatBold: () -> Void
+    let onFormatItalic: () -> Void
     let onFormatBullet: () -> Void
     let onFormatHighlight: () -> Void
     let onDelete: () -> Void
@@ -33,13 +36,14 @@ struct CanvasToolbar: View {
             isEditing: isEditing
         )
     }
-    private let buttonSize: CGFloat = 46
-    private let iconSize: CGFloat = 18
+    private let buttonSize: CGFloat = 44
+    private let iconSize: CGFloat = 17
 
     var body: some View {
         HStack(spacing: 2) {
-            ForEach(Array(configuration.items.enumerated()), id: \.offset) { _, item in
+            ForEach(configuration.items, id: \.self) { item in
                 toolbarItem(item)
+                    .transition(.opacity.combined(with: .scale(scale: 0.92)))
             }
         }
         .padding(.horizontal, 10)
@@ -55,50 +59,61 @@ struct CanvasToolbar: View {
 
     @ViewBuilder
     private func toolbarItem(_ item: CanvasToolbarItem) -> some View {
-        switch item {
-        case .paste:
-            toolButton("clipboard", action: onPaste)
-        case .newNote:
-            toolButton("square.and.pencil", action: onCreateNote)
-        case .insertImage:
-            toolButton("photo.badge.plus", action: onInsertImage)
-        case .askAI:
-            toolButton("sparkles", action: onAskAI)
-        case .details:
-            toolButton("info.circle", action: onDetails)
-                .disabled(selectedCount != 1)
-                .opacity(selectedCount == 1 ? 1 : 0.42)
-        case .editContent:
-            toolButton("character.cursor.ibeam", action: onEditContent)
-        case .manageTags:
-            toolButton("tag", action: onManageTags)
-        case .arrangeSelection:
-            toolButton("square.grid.2x2", action: onArrangeSelection)
-        case .color:
-            toolButton("paintpalette", action: onColor)
-        case .formatBold:
-            toolButton("bold", action: onFormatBold)
-        case .formatBullet:
-            toolButton("list.bullet", action: onFormatBullet)
-        case .formatHighlight:
-            toolButton("highlighter", action: onFormatHighlight)
-        case .delete:
-            destructiveButton("trash", action: onDelete)
-        case .divider:
-            AppDivider()
-        case .mode(let canvasMode):
-            modeButton(canvasMode.systemImage, for: canvasMode)
-        case .closeMode:
-            toolButton("xmark", action: onCloseMode)
-        case .drawPen:
-            drawToolButton(.pen)
-        case .drawHighlighter:
-            drawToolButton(.highlighter)
-        case .drawEraser:
-            drawToolButton(.eraser)
-        case .drawLasso:
-            drawToolButton(.lasso)
+        Group {
+            switch item {
+            case .paste:
+                toolButton("clipboard", action: onPaste)
+            case .newNote:
+                toolButton("note.text.badge.plus", action: onCreateNote)
+            case .newText:
+                toolButton("textformat", action: onCreateText)
+            case .insertImage:
+                toolButton("photo.badge.plus", action: onInsertImage)
+            case .askAI:
+                toolButton("sparkles", action: onAskAI)
+            case .details:
+                toolButton("info.circle", action: onDetails)
+                    .disabled(selectedCount != 1)
+                    .opacity(selectedCount == 1 ? 1 : 0.42)
+            case .editContent:
+                toolButton("character.cursor.ibeam", action: onEditContent)
+            case .manageTags:
+                toolButton("tag", action: onManageTags)
+            case .arrangeSelection:
+                toolButton("square.grid.2x2", action: onArrangeSelection)
+            case .duplicate:
+                toolButton("plus.square.on.square", action: onDuplicate)
+            case .color:
+                toolButton("paintpalette", action: onColor)
+            case .formatBold:
+                toolButton("bold", action: onFormatBold)
+            case .formatItalic:
+                toolButton("italic", action: onFormatItalic)
+            case .formatBullet:
+                toolButton("list.bullet", action: onFormatBullet)
+            case .formatHighlight:
+                toolButton("highlighter", action: onFormatHighlight)
+            case .delete:
+                destructiveButton("trash", action: onDelete)
+            case .divider:
+                AppDivider()
+            case .mode(let canvasMode):
+                modeButton(canvasMode.systemImage, for: canvasMode)
+            case .closeMode:
+                toolButton("xmark", action: onCloseMode)
+            case .drawPen:
+                drawToolButton(.pen)
+            case .drawHighlighter:
+                drawToolButton(.highlighter)
+            case .drawEraser:
+                drawToolButton(.eraser)
+            case .drawLasso:
+                drawToolButton(.lasso)
+            }
         }
+        .accessibilityLabel(item.label)
+        .accessibilityHidden(item == .divider)
+        .help(item.label)
     }
 
     private func modeButton(_ icon: String, for target: CanvasMode) -> some View {
@@ -148,23 +163,28 @@ struct CanvasToolbar: View {
             let selected = activeDrawTool == tool
             ZStack {
                 Circle().fill(selected ? Color.accentColor : Color.clear)
-                VStack(spacing: 0) {
-                    Spacer(minLength: 0)
-                    PencilKitToolGlyph(
-                        tool: tool,
-                        color: toolSwatchColor(for: tool),
-                        isSelected: selected
-                    )
-                    .frame(width: 25, height: 25)
-                    Spacer(minLength: 0)
-                    if let color = toolSwatchColor(for: tool) {
+                if let color = toolSwatchColor(for: tool) {
+                    VStack(spacing: 0) {
+                        Spacer(minLength: 0)
+                        PencilKitToolGlyph(
+                            tool: tool,
+                            color: color,
+                            isSelected: selected
+                        )
+                        .frame(width: 25, height: 25)
+                        Spacer(minLength: 0)
                         Capsule()
                             .fill(Color(platformColor: color))
                             .frame(width: 16, height: 3)
                             .padding(.bottom, 7)
-                    } else {
-                        Spacer().frame(height: 10)
                     }
+                } else {
+                    PencilKitToolGlyph(
+                        tool: tool,
+                        color: nil,
+                        isSelected: selected
+                    )
+                    .frame(width: 25, height: 25)
                 }
             }
             .frame(width: buttonSize, height: buttonSize)
@@ -201,5 +221,3 @@ struct CanvasToolbar: View {
     }
 
 }
-
-

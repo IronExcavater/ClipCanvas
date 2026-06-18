@@ -4,6 +4,7 @@ import SwiftData
 
 nonisolated enum CanvasObjectKind: String, Codable, CaseIterable {
     case stickyNote
+    case text
     case clipNote
     case image
     case drawing
@@ -62,6 +63,14 @@ nonisolated struct CanvasObjectStyle: Codable, Equatable {
         lineWidth: 0,
         fontSize: 16
     )
+
+    static let freeText = CanvasObjectStyle(
+        fillHex: "#FFFFFF",
+        strokeHex: nil,
+        textHex: "#1C1C1E",
+        lineWidth: 0,
+        fontSize: 19
+    )
 }
 
 nonisolated struct CanvasConnectorEndpoint: Codable, Equatable {
@@ -93,7 +102,6 @@ final class CanvasObject: Identifiable {
     var drawingData: Data?
     var connectorData: Data?
     var groupID: UUID?
-    var sourcePlacementID: UUID?
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
     var deletedAt: Date?

@@ -96,7 +96,7 @@ struct ClipCard: View {
             } else if clip.type == .image, let data = clip.imageData, let image = PlatformImage(data: data) {
                 platformImage(image)
             } else {
-                MarkdownText(displayPreview.isEmpty ? " " : displayPreview)
+                MarkdownPreview(text: displayPreview.isEmpty ? " " : displayPreview)
                     .font(.system(size: fontSize))
                     .lineLimit(nil)
                     .foregroundStyle(.primary)

@@ -15,11 +15,12 @@ struct TrashItemRow: View {
     var onAddToCanvas: (() -> Void)? = nil
 
     var body: some View {
-        ItemRow(tint: tint, opacity: 0.12, isSelecting: isSelecting, isSelected: isSelected, dragID: dragID) {
+        ItemRow(tint: tint, opacity: 0.025, isSelecting: isSelecting, isSelected: isSelected, dragID: dragID) {
             AppListRowHeader(
                 systemImage: systemImage,
                 color: tint,
                 title: title,
+                metadata: [AppListRowMetadata("trash", value: "Deleted")],
                 date: deletedAt,
                 dateSuffix: "",
                 datePrefix: "Deleted ",
@@ -29,11 +30,13 @@ struct TrashItemRow: View {
         }
         .onTapGesture { if isSelecting { onTap() } }
         .swipeActions(edge: .leading) {
-            Button(action: onRestore) { Label("Restore", systemImage: "arrow.counterclockwise") }
+            Button(action: onRestore) { Image(systemName: "arrow.counterclockwise") }
                 .tint(.green)
+                .accessibilityLabel("Restore")
         }
         .swipeActions(edge: .trailing) {
-            Button(role: .destructive, action: onDeleteForever) { Label("Delete", systemImage: "trash") }
+            Button(role: .destructive, action: onDeleteForever) { Image(systemName: "trash") }
+                .accessibilityLabel("Delete Forever")
         }
         .contextMenu {
             if let onAddToCanvas {

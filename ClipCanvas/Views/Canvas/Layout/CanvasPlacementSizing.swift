@@ -21,11 +21,6 @@ enum CanvasPlacementSizing {
         height: contentChrome.height + maximumTextLines * lineHeight
     )
 
-    static func toggledSize(for placement: CanvasPlacement, availableScreenWidth: CGFloat? = nil) -> CGSize {
-        if isExpanded(placement) { return minimumSize }
-        return expandedSize(for: placement.clip, availableScreenWidth: availableScreenWidth)
-    }
-
     static func toggledSize(for object: CanvasObject, availableScreenWidth: CGFloat? = nil) -> CGSize {
         if isExpanded(width: object.width, height: object.height) { return minimumSize }
         return expandedSize(for: object.clip, fallbackText: object.text, availableScreenWidth: availableScreenWidth)
@@ -79,19 +74,11 @@ enum CanvasPlacementSizing {
     }
 
     static func previewSize(for session: CanvasResizeSession, scale: CGFloat) -> CGSize {
-        fluidSize(dragging: session.proposedSize(scale: scale))
+        clampedSize(session.proposedSize(scale: scale))
     }
 
     static func committedSize(for session: CanvasResizeSession, scale: CGFloat, clip: Clip?) -> CGSize {
         snappedSize(session.proposedSize(scale: scale), for: clip)
-    }
-
-    static func fluidSize(dragging proposed: CGSize) -> CGSize {
-        clampedSize(proposed)
-    }
-
-    static func softSnapSize(_ proposed: CGSize) -> CGSize {
-        snappedSize(proposed, for: nil)
     }
 
     static func snappedSize(_ proposed: CGSize, for clip: Clip?) -> CGSize {
@@ -112,10 +99,6 @@ enum CanvasPlacementSizing {
         return lines.reduce(0) { partial, line in
             partial + max(Int((Double(max(line.count, 1)) / Double(columns)).rounded(.up)), 1)
         }
-    }
-
-    static func fontSizeForWidth(_ width: CGFloat) -> CGFloat {
-        (width / 10.0).clamped(to: 15...30)
     }
 
     static func fontSizeForContent(_ text: String, width: CGFloat) -> CGFloat {
@@ -160,9 +143,5 @@ enum CanvasPlacementSizing {
     private static func snapped(_ value: CGFloat, step: CGFloat, chrome: CGFloat) -> CGFloat {
         let content = max(value - chrome, step)
         return chrome + (content / step).rounded() * step
-    }
-
-    private static func isExpanded(_ placement: CanvasPlacement) -> Bool {
-        isExpanded(width: placement.width, height: placement.height)
     }
 }

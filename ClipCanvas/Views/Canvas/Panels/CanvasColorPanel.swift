@@ -13,7 +13,11 @@ struct CanvasColorPanel: View {
         VStack {
             Spacer()
 
-            VStack(alignment: .leading, spacing: 12) {
+            CanvasOverlayPanel(
+                title: objects.count > 1 ? "\(objects.count) cards selected" : "Note Color",
+                systemImage: "paintpalette",
+                onDismiss: onDismiss
+            ) {
                 LazyVGrid(
                     columns: [GridItem(.adaptive(minimum: 42), spacing: 10)],
                     alignment: .leading,
@@ -26,11 +30,8 @@ struct CanvasColorPanel: View {
                     }
                 }
             }
-            .padding(12)
-            .glassPanel(cornerRadius: 26)
             .padding(.horizontal, 18)
             .padding(.bottom, 92)
-            .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
         }
         .ignoresSafeArea(.container, edges: .bottom)
     }

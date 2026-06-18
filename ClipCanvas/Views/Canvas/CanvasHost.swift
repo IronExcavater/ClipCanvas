@@ -5,6 +5,7 @@ import SwiftData
 /// This is the single place that owns the workspace query and calls AppBootstrap.
 struct CanvasHost: View {
     let onToggleSidebar: () -> Void
+    var prefersInspector = false
 
     @Query(filter: #Predicate<Workspace> { $0.deletedAt == nil }, sort: \Workspace.sortIndex)
     private var workspaces: [Workspace]
@@ -18,7 +19,11 @@ struct CanvasHost: View {
     var body: some View {
         Group {
             if let workspace = activeWorkspace {
-                CanvasContainerView(workspace: workspace, onToggleSidebar: onToggleSidebar)
+                CanvasContainerView(
+                    workspace: workspace,
+                    onToggleSidebar: onToggleSidebar,
+                    prefersInspector: prefersInspector
+                )
             } else {
                 ContentUnavailableView {
                     Label("No Workspace", systemImage: "rectangle.3.group")

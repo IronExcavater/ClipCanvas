@@ -6,12 +6,14 @@ private struct AppListItemBackground: View {
 
     var body: some View {
         ZStack {
+            AppGlassSurface(
+                shape: .rect(cornerRadius: 14),
+                tint: Color.platformSystemBackground.opacity(0.16),
+                fallback: .color(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground).opacity(0.88)),
+                stroke: Color.primary.opacity(0.05)
+            )
             RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground).opacity(0.88))
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(tint.opacity(max(opacity, 0.14)))
-            RoundedRectangle(cornerRadius: 14, style: .continuous)
-                .fill(Color.platformSystemBackground.opacity(0.18))
+                .fill(tint.opacity(min(max(opacity, 0.02), 0.045)))
         }
     }
 }
@@ -36,8 +38,8 @@ struct AppListItemButton<Content: View>: View {
     var body: some View {
         Button(action: action) {
             content
-                .padding(.horizontal, 9)
-                .padding(.vertical, 7)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background { AppListItemBackground(tint: tint, opacity: opacity) }
                 .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -54,8 +56,8 @@ struct AppListItemContainer<Content: View>: View {
 
     var body: some View {
         content
-            .padding(.horizontal, 9)
-            .padding(.vertical, 7)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background { AppListItemBackground(tint: tint, opacity: opacity) }
             .contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
@@ -123,8 +125,30 @@ struct AppSearchSelectionBar<Actions: View>: View {
         }
         .padding(.horizontal, 12)
         .frame(height: 40)
-        .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground), in: Capsule())
-        .shadow(color: .black.opacity(0.06), radius: 8, y: 3)
+        .glassCapsule(shadow: false, interactive: true)
+    }
+}
+
+struct AppListEmptyState: View {
+    let isSourceEmpty: Bool
+    let searchText: String
+    let title: String
+    let systemImage: String
+    let description: String
+
+    var body: some View {
+        Group {
+            if isSourceEmpty {
+                ContentUnavailableView(
+                    title,
+                    systemImage: systemImage,
+                    description: Text(description)
+                )
+            } else {
+                ContentUnavailableView.search(text: searchText)
+            }
+        }
+        .appEmptyStateRow()
     }
 }
 
@@ -188,11 +212,16 @@ private struct RelativeAgeTimelineEntries: Sequence, IteratorProtocol {
 
 // MARK: - Shared list row header
 
-/// Shared header row used by ClipRow and TrashItemRow (icon + title + optional pin + date).
+/// Shared list item row used by clipboard, workspace, trash, and chat lists.
 struct AppListRowHeader: View {
+    @Environment(\.appListRowIsSelecting) private var isSelecting
+    @Environment(\.appListRowIsSelected) private var isSelected
+
     let systemImage: String
     let color: Color
     let title: String
+    var subtitle: String? = nil
+    var metadata: [AppListRowMetadata] = []
     var lineLimit: Int = 1
     var pinned = false
     var date: Date?
@@ -201,23 +230,85 @@ struct AppListRowHeader: View {
     var dateEmptyText = ""
 
     var body: some View {
-        HStack(alignment: .center, spacing: 8) {
-            AppIconBadge(systemImage: systemImage, color: color)
-            Text(title)
-                .font(.subheadline.weight(.medium))
-                .lineLimit(lineLimit)
-                .foregroundStyle(.primary)
-            Spacer(minLength: 8)
-            if pinned {
-                Image(systemName: "pin.fill")
-                    .font(.system(size: 10, weight: .semibold))
-                    .foregroundStyle(color)
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(alignment: .top, spacing: 10) {
+                leadingIcon
+                    .padding(.top, 1)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        MarkdownPreview(text: title)
+                            .font(.subheadline.weight(.semibold))
+                            .lineLimit(lineLimit)
+                            .foregroundStyle(.primary)
+
+                        if pinned {
+                            Image(systemName: "pin.fill")
+                                .font(.system(size: 10, weight: .semibold))
+                                .foregroundStyle(color)
+                        }
+
+                        Spacer(minLength: 0)
+                    }
+
+                    metadataRow
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
+
+            if let subtitle, !subtitle.isEmpty {
+                MarkdownPreview(text: subtitle)
+                    .font(.caption)
+                    .foregroundStyle(.primary.opacity(0.76))
+                    .lineLimit(3)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private var leadingIcon: some View {
+        if isSelecting {
+            SelectionIndicator(isSelected: isSelected)
+                .frame(width: 22, height: 22)
+        } else {
+            AppIconBadge(systemImage: systemImage, color: color)
+        }
+    }
+
+    private var metadataRow: some View {
+        HStack(spacing: 12) {
+            ForEach(metadata) { item in
+                HStack(spacing: 2) {
+                    Image(systemName: item.systemImage)
+                        .font(.system(size: 11, weight: .semibold))
+                    Text(item.value)
+                        .font(item.monospaced ? .caption2.weight(.semibold).monospacedDigit() : .caption2.weight(.semibold))
+                }
+            }
+
+            Spacer(minLength: 0)
+
             if let date {
                 RelativeAgeText(date: date, prefix: datePrefix, suffix: dateSuffix, emptyText: dateEmptyText)
                     .font(.caption2.weight(.medium))
-                    .foregroundStyle(.primary.opacity(0.58))
+                    .foregroundStyle(.primary.opacity(0.52))
             }
         }
+        .foregroundStyle(.primary.opacity(0.62))
+    }
+}
+
+struct AppListRowMetadata: Identifiable, Equatable {
+    let systemImage: String
+    let value: String
+    var monospaced = false
+
+    var id: String { "\(systemImage)|\(value)|\(monospaced)" }
+
+    init(_ systemImage: String, value: String, monospaced: Bool = false) {
+        self.systemImage = systemImage
+        self.value = value
+        self.monospaced = monospaced
     }
 }

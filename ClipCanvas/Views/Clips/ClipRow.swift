@@ -19,18 +19,20 @@ struct ClipRow: View {
     ) private var workspaces: [Workspace]
 
     var body: some View {
-        ItemRow(tint: primaryTagColor, isSelecting: isSelecting, isSelected: isSelected, dragID: clip.id.uuidString) {
+        ItemRow(tint: primaryTagColor, opacity: 0.025, isSelecting: isSelecting, isSelected: isSelected, dragID: clip.id.uuidString) {
             AppListRowHeader(
                 systemImage: clip.type.icon,
                 color: primaryTagColor,
-                title: displayPreview,
+                title: displayTitle,
+                subtitle: compact || isExpanded ? nil : displayPreview,
+                metadata: rowMetadata,
                 lineLimit: compact ? 1 : 2,
                 pinned: clip.isPinned,
                 date: clip.updatedAt,
                 dateSuffix: " ago"
             )
             if isExpanded {
-                Text(displayPreview)
+                MarkdownPreview(text: displayPreview)
                     .font(.callout)
                     .foregroundStyle(.primary.opacity(0.78))
                     .lineLimit(6)
@@ -91,40 +93,49 @@ struct ClipRow: View {
     private var activeWorkspace: Workspace? { workspaces.first(where: \.isActive) ?? workspaces.first }
     private var isRevealed: Bool { revealStore.isRevealed(clip) }
     private var displayPreview: String { clip.displayPreview(isRevealed: isRevealed) }
+    private var displayTitle: String {
+        displayPreview
+            .components(separatedBy: .newlines)
+            .first?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nilIfEmpty ?? ClipTag.builtInName(for: clip.type)
+    }
     private func addToCanvas() { activeWorkspace?.place(clip: clip) }
+
+    private var rowMetadata: [AppListRowMetadata] {
+        var metadata = [
+            AppListRowMetadata(clip.type.icon, value: ClipTag.builtInName(for: clip.type)),
+            AppListRowMetadata("character.cursor.ibeam", value: "\(clip.content.count)", monospaced: true)
+        ]
+        if clip.isPrivateContent {
+            metadata.append(AppListRowMetadata(isRevealed ? "eye.slash.fill" : "eye.fill", value: isRevealed ? "Shown" : "Hidden"))
+        }
+        return metadata
+    }
 
     private var rowFooter: some View {
         VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 12) {
-                clipStat(clip.type.icon, label: ClipTag.builtInName(for: clip.type))
-                clipStat("character.cursor.ibeam", label: "\(clip.content.count)")
-                if clip.isPrivateContent {
-                    Button {
-                        revealStore.toggle(clip)
-                    } label: {
-                        HStack(spacing: 2) {
-                            Image(systemName: isRevealed ? "eye.slash.fill" : "eye.fill")
-                                .font(.system(size: 11, weight: .semibold))
-                            Text(isRevealed ? "Hide" : "Reveal")
-                                .font(.caption2.weight(.semibold))
-                        }
-                        .foregroundStyle(.primary.opacity(0.56))
-                    }
-                    .buttonStyle(.plain)
-                    .accessibilityLabel(isRevealed ? "Hide sensitive content" : "Reveal sensitive content")
+            if clip.isPrivateContent {
+                Button {
+                    revealStore.toggle(clip)
+                } label: {
+                    Label(isRevealed ? "Hide sensitive content" : "Reveal sensitive content",
+                          systemImage: isRevealed ? "eye.slash.fill" : "eye.fill")
+                        .labelStyle(.iconOnly)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundStyle(.secondary)
                 }
+                .buttonStyle(.plain)
+                .accessibilityLabel(isRevealed ? "Hide sensitive content" : "Reveal sensitive content")
             }
-            .foregroundStyle(.primary.opacity(0.56))
-            .padding(.top, 2)
 
             TagPillRow(tags: Array(clip.tags), limit: 3, size: compact ? .compact : .regular)
         }
     }
+}
 
-    private func clipStat(_ icon: String, label: String) -> some View {
-        HStack(spacing: 2) {
-            Image(systemName: icon).font(.system(size: 11, weight: .semibold))
-            Text(label).font(.caption2.weight(.semibold))
-        }
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
     }
 }

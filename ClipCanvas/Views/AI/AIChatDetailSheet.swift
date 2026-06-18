@@ -5,34 +5,112 @@ struct AIChatDetailSheet: View {
     @Bindable var chat: AIChat
 
     @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        AIChatDetailView(chat: chat, onClose: { dismiss() })
+            .appSheetPresentationDetents()
+    }
+}
+
+struct AIChatDetailView: View {
+    @Bindable var chat: AIChat
+
+    @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
+    @Query(filter: #Predicate<Clip> { $0.deletedAt == nil }) private var clips: [Clip]
+    @Query(filter: #Predicate<CanvasObject> { $0.deletedAt == nil }) private var canvasObjects: [CanvasObject]
+    @Query(filter: #Predicate<Workspace> { $0.deletedAt == nil }) private var workspaces: [Workspace]
+    @Query(filter: #Predicate<AIChat> { $0.deletedAt == nil }) private var chats: [AIChat]
+
+    var onClose: (() -> Void)?
 
     @State private var input = ""
+    @State private var inputHeight: CGFloat = 42
+    @State private var inputEditorID = UUID()
+    @State private var isSending = false
+    @State private var isRenaming = false
+    @State private var renameText = ""
+    @State private var confirmingDelete = false
+    @State private var linkedClip: Clip?
+    @State private var linkedChat: AIChat?
 
     private var canSend: Bool {
-        !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        !isSending && !input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
     }
 
     var body: some View {
         NavigationStack {
-            VStack(spacing: 0) {
-                messageList
-                Divider()
-                inputBar
+            ZStack {
+                VStack(spacing: 0) {
+                    messageList
+                    inputBar
+                }
+
+                if confirmingDelete {
+                    AppConfirmationOverlay(
+                        title: "Delete this chat?",
+                        message: "The chat will move to Recently Deleted.",
+                        destructiveTitle: "Delete",
+                        onConfirm: deleteChat,
+                        onCancel: { confirmingDelete = false }
+                    )
+                    .zIndex(20)
+                }
             }
-            .navigationTitle(chat.title)
+            .navigationTitle("")
             .appInlineNavigationTitleDisplayMode()
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button(action: { dismiss() }) {
+                    Button(action: close) {
                         AppCircleIconLabel(systemImage: "xmark", size: 36, symbolSize: 14)
                     }
                     .buttonStyle(.plain)
                     .accessibilityLabel("Close")
                 }
+                ToolbarItem(placement: .principal) {
+                    titleView
+                }
+                ToolbarItem(placement: .primaryAction) {
+                    Menu {
+                        Button("Rename", systemImage: "pencil") { beginRename() }
+                        Button("Delete Chat", systemImage: "trash", role: .destructive) {
+                            confirmingDelete = true
+                        }
+                    } label: {
+                        AppCircleIconLabel(systemImage: AppSymbol.options, size: 36, symbolSize: 14)
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Chat options")
+                }
             }
         }
-        .appSheetPresentationDetents()
+        .environment(\.openURL, OpenURLAction(handler: handleOpenURL))
+        .sheet(item: $linkedClip) { ClipDetailSheet(clip: $0) }
+        .sheet(item: $linkedChat) { AIChatDetailSheet(chat: $0) }
+        .animation(.spring(response: 0.24, dampingFraction: 0.86), value: confirmingDelete)
+    }
+
+    @ViewBuilder
+    private var titleView: some View {
+        if isRenaming {
+            TextField("Chat name", text: $renameText)
+                .font(.headline.weight(.semibold))
+                .multilineTextAlignment(.center)
+                .textFieldStyle(.plain)
+                .submitLabel(.done)
+                .onSubmit(commitRename)
+                .onDisappear {
+                    if isRenaming { commitRename() }
+                }
+                .frame(maxWidth: 220)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .glassCapsule(shadow: false, interactive: true)
+        } else {
+            Text(chat.title)
+                .font(.headline.weight(.semibold))
+                .lineLimit(1)
+        }
     }
 
     private var messageList: some View {
@@ -41,9 +119,8 @@ struct AIChatDetailSheet: View {
                 LazyVStack(spacing: 12) {
                     if chat.sortedMessages.isEmpty {
                         ContentUnavailableView(
-                            "Ask About This Workspace",
-                            systemImage: "sparkles",
-                            description: Text("Attach notes and canvas cards, then ask ClipCanvas AI to reason over them.")
+                            "No Messages",
+                            systemImage: "sparkles"
                         )
                         .frame(maxWidth: .infinity, minHeight: 220)
                     }
@@ -54,6 +131,7 @@ struct AIChatDetailSheet: View {
                     }
                 }
                 .padding(16)
+                .padding(.bottom, 8)
             }
             .onChange(of: chat.sortedMessages.count) { _, _ in
                 if let id = chat.sortedMessages.last?.id {
@@ -67,29 +145,7 @@ struct AIChatDetailSheet: View {
 
     private var inputBar: some View {
         HStack(alignment: .bottom, spacing: 10) {
-            TextField("Ask ClipCanvas AI", text: $input, axis: .vertical)
-                .lineLimit(1...5)
-                .textFieldStyle(.plain)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground), in: RoundedRectangle(cornerRadius: 16, style: .continuous))
-
-            Menu {
-                Button { setMode(.quick) } label: {
-                    Label("Quick", systemImage: "bolt.fill")
-                }
-                Button { setMode(.thinking) } label: {
-                    Label("Thinking", systemImage: "brain")
-                }
-            } label: {
-                Image(systemName: chat.mode == .quick ? "bolt.fill" : "brain")
-                    .font(.system(size: 15, weight: .medium))
-                    .foregroundStyle(Color.accentColor)
-                    .frame(width: 36, height: 36)
-                    .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground), in: Circle())
-                    .shadow(color: .black.opacity(0.08), radius: 8, y: 3)
-            }
-            .buttonStyle(.plain)
+            markdownInput
 
             Button(action: send) {
                 Image(systemName: "arrow.up")
@@ -102,13 +158,70 @@ struct AIChatDetailSheet: View {
             .disabled(!canSend)
             .accessibilityLabel("Send")
         }
-        .padding(14)
-        .background(.regularMaterial)
+        .padding(.horizontal, 14)
+        .padding(.top, 10)
+        .padding(.bottom, 14)
+        .background {
+            AppGlassSurface(shape: .rect(cornerRadius: 0))
+        }
+        .ignoresSafeArea(.container, edges: .bottom)
     }
 
-    private func setMode(_ mode: AIChatMode) {
-        chat.mode = mode
+    private var markdownInput: some View {
+        ZStack(alignment: .topLeading) {
+            NoteTextEditor(
+                initialText: input,
+                fontSize: 15,
+                command: nil,
+                onCommit: { input = $0 },
+                onExitEditing: {},
+                onSizeChange: { size in
+                    inputHeight = (size.height + 4).clamped(to: 42...138)
+                }
+            )
+            .id(inputEditorID)
+            .frame(minHeight: 42, maxHeight: inputHeight)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+
+            if input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text("Message")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 12)
+                    .allowsHitTesting(false)
+            }
+        }
+        .frame(maxWidth: .infinity)
+        .glassPanel(cornerRadius: 18, shadow: false, interactive: true)
+    }
+
+    private func beginRename() {
+        renameText = chat.title
+        isRenaming = true
+    }
+
+    private func close() {
+        if let onClose {
+            onClose()
+        } else {
+            dismiss()
+        }
+    }
+
+    private func commitRename() {
+        let trimmed = renameText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        chat.title = trimmed
         chat.updatedAt = Date()
+        isRenaming = false
+    }
+
+    private func deleteChat() {
+        chat.softDelete()
+        confirmingDelete = false
+        close()
     }
 
     private func send() {
@@ -116,6 +229,7 @@ struct AIChatDetailSheet: View {
         guard !trimmed.isEmpty else { return }
 
         input = ""
+        inputEditorID = UUID()
         if chat.messages.isEmpty {
             chat.title = String(trimmed.prefix(42))
         }
@@ -125,14 +239,54 @@ struct AIChatDetailSheet: View {
         chat.messages.append(user)
         context.insert(user)
 
-        let assistant = ChatMessage(
-            role: .assistant,
-            content: "AI streaming and workspace tools are being connected through the shared action layer."
-        )
+        let assistant = ChatMessage(role: .assistant, content: "")
+        assistant.status = .streaming
         assistant.chat = chat
         chat.messages.append(assistant)
         context.insert(assistant)
         chat.updatedAt = Date()
+
+        isSending = true
+        Task {
+            await AIChatCommandRouter.respond(to: user, with: assistant, in: context)
+            isSending = false
+        }
+    }
+
+    private func handleOpenURL(_ url: URL) -> OpenURLAction.Result {
+        guard url.scheme == "clipcanvas", let host = url.host() else {
+            return .systemAction
+        }
+        let idText = url.pathComponents.dropFirst().first
+        guard let idText, let id = UUID(uuidString: idText) else {
+            return .discarded
+        }
+
+        switch host {
+        case "object":
+            if let clip = canvasObjects.first(where: { $0.id == id })?.clip {
+                linkedClip = clip
+                return .handled
+            }
+        case "clip":
+            if let clip = clips.first(where: { $0.id == id }) {
+                linkedClip = clip
+                return .handled
+            }
+        case "chat":
+            if let linked = chats.first(where: { $0.id == id }), linked.id != chat.id {
+                linkedChat = linked
+                return .handled
+            }
+        case "workspace":
+            if let workspace = workspaces.first(where: { $0.id == id }) {
+                WorkspaceActionService.activate(workspace, among: workspaces)
+                return .handled
+            }
+        default:
+            break
+        }
+        return .discarded
     }
 }
 
@@ -140,25 +294,28 @@ private struct AIChatMessageBubble: View {
     let message: ChatMessage
 
     private var isUser: Bool { message.role == .user }
-    private var hasVisibleContent: Bool {
-        !message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || message.sortedToolEvents.isEmpty
-    }
+    private var hasVisibleContent: Bool { !message.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
 
     var body: some View {
         VStack(alignment: isUser ? .trailing : .leading, spacing: 6) {
             if hasVisibleContent {
                 HStack {
                     if isUser { Spacer(minLength: 44) }
-                    Text(message.content)
+                    MarkdownPreview(text: message.content)
                         .font(.body)
                         .foregroundStyle(isUser ? .white : .primary)
                         .textSelection(.enabled)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 10)
                         .background(
-                            isUser ? Color.accentColor : Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground),
-                            in: RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            isUser ? Color.accentColor : assistantBubbleColor,
+                            in: bubbleShape
                         )
+                        .overlay {
+                            if !isUser {
+                                bubbleShape.stroke(Color.accentColor.opacity(0.12), lineWidth: 1)
+                            }
+                        }
                     if !isUser { Spacer(minLength: 44) }
                 }
             }
@@ -179,6 +336,23 @@ private struct AIChatMessageBubble: View {
                 }
             }
         }
+    }
+
+    private var bubbleShape: UnevenRoundedRectangle {
+        UnevenRoundedRectangle(
+            cornerRadii: RectangleCornerRadii(
+                topLeading: 18,
+                bottomLeading: isUser ? 16 : 4,
+                bottomTrailing: isUser ? 4 : 16,
+                topTrailing: 18
+            ),
+            style: .continuous
+        )
+    }
+
+    private var assistantBubbleColor: Color {
+        Color.adaptive(light: PlatformColor.secondarySystemBackground, dark: PlatformColor.secondarySystemBackground)
+            .opacity(0.92)
     }
 }
 

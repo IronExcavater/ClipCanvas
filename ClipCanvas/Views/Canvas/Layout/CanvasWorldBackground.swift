@@ -55,7 +55,7 @@ struct CanvasDotGrid: View, Animatable {
                 }
             }
         }
-        .background(Color.platformSystemBackground)
+        .background { CanvasWorldSurface() }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
@@ -69,6 +69,24 @@ struct CanvasDotGrid: View, Animatable {
     }
 }
 
+private struct CanvasWorldSurface: View {
+    var body: some View {
+        ZStack {
+            Color.platformSystemBackground
+            Color.platformSecondarySystemBackground.opacity(0.34)
+            LinearGradient(
+                colors: [
+                    Color.primary.opacity(0.035),
+                    Color.clear,
+                    Color.accentColor.opacity(0.045)
+                ],
+                startPoint: .topLeading,
+                endPoint: .bottomTrailing
+            )
+        }
+    }
+}
+
 struct EmptyCanvasHint: View {
     var body: some View {
         VStack(spacing: 12) {
@@ -78,7 +96,7 @@ struct EmptyCanvasHint: View {
             Text("Nothing here yet")
                 .font(.headline)
                 .foregroundStyle(.primary)
-            Text("Paste or double tap in Edit")
+            Text("Add a card, text, or image")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

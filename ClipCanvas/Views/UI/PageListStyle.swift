@@ -50,6 +50,7 @@ extension View {
             .listStyle(.plain)
             .scrollContentBackground(.hidden)
             .contentMargins(.top, 0, for: .scrollContent)
+            .contentMargins(.horizontal, 14, for: .scrollContent)
     }
 
     /// Standard toolbar options button (ellipsis circle) used on list pages.

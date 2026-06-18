@@ -1,11 +1,5 @@
 import SwiftUI
 
-enum AppSymbol {
-    static let sidebar = "rectangle.leadinghalf.inset.filled"
-    static let options = "ellipsis"
-    static let settings = "slider.horizontal.3"
-}
-
 struct BlendedIconButtonStyle: ButtonStyle {
     let size: CGFloat
 
@@ -31,7 +25,14 @@ private struct BlendedIconButtonBackground: ViewModifier {
     @ViewBuilder
     func body(content: Content) -> some View {
         content
-            .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground), in: Circle())
+            .background {
+                AppGlassSurface(
+                    shape: .circle,
+                    fallback: .color(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground)),
+                    interactive: true,
+                    stroke: Color.primary.opacity(0.06)
+                )
+            }
             .shadow(color: .black.opacity(isPressed ? 0.08 : 0.14), radius: isPressed ? 5 : 10, y: isPressed ? 2 : 5)
     }
 }
@@ -60,7 +61,12 @@ struct AppToolbarCircleLabel: View {
             .font(.system(size: symbolSize, weight: .semibold))
             .foregroundStyle(.primary)
             .frame(width: size, height: size)
-            .background(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground), in: Circle())
+            .background {
+                AppGlassSurface(
+                    shape: .circle,
+                    fallback: .color(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground))
+                )
+            }
             .shadow(color: .black.opacity(0.10), radius: 8, y: 3)
             .contentShape(Circle())
     }
@@ -161,6 +167,19 @@ extension View {
     }
 
     @ViewBuilder
+    func appSidebarListStyle() -> some View {
+        #if os(macOS)
+        self
+            .listStyle(.sidebar)
+            .contentMargins(.horizontal, 14, for: .scrollContent)
+        #else
+        self
+            .listStyle(.plain)
+            .contentMargins(.horizontal, 14, for: .scrollContent)
+        #endif
+    }
+
+    @ViewBuilder
     func appHideNavigationBarIfAvailable() -> some View {
         #if canImport(UIKit)
         self.toolbar(.hidden, for: .navigationBar)
@@ -175,7 +194,7 @@ extension View {
         }
     }
 
-    func appListItemRowInsets(horizontal: CGFloat = 6, vertical: CGFloat = 2) -> some View {
+    func appListItemRowInsets(horizontal: CGFloat = 0, vertical: CGFloat = 2) -> some View {
         self
             .listRowInsets(EdgeInsets(top: vertical, leading: horizontal, bottom: vertical, trailing: horizontal))
             .listRowSeparator(.hidden)
@@ -190,34 +209,19 @@ extension View {
     }
 
     /// Wraps the view in a glass panel background (iOS 26 glass or regularMaterial fallback).
-    @ViewBuilder
-    func glassPanel(cornerRadius: CGFloat = 26, shadow: Bool = true) -> some View {
+    func glassPanel(cornerRadius: CGFloat = 26, shadow: Bool = true, interactive: Bool = false) -> some View {
         self
             .background {
-                if #available(iOS 26, *) {
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(Color.clear)
-                        .glassEffect(.regular, in: .rect(cornerRadius: cornerRadius))
-                } else {
-                    RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
-                        .fill(.regularMaterial)
-                }
+                AppGlassSurface(shape: .rect(cornerRadius: cornerRadius), interactive: interactive)
             }
             .shadow(color: .black.opacity(shadow ? 0.16 : 0), radius: shadow ? 22 : 0, y: shadow ? 10 : 0)
     }
 
     /// Wraps the view in a capsule glass background (iOS 26 glass or regularMaterial fallback).
-    @ViewBuilder
-    func glassCapsule(shadow: Bool = true) -> some View {
+    func glassCapsule(shadow: Bool = true, interactive: Bool = false) -> some View {
         self
             .background {
-                if #available(iOS 26, *) {
-                    Capsule()
-                        .fill(Color.clear)
-                        .glassEffect(.regular, in: .capsule)
-                } else {
-                    Capsule().fill(.regularMaterial)
-                }
+                AppGlassSurface(shape: .capsule, interactive: interactive)
             }
             .shadow(color: .black.opacity(shadow ? 0.18 : 0), radius: shadow ? 20 : 0, y: shadow ? 8 : 0)
     }

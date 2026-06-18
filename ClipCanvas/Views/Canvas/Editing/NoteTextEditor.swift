@@ -77,6 +77,22 @@ struct NoteTextEditor: UIViewRepresentable {
             pattern: #"\*\*(.+?)\*\*"#,
             options: .dotMatchesLineSeparators
         )
+        private static let italicPattern = try? NSRegularExpression(
+            pattern: #"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)"#,
+            options: .dotMatchesLineSeparators
+        )
+        private static let highlightPattern = try? NSRegularExpression(
+            pattern: #"==(.+?)=="#,
+            options: .dotMatchesLineSeparators
+        )
+        private static let inlineCodePattern = try? NSRegularExpression(
+            pattern: #"`(.+?)`"#,
+            options: .dotMatchesLineSeparators
+        )
+        private static let bulletPattern = try? NSRegularExpression(
+            pattern: #"(?m)^(\s*)[-*]\s+"#,
+            options: []
+        )
 
         init(
             text: String,
@@ -115,6 +131,8 @@ struct NoteTextEditor: UIViewRepresentable {
             switch command.kind {
             case .bold:
                 wrapSelection(in: textView, prefix: "**", suffix: "**", placeholder: "bold")
+            case .italic:
+                wrapSelection(in: textView, prefix: "*", suffix: "*", placeholder: "italic")
             case .highlight:
                 wrapSelection(in: textView, prefix: "==", suffix: "==", placeholder: "highlight")
             case .bullet:
@@ -128,8 +146,8 @@ struct NoteTextEditor: UIViewRepresentable {
             scrollCaretIntoView(textView)
         }
 
-        // Re-parses **...** markers and applies bold NSAttributedString attributes
-        // so users see visual bold while the plain text (with markers) is preserved.
+        // Re-parses markdown markers so the stored plain text remains editable,
+        // while the card shows the formatted result during editing.
         func refreshAttributes(_ textView: UITextView) {
             let plain = textView.text ?? ""
             let nsRange = NSRange(plain.startIndex..., in: plain)
@@ -137,10 +155,42 @@ struct NoteTextEditor: UIViewRepresentable {
                 .font: UIFont.systemFont(ofSize: fontSize),
                 .foregroundColor: UIColor.label
             ])
-            Self.boldPattern?.enumerateMatches(in: plain, range: nsRange) { match, _, _ in
-                guard let match else { return }
-                attr.addAttribute(.font, value: UIFont.boldSystemFont(ofSize: fontSize), range: match.range)
-            }
+            applyInlineFontMarkdown(
+                pattern: Self.boldPattern,
+                to: attr,
+                in: plain,
+                range: nsRange,
+                traits: .traitBold,
+                markerLength: 2
+            )
+            applyInlineFontMarkdown(
+                pattern: Self.italicPattern,
+                to: attr,
+                in: plain,
+                range: nsRange,
+                traits: .traitItalic,
+                markerLength: 1
+            )
+            applyInlineMarkdown(
+                pattern: Self.highlightPattern,
+                to: attr,
+                in: plain,
+                range: nsRange,
+                bodyAttributes: [.backgroundColor: UIColor.systemYellow.withAlphaComponent(0.35)],
+                markerLength: 2
+            )
+            applyInlineMarkdown(
+                pattern: Self.inlineCodePattern,
+                to: attr,
+                in: plain,
+                range: nsRange,
+                bodyAttributes: [
+                    .font: UIFont.monospacedSystemFont(ofSize: max(fontSize - 1, 11), weight: .regular),
+                    .backgroundColor: UIColor.secondarySystemFill
+                ],
+                markerLength: 1
+            )
+            applyBulletAttributes(to: attr, in: plain, range: nsRange)
             let saved = textView.selectedRange
             textView.attributedText = attr
             let length = (textView.text as NSString?)?.length ?? 0
@@ -155,9 +205,9 @@ struct NoteTextEditor: UIViewRepresentable {
             suffix: String,
             placeholder: String
         ) {
-            let range = textView.selectedRange
             let source = textView.text ?? ""
             let ns = source as NSString
+            let range = markdownBodyRange(for: textView.selectedRange, in: ns)
             let selected = range.length > 0 ? ns.substring(with: range) : placeholder
             let replacement = "\(prefix)\(selected)\(suffix)"
             textView.text = ns.replacingCharacters(in: range, with: replacement)
@@ -165,20 +215,130 @@ struct NoteTextEditor: UIViewRepresentable {
             textView.selectedRange = NSRange(location: range.location + cursorOffset, length: 0)
         }
 
+        private func markdownBodyRange(for selectedRange: NSRange, in ns: NSString) -> NSRange {
+            let lineRange = ns.lineRange(for: selectedRange)
+            guard lineRange.length >= 2 else { return selectedRange }
+            let line = ns.substring(with: lineRange)
+            let markerLength: Int
+            if line.hasPrefix("- ") || line.hasPrefix("* ") {
+                markerLength = 2
+            } else {
+                return selectedRange
+            }
+
+            let bodyStart = lineRange.location + markerLength
+            if selectedRange.length == 0 {
+                return NSRange(location: max(selectedRange.location, bodyStart), length: 0)
+            }
+
+            let end = selectedRange.location + selectedRange.length
+            let adjustedStart = max(selectedRange.location, bodyStart)
+            return NSRange(location: adjustedStart, length: max(0, end - adjustedStart))
+        }
+
         private func applyBullet(in textView: UITextView) {
             let source = textView.text ?? ""
             let ns = source as NSString
             let range = ns.lineRange(for: textView.selectedRange)
-            let selectedLines = ns.substring(with: range)
-            let replacement = selectedLines
-                .components(separatedBy: .newlines)
-                .map { line in
-                    guard !line.isEmpty else { return line }
-                    return line.hasPrefix("- ") ? String(line.dropFirst(2)) : "- \(line)"
-                }
-                .joined(separator: "\n")
+            var lines = ns.substring(with: range).components(separatedBy: .newlines)
+            let keepsTrailingNewline = lines.last == ""
+            if keepsTrailingNewline { lines.removeLast() }
+            let replacement = lines.map { line in
+                guard !line.trimmingCharacters(in: .whitespaces).isEmpty else { return line }
+                if line.hasPrefix("- ") { return String(line.dropFirst(2)) }
+                if line.hasPrefix("* ") { return String(line.dropFirst(2)) }
+                return "- \(line)"
+            }
+            .joined(separator: "\n") + (keepsTrailingNewline ? "\n" : "")
             textView.text = ns.replacingCharacters(in: range, with: replacement)
             textView.selectedRange = NSRange(location: range.location + replacement.count, length: 0)
+        }
+
+        private func applyInlineMarkdown(
+            pattern: NSRegularExpression?,
+            to attr: NSMutableAttributedString,
+            in plain: String,
+            range: NSRange,
+            bodyAttributes: [NSAttributedString.Key: Any],
+            markerLength: Int
+        ) {
+            pattern?.enumerateMatches(in: plain, range: range) { match, _, _ in
+                guard let match, match.numberOfRanges > 1 else { return }
+                let bodyRange = match.range(at: 1)
+                attr.addAttributes(bodyAttributes, range: bodyRange)
+                hideMarkdownMarkers(in: attr, matchRange: match.range, bodyRange: bodyRange, markerLength: markerLength)
+            }
+        }
+
+        private func applyInlineFontMarkdown(
+            pattern: NSRegularExpression?,
+            to attr: NSMutableAttributedString,
+            in plain: String,
+            range: NSRange,
+            traits: UIFontDescriptor.SymbolicTraits,
+            markerLength: Int
+        ) {
+            pattern?.enumerateMatches(in: plain, range: range) { match, _, _ in
+                guard let match, match.numberOfRanges > 1 else { return }
+                let bodyRange = match.range(at: 1)
+                attr.enumerateAttribute(.font, in: bodyRange) { value, subrange, _ in
+                    let existing = value as? UIFont ?? UIFont.systemFont(ofSize: fontSize)
+                    attr.addAttribute(.font, value: font(existing, adding: traits), range: subrange)
+                }
+                hideMarkdownMarkers(in: attr, matchRange: match.range, bodyRange: bodyRange, markerLength: markerLength)
+            }
+        }
+
+        private func hideMarkdownMarkers(
+            in attr: NSMutableAttributedString,
+            matchRange: NSRange,
+            bodyRange: NSRange,
+            markerLength: Int
+        ) {
+            let leading = NSRange(location: matchRange.location, length: markerLength)
+            let trailing = NSRange(location: bodyRange.location + bodyRange.length, length: markerLength)
+            [leading, trailing].forEach { markerRange in
+                attr.addAttributes(hiddenMarkerAttributes, range: markerRange)
+            }
+        }
+
+        private func applyBulletAttributes(to attr: NSMutableAttributedString, in plain: String, range: NSRange) {
+            Self.bulletPattern?.enumerateMatches(in: plain, range: range) { match, _, _ in
+                guard let match else { return }
+                attr.addAttributes(hiddenMarkerAttributes, range: match.range)
+
+                let paragraph = NSMutableParagraphStyle()
+                paragraph.headIndent = 18
+                paragraph.firstLineHeadIndent = 0
+                paragraph.paragraphSpacing = 2
+                if #available(iOS 15.0, *) {
+                    paragraph.textLists = [NSTextList(markerFormat: .disc, options: 0)]
+                }
+                let lineRange = (plain as NSString).lineRange(for: match.range)
+                attr.addAttribute(.paragraphStyle, value: paragraph, range: lineRange)
+            }
+        }
+
+        private var hiddenMarkerAttributes: [NSAttributedString.Key: Any] {
+            [
+                .foregroundColor: UIColor.clear,
+                .font: UIFont.systemFont(ofSize: 0.001),
+                .kern: -0.001
+            ]
+        }
+
+        private func font(_ base: UIFont, adding traits: UIFontDescriptor.SymbolicTraits) -> UIFont {
+            var combined = base.fontDescriptor.symbolicTraits
+            combined.insert(traits)
+            guard let descriptor = base.fontDescriptor.withSymbolicTraits(combined) else {
+                if traits.contains(.traitBold), traits.contains(.traitItalic) {
+                    return UIFont(descriptor: UIFont.boldSystemFont(ofSize: fontSize).fontDescriptor.withSymbolicTraits(.traitItalic) ?? UIFont.italicSystemFont(ofSize: fontSize).fontDescriptor, size: fontSize)
+                }
+                if traits.contains(.traitBold) { return UIFont.boldSystemFont(ofSize: fontSize) }
+                if traits.contains(.traitItalic) { return UIFont.italicSystemFont(ofSize: fontSize) }
+                return base
+            }
+            return UIFont(descriptor: descriptor, size: fontSize)
         }
 
         func reportSize(_ textView: UITextView) {
@@ -250,6 +410,8 @@ struct NoteTextEditor: View {
         switch command.kind {
         case .bold:
             text = text.isEmpty ? "**bold**" : "**\(text)**"
+        case .italic:
+            text = text.isEmpty ? "*italic*" : "*\(text)*"
         case .highlight:
             text = text.isEmpty ? "==highlight==" : "==\(text)=="
         case .bullet:

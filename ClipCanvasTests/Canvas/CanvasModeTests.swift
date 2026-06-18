@@ -9,13 +9,14 @@ import Testing
         #expect(!CanvasMode.draw.allowsCanvasPan)
     }
 
-    @Test func emptyToolbarShowsAIAndEditModeSwitchers() {
+    @Test func emptyToolbarShowsCreationPalette() {
         let configuration = CanvasToolbarConfiguration.make(selectedCount: 0, mode: .pan)
 
         #expect(configuration.items == [
             .askAI,
-            .divider,
-            .mode(.edit),
+            .newNote,
+            .newText,
+            .insertImage,
             .mode(.draw)
         ])
     }
@@ -25,18 +26,32 @@ import Testing
 
         #expect(configuration.items == [
             .closeMode,
-            .paste,
             .newNote,
+            .newText,
             .insertImage,
         ])
     }
 
     @Test func panSelectionToolbarShowsSelectionActions() {
-        let configuration = CanvasToolbarConfiguration.make(selectedCount: 1, mode: .pan)
+        let configuration = CanvasToolbarConfiguration.make(selectedCount: 1, mode: .pan, selectionKind: .clip)
 
         #expect(configuration.items == [
             .askAI,
+            .editContent,
             .details,
+            .duplicate,
+            .arrangeSelection,
+            .delete
+        ])
+    }
+
+    @Test func panStandaloneTextSelectionOmitsUnavailableDetails() {
+        let configuration = CanvasToolbarConfiguration.make(selectedCount: 1, mode: .pan, selectionKind: .text)
+
+        #expect(configuration.items == [
+            .askAI,
+            .editContent,
+            .duplicate,
             .arrangeSelection,
             .delete
         ])
@@ -47,6 +62,7 @@ import Testing
 
         #expect(configuration.items == [
             .askAI,
+            .duplicate,
             .arrangeSelection,
             .delete
         ])
@@ -58,32 +74,31 @@ import Testing
         #expect(configuration.items == [
             .closeMode,
             .formatBold,
+            .formatItalic,
             .formatBullet,
             .formatHighlight
         ])
     }
 
-    @Test func editSelectionToolbarShowsEditTagsAndDelete() {
+    @Test func editSelectionToolbarKeepsCreationToolsUntilActivelyEditing() {
         let configuration = CanvasToolbarConfiguration.make(selectedCount: 1, mode: .edit, selectionKind: .text)
 
         #expect(configuration.items == [
             .closeMode,
-            .editContent,
-            .color,
-            .manageTags,
-            .details,
-            .delete
+            .newNote,
+            .newText,
+            .insertImage,
         ])
     }
 
-    @Test func editImageSelectionShowsImageActionsOnly() {
+    @Test func editImageSelectionDoesNotMoveIntoOverlayTools() {
         let configuration = CanvasToolbarConfiguration.make(selectedCount: 1, mode: .edit, selectionKind: .image)
 
         #expect(configuration.items == [
             .closeMode,
-            .arrangeSelection,
-            .details,
-            .delete
+            .newNote,
+            .newText,
+            .insertImage,
         ])
     }
 

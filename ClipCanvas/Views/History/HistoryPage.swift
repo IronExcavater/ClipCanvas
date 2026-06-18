@@ -14,8 +14,7 @@ struct HistoryPage: View {
     @State private var selection = SelectionState<UUID>()
     @State private var expandedClipID: UUID?
     @State private var confirmingClearHistory = false
-    @State private var feedback: String?
-    @State private var feedbackToken = UUID()
+    @State private var feedbackPresenter = FeedbackPresenter()
 
     private var filtered: [Clip] {
         clips.filter { filter.matches($0) }.sortedForPinnedRecency()
@@ -44,7 +43,7 @@ struct HistoryPage: View {
                 .buttonStyle(.plain)
                 .disabled(selection.isEmpty)
             }
-            .appListItemRowInsets(horizontal: 14, vertical: 4)
+            .appListItemRowInsets(vertical: 4)
 
             HistoryFilterBar(filter: filter)
                 .appListItemRowInsets(vertical: 0)
@@ -54,7 +53,7 @@ struct HistoryPage: View {
             } else {
                 ForEach(grouped, id: \.label) { group in
                     AppSectionHeader(title: group.label)
-                        .appListItemRowInsets(horizontal: 14, vertical: 0)
+                        .appListItemRowInsets(vertical: 0)
 
                     ForEach(group.clips) { clip in
                         ClipRow(
@@ -87,19 +86,20 @@ struct HistoryPage: View {
                 .accessibilityLabel("History options")
             }
         }
-        .overlay(alignment: .top) {
-            FeedbackBanner(message: feedback ?? "")
-                .opacity(feedback == nil ? 0 : 1)
-                .offset(y: feedback == nil ? -12 : 10)
-                .scaleEffect(feedback == nil ? 0.96 : 1)
-                .allowsHitTesting(false)
-        }
-        .animation(.spring(response: 0.22, dampingFraction: 0.86), value: feedback)
-        .confirmationDialog("Clear clipboard history?", isPresented: $confirmingClearHistory, titleVisibility: .visible) {
-            Button("Clear History", role: .destructive, action: clearHistory)
-            Button("Cancel", role: .cancel) {}
-        } message: {
-            Text("All clipboard history items will move to Recently Deleted.")
+        .appFeedbackOverlay(feedbackPresenter, topPadding: 10)
+        .overlay {
+            if confirmingClearHistory {
+                AppConfirmationOverlay(
+                    title: "Clear clipboard history?",
+                    message: "All clipboard history items will move to Recently Deleted.",
+                    destructiveTitle: "Clear",
+                    onConfirm: {
+                        clearHistory()
+                        confirmingClearHistory = false
+                    },
+                    onCancel: { confirmingClearHistory = false }
+                )
+            }
         }
         .sheet(item: $detailClip) { ClipDetailSheet(clip: $0) }
         .sheet(isPresented: $showTagSheet) {
@@ -122,13 +122,13 @@ struct HistoryPage: View {
 
     @ViewBuilder
     private var emptyState: some View {
-        if clips.isEmpty {
-            ContentUnavailableView("No History Yet", systemImage: "doc.on.clipboard",
-                                   description: Text("Copy something to get started."))
-            .appEmptyStateRow()
-        } else {
-            ContentUnavailableView.search(text: filter.search).appEmptyStateRow()
-        }
+        AppListEmptyState(
+            isSourceEmpty: clips.isEmpty,
+            searchText: filter.search,
+            title: "No History Yet",
+            systemImage: "doc.on.clipboard",
+            description: "No clipboard history."
+        )
     }
 
     private func openTagSheet() {
@@ -153,16 +153,7 @@ struct HistoryPage: View {
     }
 
     private func showFeedback(_ message: String) {
-        let token = UUID()
-        feedbackToken = token
-        withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) { feedback = message }
-        Task {
-            try? await Task.sleep(for: .seconds(1.5))
-            await MainActor.run {
-                guard feedbackToken == token else { return }
-                withAnimation(.easeInOut(duration: 0.18)) { feedback = nil }
-            }
-        }
+        feedbackPresenter.show(message, duration: .seconds(1.5))
     }
 }
 

@@ -1,5 +1,6 @@
 import SwiftUI
 import SwiftData
+import PhotosUI
 
 extension CanvasContainerView {
 
@@ -7,12 +8,10 @@ extension CanvasContainerView {
 
     func clearAll() {
         let objects = Array(workspace.canvasObjects)
-        let placements = Array(workspace.placements)
         objects.forEach { context.delete($0) }
-        placements.forEach { context.delete($0) }
         workspace.updatedAt = Date()
         selectedObjectIDs.removeAll()
-        showFeedback(objects.count + placements.count == 0 ? "Canvas is already empty" : "Canvas cleared")
+        showFeedback(objects.isEmpty ? "Canvas is already empty" : "Canvas cleared")
     }
 
     func showSelectedDetails() {
@@ -45,24 +44,79 @@ extension CanvasContainerView {
 
     func deleteSelected() {
         let selected = workspace.canvasObjects.filter { selectedObjectIDs.contains($0.id) }
-        let sourcePlacementIDs = Set(selected.compactMap(\.sourcePlacementID))
-        let legacyPlacements = workspace.placements.filter { sourcePlacementIDs.contains($0.id) }
         selected.forEach { context.delete($0) }
-        legacyPlacements.forEach { context.delete($0) }
         selectedObjectIDs.removeAll()
         showFeedback(selected.count == 1 ? "Deleted 1 card" : "Deleted \(selected.count) cards")
     }
 
+    func duplicateSelected() {
+        let ids = Array(selectedObjectIDs)
+        guard !ids.isEmpty else { return }
+        let arguments = WorkspaceDuplicateObjectsArguments(
+            objectIDs: ids,
+            offsetX: 28,
+            offsetY: 28
+        )
+        guard let data = try? JSONEncoder().encode(arguments) else {
+            showFeedback("Could not duplicate selection")
+            return
+        }
+        let request = WorkspaceActionRequest(
+            name: .canvasDuplicateObjects,
+            workspaceID: workspace.id,
+            argumentsData: data,
+            source: .user
+        )
+        let result = WorkspaceActionRegistry.perform(request, in: context, confirmed: true)
+        if result.success {
+            selectedObjectIDs = Set(result.changedObjectIDs)
+            showFeedback(result.changedObjectIDs.count == 1 ? "Duplicated 1 card" : "Duplicated \(result.changedObjectIDs.count) cards")
+        } else {
+            showFeedback(result.message)
+        }
+    }
+
     func createNoteAtViewCenter() {
         let note = workspace.createNote(centeredAt: visibleViewportCenter, size: CanvasPlacementSizing.defaultSize)
-        context.insert(note)
         selectedObjectIDs = [note.id]
         editingObjectID = note.id
         showFeedback("New note")
     }
 
+    func createTextAtViewCenter() {
+        let object = workspace.createText(centeredAt: visibleViewportCenter)
+        selectedObjectIDs = [object.id]
+        editingObjectID = object.id
+        showFeedback("New text")
+    }
+
     func insertImageFromLibrary() {
-        showFeedback("Image picker coming soon")
+        isImagePickerPresented = true
+    }
+
+    func importSelectedImage(_ item: PhotosPickerItem?) async {
+        defer { selectedPhotoItem = nil }
+        guard let item else { return }
+
+        do {
+            guard let data = try await item.loadTransferable(type: Data.self) else {
+                showFeedback("Could not load image")
+                return
+            }
+            let clip = Clip(content: "Image", imageData: data, imageUTI: item.supportedContentTypes.first?.identifier, origin: .typed)
+            context.insert(clip)
+            let object = workspace.place(
+                clip: clip,
+                at: CGPoint(
+                    x: visibleViewportCenter.x - 130,
+                    y: visibleViewportCenter.y - 95
+                )
+            )
+            selectedObjectIDs = [object.id]
+            showFeedback("Image added")
+        } catch {
+            showFeedback("Could not load image")
+        }
     }
 
     // MARK: - Rename / Search / Sidebar
@@ -89,7 +143,7 @@ extension CanvasContainerView {
             closeCanvasSearch()
         } else {
             withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) { isCanvasSearchActive = true }
-            searchFocused = true
+            DispatchQueue.main.async { searchFocused = true }
         }
     }
 
@@ -120,12 +174,11 @@ extension CanvasContainerView {
         let chat = AIChatService.createChat(in: context, workspace: workspace)
         AIChatService.attachObjects(objects, to: chat, in: context)
         activeAIChat = chat
-        showFeedback(objects.count == 1 ? "Attached 1 card" : "Attached \(objects.count) cards")
     }
 
     func openRecentOrNewAIChat() {
         let recent = workspace.chats
-            .filter { !$0.messages.isEmpty }
+            .filter { $0.deletedAt == nil && !$0.messages.isEmpty }
             .sorted { $0.updatedAt > $1.updatedAt }
             .first
         activeAIChat = recent ?? AIChatService.createChat(in: context, workspace: workspace)
@@ -148,22 +201,14 @@ extension CanvasContainerView {
 
     func canvasSelectionKind(for object: CanvasObject) -> CanvasSelectionKind {
         if object.kind == .image || object.clip?.type == .image { return .image }
-        if object.kind == .stickyNote || object.kind == .clipNote { return .text }
+        if object.clip != nil { return .clip }
+        if object.kind == .stickyNote || object.kind == .text { return .text }
         return .mixed
     }
 
     // MARK: - Feedback
 
     func showFeedback(_ msg: String) {
-        let token = UUID()
-        feedbackToken = token
-        withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) { feedback = msg }
-        Task {
-            try? await Task.sleep(for: .seconds(1.7))
-            await MainActor.run {
-                guard feedbackToken == token else { return }
-                withAnimation(.easeInOut(duration: 0.18)) { feedback = nil }
-            }
-        }
+        feedbackPresenter.show(msg)
     }
 }

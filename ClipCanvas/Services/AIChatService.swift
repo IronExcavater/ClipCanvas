@@ -32,7 +32,7 @@ enum AIChatService {
 
         let message = ChatMessage(
             role: .user,
-            content: messageContent ?? defaultAttachmentMessage(for: uniqueObjects)
+            content: messageContent ?? ""
         )
         message.chat = chat
         chat.messages.append(message)
@@ -61,12 +61,6 @@ private extension AIChatService {
             seen.insert(object.id)
             return true
         }
-    }
-
-    static func defaultAttachmentMessage(for objects: [CanvasObject]) -> String {
-        objects.count == 1
-            ? "Attached 1 canvas card."
-            : "Attached \(objects.count) canvas cards."
     }
 
     static func defaultTitle(for objects: [CanvasObject]) -> String {

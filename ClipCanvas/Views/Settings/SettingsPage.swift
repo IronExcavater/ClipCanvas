@@ -2,9 +2,18 @@ import SwiftUI
 
 struct SettingsPage: View {
     @AppStorage("settings.trashRetentionDays") private var trashRetentionDays = TrashRetentionService.defaultRetentionDays
+    @AppStorage(OpenAIConfiguration.apiKeyUserDefaultsKey) private var openAIAPIKey = ""
+    @AppStorage(OpenAIConfiguration.modelUserDefaultsKey) private var openAIModel = ""
 
     var body: some View {
         List {
+            Section("AI") {
+                SecureField("OpenAI API key", text: $openAIAPIKey)
+                    .textContentType(.password)
+                TextField("Model", text: $openAIModel, prompt: Text(AIModelPresetService.preset(for: .quick).model))
+                    .autocorrectionDisabled()
+            }
+
             Section("Tags") {
                 ClipTagEditor(clips: [], showsClipTypes: true, layout: .twoColumns)
                     .padding(.vertical, 4)

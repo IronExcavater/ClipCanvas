@@ -25,7 +25,6 @@ enum AppBootstrap {
         }
 
         seedBuiltInTags(in: context)
-        CanvasObjectMigrationService.migratePlacements(in: context)
     }
 
     private static func seedBuiltInTags(in context: ModelContext) {

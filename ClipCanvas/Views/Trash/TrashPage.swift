@@ -4,6 +4,7 @@ import SwiftData
 struct TrashPage: View {
     @Query(filter: #Predicate<Clip>      { $0.deletedAt != nil }, sort: \Clip.deletedAt,      order: .reverse) private var deletedClips: [Clip]
     @Query(filter: #Predicate<Workspace> { $0.deletedAt != nil }, sort: \Workspace.deletedAt, order: .reverse) private var deletedWorkspaces: [Workspace]
+    @Query(filter: #Predicate<AIChat>    { $0.deletedAt != nil }, sort: \AIChat.deletedAt,    order: .reverse) private var deletedChats: [AIChat]
     @Query(filter: #Predicate<Workspace> { $0.deletedAt == nil }, sort: \Workspace.sortIndex)                  private var liveWorkspaces: [Workspace]
 
     @Environment(\.modelContext) private var context
@@ -21,10 +22,16 @@ struct TrashPage: View {
                        : deletedClips.filter { $0.content.localizedCaseInsensitiveContains(search)
                                               || $0.preview.localizedCaseInsensitiveContains(search) }
     }
-    private var hasDeletedItems: Bool { !deletedClips.isEmpty || !deletedWorkspaces.isEmpty }
+    private var filteredChats: [AIChat] {
+        search.isEmpty ? deletedChats
+                       : deletedChats.filter { $0.title.localizedCaseInsensitiveContains(search)
+                                              || $0.preview.localizedCaseInsensitiveContains(search) }
+    }
+    private var hasDeletedItems: Bool { !deletedClips.isEmpty || !deletedWorkspaces.isEmpty || !deletedChats.isEmpty }
     private var activeWorkspace: Workspace? { liveWorkspaces.first(where: \.isActive) ?? liveWorkspaces.first }
     private var selectedClips: [Clip]      { deletedClips.filter      { selection.contains(key(for: $0)) } }
     private var selectedWorkspaces: [Workspace] { deletedWorkspaces.filter { selection.contains(key(for: $0)) } }
+    private var selectedChats: [AIChat] { deletedChats.filter { selection.contains(key(for: $0)) } }
 
     var body: some View {
         List {
@@ -48,14 +55,16 @@ struct TrashPage: View {
                 .buttonStyle(.plain)
                 .disabled(selection.isEmpty)
             }
-            .appListItemRowInsets(horizontal: 14, vertical: 4)
+            .appListItemRowInsets(vertical: 4)
 
-            if deletedWorkspaces.isEmpty && deletedClips.isEmpty {
-                ContentUnavailableView("Recently Deleted is Empty", systemImage: "trash",
-                    description: Text("Deleted items appear here before being permanently removed."))
-                .appEmptyStateRow()
-            } else if filteredWorkspaces.isEmpty && filteredClips.isEmpty {
-                ContentUnavailableView.search(text: search).appEmptyStateRow()
+            if !hasDeletedItems || (filteredWorkspaces.isEmpty && filteredClips.isEmpty && filteredChats.isEmpty) {
+                AppListEmptyState(
+                    isSourceEmpty: !hasDeletedItems,
+                    searchText: search,
+                    title: "Recently Deleted is Empty",
+                    systemImage: "trash",
+                    description: "No recoverable items."
+                )
             }
 
             if !filteredWorkspaces.isEmpty {
@@ -66,7 +75,26 @@ struct TrashPage: View {
                                      isSelected: selection.contains(key(for: ws)),
                                      onTap: { selection.toggle(key(for: ws)) },
                                      onRestore: { ws.restore() },
-                                     onDeleteForever: { context.delete(ws) })
+                                     onDeleteForever: { TrashRetentionService.deleteForever(ws, in: context) })
+                        .appListItemRowInsets(vertical: 3)
+                    }
+                }
+            }
+
+            if !filteredChats.isEmpty {
+                Section("AI Chats") {
+                    ForEach(filteredChats) { chat in
+                        TrashItemRow(
+                            title: chat.title,
+                            systemImage: "sparkles",
+                            deletedAt: chat.deletedAt,
+                            tint: .accentColor,
+                            isSelecting: selection.isActive,
+                            isSelected: selection.contains(key(for: chat)),
+                            onTap: { selection.toggle(key(for: chat)) },
+                            onRestore: { chat.restore() },
+                            onDeleteForever: { context.delete(chat) }
+                        )
                         .appListItemRowInsets(vertical: 3)
                     }
                 }
@@ -107,14 +135,31 @@ struct TrashPage: View {
             }
         }
         .task { TrashRetentionService.purgeExpired(in: context) }
-        .alert("Delete all recently deleted items forever?", isPresented: $confirmingDeleteAll) {
-            Button("Cancel", role: .cancel) {}
-            Button("Delete All", role: .destructive, action: emptyTrash)
-        } message: { Text("This permanently deletes all recently deleted clips and workspaces.") }
-        .alert("Delete selected items forever?", isPresented: $confirmingDeleteSelected) {
-            Button("Cancel", role: .cancel) {}
-            Button("Delete Selected", role: .destructive, action: deleteSelectedForever)
-        } message: { Text("This permanently deletes the selected recently deleted items.") }
+        .overlay {
+            if confirmingDeleteAll {
+                AppConfirmationOverlay(
+                    title: "Delete everything forever?",
+                    message: "This permanently deletes all recently deleted items.",
+                    destructiveTitle: "Delete All",
+                    onConfirm: {
+                        emptyTrash()
+                        confirmingDeleteAll = false
+                    },
+                    onCancel: { confirmingDeleteAll = false }
+                )
+            } else if confirmingDeleteSelected {
+                AppConfirmationOverlay(
+                    title: "Delete selected items forever?",
+                    message: "This permanently deletes the selected recently deleted items.",
+                    destructiveTitle: "Delete",
+                    onConfirm: {
+                        deleteSelectedForever()
+                        confirmingDeleteSelected = false
+                    },
+                    onCancel: { confirmingDeleteSelected = false }
+                )
+            }
+        }
     }
 
     // MARK: - Actions
@@ -122,22 +167,26 @@ struct TrashPage: View {
     private func restoreAll() {
         deletedClips.forEach { $0.restore() }
         deletedWorkspaces.forEach { $0.restore() }
+        deletedChats.forEach { $0.restore() }
     }
 
     private func restoreSelected() {
         selectedClips.forEach { $0.restore() }
         selectedWorkspaces.forEach { $0.restore() }
+        selectedChats.forEach { $0.restore() }
         selection.end()
     }
 
     private func emptyTrash() {
         deletedClips.forEach { context.delete($0) }
-        deletedWorkspaces.forEach { context.delete($0) }
+        deletedWorkspaces.forEach { TrashRetentionService.deleteForever($0, in: context) }
+        deletedChats.forEach { context.delete($0) }
     }
 
     private func deleteSelectedForever() {
         selectedClips.forEach { context.delete($0) }
-        selectedWorkspaces.forEach { context.delete($0) }
+        selectedWorkspaces.forEach { TrashRetentionService.deleteForever($0, in: context) }
+        selectedChats.forEach { context.delete($0) }
         selection.end()
     }
 
@@ -149,4 +198,5 @@ struct TrashPage: View {
 
     private func key(for clip: Clip) -> String      { "clip:\(clip.id.uuidString)" }
     private func key(for ws: Workspace) -> String   { "ws:\(ws.id.uuidString)" }
+    private func key(for chat: AIChat) -> String    { "chat:\(chat.id.uuidString)" }
 }

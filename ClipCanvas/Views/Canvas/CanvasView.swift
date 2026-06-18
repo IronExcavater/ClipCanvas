@@ -19,6 +19,9 @@ struct CanvasView: View {
     @Binding var noteTextCommand: NoteTextCommand?
     var drawingTool: PKTool
     var canvasSearch: String = ""
+    var onShowDetails: (CanvasObject) -> Void = { _ in }
+    var onManageTags: ([CanvasObject]) -> Void = { _ in }
+    var onAskAI: ([CanvasObject]) -> Void = { _ in }
 
     @Query private var allClips: [Clip]
     @State private var viewportOrigin: CGPoint = .zero
@@ -30,6 +33,8 @@ struct CanvasView: View {
     @State private var panStartOrigin: CGPoint?
     @State private var pinchStartScale: CGFloat?
     @State private var pinchAnchorCenter: CGPoint?
+    @State private var isPanningCanvas = false
+    @State private var isPinchingCanvas = false
     @State private var didInitializeViewport = false
     @State private var editOverlayContentHeight: CGFloat = 0
 
@@ -46,31 +51,52 @@ struct CanvasView: View {
 
     var body: some View {
         GeometryReader { geo in
+            let drawingWorld = drawingWorld(in: geo)
             ZStack(alignment: .topLeading) {
                 CanvasDotGrid(
                     viewportOrigin: viewportOrigin,
                     canvasScale: canvasScale,
                     boundsRadius: canvasBounds(viewportSize: geo.size).radius
                 )
+                .transaction { transaction in
+                    if isPanningCanvas || isPinchingCanvas {
+                        transaction.animation = nil
+                    }
+                }
+                .animation(
+                    isPanningCanvas ? nil : .smooth(duration: 0.22),
+                    value: viewportOrigin
+                )
+                .animation(
+                    isPinchingCanvas ? nil : .spring(response: 0.26, dampingFraction: 0.84),
+                    value: canvasScale
+                )
                 .contentShape(Rectangle())
                 .gesture(canvasTapGesture(in: geo))
                 .simultaneousGesture(mode.allowsCanvasPan && editingObjectID == nil ? canvasPanGesture(in: geo) : nil)
                 .zIndex(0)
 
-                if !canvasSearch.isEmpty {
-                    Color.black.opacity(0.38)
+                if !canvasSearch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Rectangle()
+                        .fill(.regularMaterial)
+                        .opacity(0.64)
                         .ignoresSafeArea()
                         .allowsHitTesting(false)
                         .zIndex(0.5)
                         .transition(.opacity)
                 }
 
-                if mode == .draw {
-                    CanvasDrawingLayer(drawing: $activeDrawing, activeTool: drawingTool)
-                        .frame(width: geo.size.width, height: geo.size.height)
-                        .allowsHitTesting(true)
-                        .zIndex(1)
-                }
+                CanvasDrawingLayer(
+                    drawing: $activeDrawing,
+                    activeTool: drawingTool,
+                    viewportOrigin: viewportOrigin,
+                    canvasScale: canvasScale,
+                    worldOrigin: drawingWorld.origin,
+                    worldSize: drawingWorld.size
+                )
+                    .frame(width: geo.size.width, height: geo.size.height)
+                    .allowsHitTesting(mode == .draw)
+                    .zIndex(1)
 
                 ForEach(renderedCanvasObjects(in: geo)) { object in
                     positionedObject(object, in: geo)
@@ -85,9 +111,7 @@ struct CanvasView: View {
                         .zIndex(2)
                 }
 
-                if mode == .edit,
-                   selectedObjectIDs.count == 1,
-                   let selectedID = selectedObjectIDs.first,
+                if let selectedID = editingObjectID,
                    let selectedObject = canvasObjects.first(where: { $0.id == selectedID }) {
                     editModeOverlay(for: selectedObject, in: geo)
                         .zIndex(20000)
@@ -196,7 +220,7 @@ struct CanvasView: View {
     ) -> some View {
         let isDragging = activeDrag?.objectIDs.contains(object.id) == true
         let isSelected = selectedObjectIDs.contains(object.id)
-        let isOverlaid = mode == .edit && selectedObjectIDs == [object.id]
+        let isOverlaid = editingObjectID == object.id
         return content(isSelected, isDragging)
             .modifier(CanvasObjectPositionModifier(
                 object: object,
@@ -209,7 +233,46 @@ struct CanvasView: View {
             .opacity(isOverlaid ? 0 : searchOpacity(for: object))
             .allowsHitTesting(!isOverlaid)
             .gesture(objectDragGesture(for: object, in: geo))
+            .contextMenu {
+                objectContextMenu(for: object, in: geo)
+            }
             .zIndex(zIndex(for: object, isSelected: isSelected, isDragging: isDragging))
+    }
+
+    @ViewBuilder
+    private func objectContextMenu(for object: CanvasObject, in geo: GeometryProxy) -> some View {
+        if canEditText(object) {
+            Button("Edit Text", systemImage: "character.cursor.ibeam") {
+                beginEditing(object, in: geo)
+            }
+        }
+
+        if object.clip != nil {
+            Button("Info", systemImage: "info.circle") {
+                selectedObjectIDs = [object.id]
+                onShowDetails(object)
+            }
+
+            Button("Tags", systemImage: "tag") {
+                selectedObjectIDs = [object.id]
+                onManageTags([object])
+            }
+        }
+
+        Button("Ask AI", systemImage: "sparkles") {
+            selectedObjectIDs = [object.id]
+            onAskAI([object])
+        }
+
+        Button("Duplicate", systemImage: "plus.square.on.square") {
+            selectedObjectIDs = [object.id]
+            duplicate(object, in: geo)
+        }
+
+        Button("Delete", systemImage: "trash", role: .destructive) {
+            selectedObjectIDs = [object.id]
+            delete(object)
+        }
     }
 
     private func renderedCanvasObjects(in geo: GeometryProxy) -> [CanvasObject] {
@@ -225,18 +288,20 @@ struct CanvasView: View {
     }
 
     private func matchesSearch(_ object: CanvasObject) -> Bool {
-        guard !canvasSearch.isEmpty else { return true }
-        let query = canvasSearch.lowercased()
+        let query = canvasSearch.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !query.isEmpty else { return true }
         if object.text.lowercased().contains(query) { return true }
+        if object.displayText.lowercased().contains(query) { return true }
         if let clip = object.clip {
             if clip.content.lowercased().contains(query) { return true }
+            if clip.preview.lowercased().contains(query) { return true }
             if clip.tags.contains(where: { $0.name.lowercased().contains(query) }) { return true }
         }
         return false
     }
 
     private func searchOpacity(for object: CanvasObject) -> CGFloat {
-        guard !canvasSearch.isEmpty else { return 1 }
+        guard !canvasSearch.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return 1 }
         return matchesSearch(object) ? 1 : 0.12
     }
 
@@ -264,6 +329,7 @@ struct CanvasView: View {
                 if panStartOrigin == nil {
                     panStartOrigin = start
                 }
+                isPanningCanvas = true
                 let proposed = CGPoint(
                     x: start.x - value.translation.width / canvasScale,
                     y: start.y - value.translation.height / canvasScale
@@ -281,6 +347,7 @@ struct CanvasView: View {
                     y: start.y - (value.translation.height + throwVector.height) / canvasScale
                 )
                 let target = boundedOrigin(proposed, viewportSize: geo.size, rubberBand: false)
+                isPanningCanvas = false
                 withAnimation(.smooth(duration: 0.22)) {
                     viewportOrigin = target
                 }
@@ -297,11 +364,15 @@ struct CanvasView: View {
                     pinchStartScale = startScale
                     pinchAnchorCenter = anchorCenter
                 }
+                isPinchingCanvas = true
                 let next = CanvasScaleSteps.clamp(startScale * value)
                 zoom(to: next, around: anchorCenter, in: geo)
             }
             .onEnded { _ in
-                zoom(to: CanvasScaleSteps.nearest(canvasScale), in: geo)
+                isPinchingCanvas = false
+                withAnimation(.smooth(duration: 0.18)) {
+                    zoom(to: CanvasScaleSteps.nearest(canvasScale), in: geo)
+                }
                 pinchStartScale = nil
                 pinchAnchorCenter = nil
             }
@@ -334,7 +405,7 @@ struct CanvasView: View {
     // MARK: - Zoom
 
     private func handleZoom(_ command: ZoomCommand, in geo: GeometryProxy) {
-        withAnimation(.spring(response: 0.28, dampingFraction: 0.85)) {
+        withAnimation(.smooth(duration: 0.22)) {
             switch command {
             case .zoomIn:
                 zoom(to: CanvasScaleSteps.nextZoomIn(from: canvasScale), in: geo)
@@ -471,7 +542,7 @@ struct CanvasView: View {
 
     private func canEditText(_ object: CanvasObject) -> Bool {
         switch object.kind {
-        case .stickyNote:
+        case .stickyNote, .text:
             return true
         case .clipNote:
             return object.clip?.type != .image
@@ -496,12 +567,12 @@ struct CanvasView: View {
     // MARK: - Edit Mode Overlay
 
     private func editScreenFrame(in geo: GeometryProxy) -> CGRect {
-        let topInset = geo.safeAreaInsets.top + topBarContentHeight
-        let bottomInset = max(keyboardHeight - 32, 0) + 58 + geo.safeAreaInsets.bottom
-        let sideInset: CGFloat = 16
-        let width = geo.size.width - sideInset * 2
-        let availableHeight = max(80, geo.size.height - topInset - bottomInset)
-        return CGRect(x: sideInset, y: topInset, width: width, height: availableHeight)
+        CanvasEditOverlayLayout.availableFrame(
+            viewportSize: geo.size,
+            topBarContentHeight: topBarContentHeight,
+            keyboardHeight: keyboardHeight,
+            safeAreaBottom: geo.safeAreaInsets.bottom
+        )
     }
 
     private func updateEditOverlayContentHeight(_ contentSize: CGSize, maxHeight: CGFloat) {
@@ -567,6 +638,8 @@ struct CanvasView: View {
             .frame(width: available.width, height: height)
             .offset(x: available.minX, y: available.minY)
             .animation(.spring(response: 0.25, dampingFraction: 0.85), value: height)
+            .animation(.spring(response: 0.28, dampingFraction: 0.86), value: available)
+            .animation(.spring(response: 0.28, dampingFraction: 0.86), value: topBarContentHeight)
         } else if isImageObject(object), let clip = object.clip {
             let aspect = imageAspectRatio(for: object) ?? max(object.width / max(object.height, 1), 1)
             let rawImgHeight = available.width / max(aspect, 0.001)
@@ -587,6 +660,8 @@ struct CanvasView: View {
             )
             .frame(width: imgWidth, height: imgHeight)
             .offset(x: xOffset, y: yOffset)
+            .animation(.spring(response: 0.28, dampingFraction: 0.86), value: available)
+            .animation(.spring(response: 0.28, dampingFraction: 0.86), value: topBarContentHeight)
         }
     }
 
@@ -647,6 +722,20 @@ struct CanvasView: View {
         )
     }
 
+    private func drawingWorld(in geo: GeometryProxy) -> (origin: CGPoint, size: CGSize) {
+        let bounds = canvasBounds(viewportSize: geo.size)
+        let viewportDiagonal = hypot(
+            geo.size.width / max(canvasScale, 0.001),
+            geo.size.height / max(canvasScale, 0.001)
+        )
+        let margin = max(viewportDiagonal, 800)
+        let offset = bounds.radius + margin
+        return (
+            CGPoint(x: offset, y: offset),
+            CGSize(width: offset * 2, height: offset * 2)
+        )
+    }
+
     private func arrangeObjects(_ target: [CanvasObject], at center: CGPoint, fitAfter: Bool, in geo: GeometryProxy) {
         guard !target.isEmpty else { return }
 
@@ -675,23 +764,10 @@ struct CanvasView: View {
 
     private func handleTap(for object: CanvasObject, in geo: GeometryProxy) {
         bringToFront(object.id)
-        if mode == .edit, canEditText(object) {
-            if editingObjectID == object.id { return }
-            if selectedObjectIDs == [object.id] {
-                beginEditing(object, in: geo)
-            } else {
-                editOverlayContentHeight = 0
-                selectedObjectIDs = [object.id]
-            }
-        } else if mode == .edit, isImageObject(object) {
-            editOverlayContentHeight = 0
-            selectedObjectIDs = [object.id]
+        if selectedObjectIDs.contains(object.id) {
+            selectedObjectIDs.remove(object.id)
         } else {
-            if selectedObjectIDs.contains(object.id) {
-                selectedObjectIDs.remove(object.id)
-            } else {
-                selectedObjectIDs.insert(object.id)
-            }
+            selectedObjectIDs.insert(object.id)
         }
     }
 
@@ -715,13 +791,43 @@ struct CanvasView: View {
 
     private func createNote(at center: CGPoint, in geo: GeometryProxy, beginEditing shouldBeginEditing: Bool) {
         let note = workspace.createNote(centeredAt: center, size: CanvasPlacementSizing.defaultSize)
-        context.insert(note)
         clampObject(note, in: geo)
         selectedObjectIDs = [note.id]
         bringToFront(note.id)
         if shouldBeginEditing {
             beginEditing(note, in: geo)
         }
+    }
+
+    private func duplicate(_ object: CanvasObject, in geo: GeometryProxy) {
+        let copy = CanvasObject(
+            kind: object.kind,
+            workspace: workspace,
+            clip: object.clip,
+            x: object.x + 28,
+            y: object.y + 28,
+            width: object.width,
+            height: object.height,
+            text: object.text,
+            shapeKind: object.shapeKind,
+            style: object.style,
+            connector: object.connector
+        )
+        copy.rotation = object.rotation
+        copy.groupID = object.groupID
+        copy.drawingData = object.drawingData
+        copy.zIndex = nextZOrder
+        nextZOrder += 1
+        context.insert(copy)
+        workspace.canvasObjects.append(copy)
+        clampObject(copy, in: geo)
+        selectedObjectIDs = [copy.id]
+        updateVisibleObjectIDs(in: geo)
+    }
+
+    private func delete(_ object: CanvasObject) {
+        context.delete(object)
+        selectedObjectIDs.remove(object.id)
     }
 
     private func placeDroppedClips(_ ids: [String], at location: CGPoint, in geo: GeometryProxy) -> Bool {
@@ -736,11 +842,9 @@ struct CanvasView: View {
             if clip.deletedAt != nil {
                 clip.restore()
             }
-            let placement = workspace.place(clip: clip, at: canvasPoint)
-            if let object = workspace.canvasObjects.first(where: { $0.sourcePlacementID == placement.id }) {
-                clampObject(object, in: geo)
-                selectedObjectIDs = [object.id]
-            }
+            let object = workspace.place(clip: clip, at: canvasPoint)
+            clampObject(object, in: geo)
+            selectedObjectIDs = [object.id]
             didPlace = true
         }
         return didPlace

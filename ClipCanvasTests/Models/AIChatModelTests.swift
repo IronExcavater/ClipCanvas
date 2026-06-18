@@ -9,8 +9,19 @@ import Testing
 
         #expect(chat.mode == .quick)
         #expect(!chat.isPinned)
+        #expect(chat.deletedAt == nil)
         #expect(chat.openAIConversationID == nil)
         #expect(chat.lastResponseID == nil)
+    }
+
+    @Test func chatSupportsSoftDeleteAndRestore() {
+        let chat = AIChat(title: "Draft")
+
+        chat.softDelete()
+        #expect(chat.deletedAt != nil)
+
+        chat.restore()
+        #expect(chat.deletedAt == nil)
     }
 
     @Test func sortedMessagesUseCreationDate() {

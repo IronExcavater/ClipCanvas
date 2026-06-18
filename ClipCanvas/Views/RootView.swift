@@ -10,8 +10,21 @@ struct RootView: View {
     @State private var activeAIChat: AIChat?
 
     var body: some View {
-        Group {
-            if hSizeClass == .compact { iPhoneLayout } else { splitLayout }
+        GeometryReader { proxy in
+            let layout = WorkspaceShellLayout.resolve(
+                width: proxy.size.width,
+                isCompactWidth: hSizeClass == .compact,
+                prefersDesktopLayout: prefersDesktopLayout
+            )
+
+            Group {
+                switch layout {
+                case .overlayDrawer:
+                    iPhoneLayout
+                case .split, .splitWithInspector:
+                    splitLayout(prefersInspector: layout.prefersInspector)
+                }
+            }
         }
         .sheet(item: $activeAIChat) { chat in
             AIChatDetailSheet(chat: chat)
@@ -52,7 +65,7 @@ struct RootView: View {
 
     // MARK: - iPad / Mac: NavigationSplitView
 
-    private var splitLayout: some View {
+    private func splitLayout(prefersInspector: Bool) -> some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
             NavigationStack {
                 SidebarView(
@@ -65,20 +78,20 @@ struct RootView: View {
                 withAnimation {
                     columnVisibility = columnVisibility == .all ? .detailOnly : .all
                 }
-            })
+            }, prefersInspector: prefersInspector)
         }
     }
 
-    @ViewBuilder
+    private var prefersDesktopLayout: Bool {
+        #if os(macOS)
+        true
+        #else
+        false
+        #endif
+    }
+
     private var sidebarDrawerBackground: some View {
-        if #available(iOS 26, *) {
-            Rectangle()
-                .fill(Color.clear)
-                .glassEffect(.regular, in: .rect(cornerRadius: 0))
-        } else {
-            Rectangle()
-                .fill(.regularMaterial)
-        }
+        AppGlassSurface(shape: .rect(cornerRadius: 0))
     }
 
     private func openAIChatFromSidebar(_ chat: AIChat) {

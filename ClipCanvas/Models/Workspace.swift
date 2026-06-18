@@ -12,9 +12,6 @@ final class Workspace: SoftDeletable, Identifiable {
     var updatedAt: Date = Date()
     var deletedAt: Date? = nil
 
-    @Relationship(deleteRule: .cascade, inverse: \CanvasPlacement.workspace)
-    var placements: [CanvasPlacement] = []
-
     @Relationship(deleteRule: .cascade, inverse: \CanvasObject.workspace)
     var canvasObjects: [CanvasObject] = []
 
@@ -34,7 +31,7 @@ final class Workspace: SoftDeletable, Identifiable {
 
     // Staggers new cards so they don't all land on top of each other.
     func nextPosition() -> CGPoint {
-        let i = Double(max(canvasObjects.count, placements.count))
+        let i = Double(canvasObjects.count)
         return CGPoint(
             x: 200 + i.truncatingRemainder(dividingBy: 6) * 30,
             y: 180 + i.truncatingRemainder(dividingBy: 8) * 24
@@ -42,7 +39,7 @@ final class Workspace: SoftDeletable, Identifiable {
     }
 
     func nextPosition(around anchor: CGPoint) -> CGPoint {
-        let i = Double(max(canvasObjects.count, placements.count))
+        let i = Double(canvasObjects.count)
         let column = i.truncatingRemainder(dividingBy: 4)
         let row = floor(i.truncatingRemainder(dividingBy: 12) / 4)
         return CGPoint(
@@ -69,62 +66,43 @@ final class Workspace: SoftDeletable, Identifiable {
     }
 
     @discardableResult
-    func place(clip: Clip, at position: CGPoint? = nil) -> CanvasPlacement {
+    func createText(centeredAt center: CGPoint, text: String = "") -> CanvasObject {
+        let size = CGSize(width: 280, height: 96)
+        let object = CanvasObject(
+            kind: .text,
+            workspace: self,
+            x: center.x - size.width / 2,
+            y: center.y - size.height / 2,
+            width: size.width,
+            height: size.height,
+            text: text,
+            style: .freeText
+        )
+        object.zIndex = Double(canvasObjects.count)
+        canvasObjects.append(object)
+        updatedAt = Date()
+        return object
+    }
+
+    @discardableResult
+    func place(clip: Clip, at position: CGPoint? = nil) -> CanvasObject {
         let pos = position ?? nextPosition()
-        let p = CanvasPlacement(clip: clip, x: pos.x, y: pos.y)
-        p.workspace = self
-        placements.append(p)
         let isImage = clip.type == .image
         let size = isImage
             ? CGSize(width: 260, height: 190)
             : CanvasPlacementSizing.defaultSize
-        p.width = size.width
-        p.height = size.height
         let object = CanvasObject(
             kind: isImage ? .image : .clipNote,
             workspace: self,
             clip: clip,
-            x: p.x,
-            y: p.y,
+            x: pos.x,
+            y: pos.y,
             width: size.width,
             height: size.height
         )
-        object.sourcePlacementID = p.id
         object.zIndex = Double(canvasObjects.count)
         canvasObjects.append(object)
         updatedAt = Date()
-        return p
-    }
-}
-
-@Model
-final class CanvasPlacement: Identifiable {
-    var id: UUID = UUID()
-    var workspace: Workspace?
-    var clip: Clip?           // nullify on clip delete — placement disappears naturally
-    var x: Double
-    var y: Double
-    var width: Double = Double(CanvasPlacementSizing.defaultSize.width)
-    var height: Double = Double(CanvasPlacementSizing.defaultSize.height)
-    var createdAt: Date = Date()
-
-    init(clip: Clip?, x: Double, y: Double) {
-        self.clip = clip
-        self.x = x
-        self.y = y
-    }
-}
-
-extension CanvasPlacement {
-    var frame: CGRect {
-        get {
-            CGRect(x: x, y: y, width: width, height: height)
-        }
-        set {
-            x = Double(newValue.origin.x)
-            y = Double(newValue.origin.y)
-            width = Double(newValue.width)
-            height = Double(newValue.height)
-        }
+        return object
     }
 }

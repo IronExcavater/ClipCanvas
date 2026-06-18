@@ -83,12 +83,7 @@ import Testing
     }
 
     private func makeWorkspaceAndMessage() throws -> (ModelContext, Workspace, ChatMessage) {
-        let container = try ModelContainer(
-            for: Clip.self, ClipTag.self, Workspace.self, CanvasPlacement.self, CanvasObject.self,
-            AIChat.self, ChatMessage.self, ChatAttachment.self, AIToolEvent.self,
-            configurations: ModelConfiguration(isStoredInMemoryOnly: true)
-        )
-        let context = ModelContext(container)
+        let context = try ModelContextFactory.makeContext()
         let workspace = Workspace(name: "AI", isActive: true)
         let chat = AIChat(title: "AI Chat")
         let message = ChatMessage(role: .assistant, content: "")

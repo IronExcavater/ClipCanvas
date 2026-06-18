@@ -14,9 +14,4 @@ final class HistoryFilter {
         let matchesUserTag = userTagID.map { id in clip.tags.contains { $0.id == id } } ?? true
         return matchesSearch && matchesType && matchesUserTag
     }
-
-    func clear() {
-        type = nil
-        userTagID = nil
-    }
 }

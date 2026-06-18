@@ -5,7 +5,7 @@ import SwiftData
 struct ClipCanvasApp: App {
     let container: ModelContainer = {
         do {
-            return try ModelContainer(for: Clip.self, Workspace.self, CanvasPlacement.self, CanvasObject.self,
+            return try ModelContainer(for: Clip.self, Workspace.self, CanvasObject.self,
                                       ClipTag.self, AIChat.self, ChatMessage.self, ChatAttachment.self,
                                       AIToolEvent.self)
         } catch {
@@ -17,6 +17,9 @@ struct ClipCanvasApp: App {
         WindowGroup {
             RootView()
                 .modelContainer(container)
+        }
+        .commands {
+            ClipCanvasCommands()
         }
     }
 }
