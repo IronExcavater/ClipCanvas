@@ -177,13 +177,10 @@ private struct AIChatRow: View {
             if newValue { focused = true }
         }
         .swipeActions(edge: .leading) {
-            Button(action: onRename) { Image(systemName: "pencil") }
-                .tint(.blue)
-                .accessibilityLabel("Rename")
+            AppSwipeIconButton(systemImage: "pencil", tint: .blue, accessibilityLabel: "Rename", action: onRename)
         }
         .swipeActions(edge: .trailing) {
-            Button(role: .destructive, action: onDelete) { Image(systemName: "trash") }
-                .accessibilityLabel("Delete")
+            AppSwipeIconButton(systemImage: "trash", role: .destructive, accessibilityLabel: "Delete", action: onDelete)
         }
         .contextMenu {
             Button("Rename", systemImage: "pencil", action: onRename)

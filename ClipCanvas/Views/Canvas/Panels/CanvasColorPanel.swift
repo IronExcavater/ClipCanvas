@@ -10,30 +10,23 @@ struct CanvasColorPanel: View {
     ]
 
     var body: some View {
-        VStack {
-            Spacer()
-
-            CanvasOverlayPanel(
-                title: objects.count > 1 ? "\(objects.count) cards selected" : "Note Color",
-                systemImage: "paintpalette",
-                onDismiss: onDismiss
+        CanvasOverlayPanel(
+            title: objects.count > 1 ? "\(objects.count) cards selected" : "Note Color",
+            systemImage: "paintpalette",
+            onDismiss: onDismiss
+        ) {
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 42), spacing: 10)],
+                alignment: .leading,
+                spacing: 10
             ) {
-                LazyVGrid(
-                    columns: [GridItem(.adaptive(minimum: 42), spacing: 10)],
-                    alignment: .leading,
-                    spacing: 10
-                ) {
-                    ForEach(presets, id: \.self) { hex in
-                        ColorSwatch(hex: hex, isSelected: selectedHex == hex) {
-                            apply(hex)
-                        }
+                ForEach(presets, id: \.self) { hex in
+                    ColorSwatch(hex: hex, isSelected: selectedHex == hex) {
+                        apply(hex)
                     }
                 }
             }
-            .padding(.horizontal, 18)
-            .padding(.bottom, 92)
         }
-        .ignoresSafeArea(.container, edges: .bottom)
     }
 
     private var selectedHex: String? {

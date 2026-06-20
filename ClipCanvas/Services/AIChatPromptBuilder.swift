@@ -58,7 +58,7 @@ nonisolated enum AIChatPromptBuilder {
 
     private static func visibleCardsSection(workspace: Workspace) -> String {
         let objects = workspace.canvasObjects
-            .filter { $0.isVisible && $0.kind != .connector }
+            .filter(\.isCanvasContent)
             .sorted { lhs, rhs in
                 if lhs.zIndex == rhs.zIndex { return lhs.createdAt < rhs.createdAt }
                 return lhs.zIndex < rhs.zIndex

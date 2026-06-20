@@ -1,6 +1,7 @@
 import SwiftUI
 import SwiftData
 import PhotosUI
+import PencilKit
 
 extension CanvasContainerView {
 
@@ -9,9 +10,10 @@ extension CanvasContainerView {
     func clearAll() {
         let objects = Array(workspace.canvasObjects)
         objects.forEach { context.delete($0) }
+        activeDrawing = PKDrawing()
         workspace.updatedAt = Date()
         selectedObjectIDs.removeAll()
-        showFeedback(objects.isEmpty ? "Canvas is already empty" : "Canvas cleared")
+        showFeedback(objects.isEmpty ? "Canvas is already empty" : "Canvas cleared", kind: objects.isEmpty ? .info : .success)
     }
 
     func showSelectedDetails() {
@@ -30,7 +32,7 @@ extension CanvasContainerView {
         let objects = orderedCanvasObjects(matching: selectedObjectIDs)
             .filter { $0.kind != .image && $0.kind != .drawing && $0.kind != .group && $0.kind != .connector }
         if colorObjects != nil { colorObjects = nil; return }
-        guard !objects.isEmpty else { showFeedback("Select a note to color"); return }
+        guard !objects.isEmpty else { showFeedback("Select a note to color", kind: .info); return }
         tagClips = nil
         colorObjects = objects
     }
@@ -46,7 +48,7 @@ extension CanvasContainerView {
         let selected = workspace.canvasObjects.filter { selectedObjectIDs.contains($0.id) }
         selected.forEach { context.delete($0) }
         selectedObjectIDs.removeAll()
-        showFeedback(selected.count == 1 ? "Deleted 1 card" : "Deleted \(selected.count) cards")
+        showFeedback(selected.count == 1 ? "Deleted 1 card" : "Deleted \(selected.count) cards", kind: .success)
     }
 
     func duplicateSelected() {
@@ -58,7 +60,7 @@ extension CanvasContainerView {
             offsetY: 28
         )
         guard let data = try? JSONEncoder().encode(arguments) else {
-            showFeedback("Could not duplicate selection")
+            showFeedback("Could not duplicate selection", kind: .failure)
             return
         }
         let request = WorkspaceActionRequest(
@@ -70,9 +72,9 @@ extension CanvasContainerView {
         let result = WorkspaceActionRegistry.perform(request, in: context, confirmed: true)
         if result.success {
             selectedObjectIDs = Set(result.changedObjectIDs)
-            showFeedback(result.changedObjectIDs.count == 1 ? "Duplicated 1 card" : "Duplicated \(result.changedObjectIDs.count) cards")
+            showFeedback(result.changedObjectIDs.count == 1 ? "Duplicated 1 card" : "Duplicated \(result.changedObjectIDs.count) cards", kind: .success)
         } else {
-            showFeedback(result.message)
+            showFeedback(result.message, kind: .failure)
         }
     }
 
@@ -80,18 +82,31 @@ extension CanvasContainerView {
         let note = workspace.createNote(centeredAt: visibleViewportCenter, size: CanvasPlacementSizing.defaultSize)
         selectedObjectIDs = [note.id]
         editingObjectID = note.id
-        showFeedback("New note")
+        showFeedback("New note", kind: .success)
     }
 
     func createTextAtViewCenter() {
         let object = workspace.createText(centeredAt: visibleViewportCenter)
         selectedObjectIDs = [object.id]
         editingObjectID = object.id
-        showFeedback("New text")
+        showFeedback("New text", kind: .success)
     }
 
     func insertImageFromLibrary() {
         isImagePickerPresented = true
+    }
+
+    func loadPersistedDrawing() {
+        isLoadingPersistedDrawing = true
+        activeDrawing = CanvasDrawingPersistence.drawing(in: workspace)
+        DispatchQueue.main.async {
+            isLoadingPersistedDrawing = false
+        }
+    }
+
+    func persistActiveDrawing(_ drawing: PKDrawing) {
+        guard !isLoadingPersistedDrawing else { return }
+        CanvasDrawingPersistence.persist(drawing, in: workspace, context: context)
     }
 
     func importSelectedImage(_ item: PhotosPickerItem?) async {
@@ -100,7 +115,7 @@ extension CanvasContainerView {
 
         do {
             guard let data = try await item.loadTransferable(type: Data.self) else {
-                showFeedback("Could not load image")
+                showFeedback("Could not load image", kind: .failure)
                 return
             }
             let clip = Clip(content: "Image", imageData: data, imageUTI: item.supportedContentTypes.first?.identifier, origin: .typed)
@@ -113,9 +128,9 @@ extension CanvasContainerView {
                 )
             )
             selectedObjectIDs = [object.id]
-            showFeedback("Image added")
+            showFeedback("Image added", kind: .success)
         } catch {
-            showFeedback("Could not load image")
+            showFeedback("Could not load image", kind: .failure)
         }
     }
 
@@ -170,7 +185,7 @@ extension CanvasContainerView {
     }
 
     func openAIChat(attaching objects: [CanvasObject]) {
-        guard !objects.isEmpty else { showFeedback("No cards to attach"); return }
+        guard !objects.isEmpty else { showFeedback("No cards to attach", kind: .info); return }
         let chat = AIChatService.createChat(in: context, workspace: workspace)
         AIChatService.attachObjects(objects, to: chat, in: context)
         activeAIChat = chat
@@ -187,12 +202,12 @@ extension CanvasContainerView {
     // MARK: - Helpers
 
     var selectedClips: [Clip] {
-        workspace.canvasObjects.filter { selectedObjectIDs.contains($0.id) }.compactMap(\.clip)
+        workspace.canvasObjects.filter { selectedObjectIDs.contains($0.id) && $0.isCanvasContent }.compactMap(\.clip)
     }
 
     func orderedCanvasObjects(matching ids: Set<UUID>) -> [CanvasObject] {
         workspace.canvasObjects
-            .filter { ids.contains($0.id) && $0.isVisible }
+            .filter { ids.contains($0.id) && $0.isCanvasContent }
             .sorted { lhs, rhs in
                 if lhs.zIndex == rhs.zIndex { return lhs.createdAt < rhs.createdAt }
                 return lhs.zIndex < rhs.zIndex
@@ -208,7 +223,7 @@ extension CanvasContainerView {
 
     // MARK: - Feedback
 
-    func showFeedback(_ msg: String) {
-        feedbackPresenter.show(msg)
+    func showFeedback(_ msg: String, kind: FeedbackKind? = nil) {
+        feedbackPresenter.show(msg, kind: kind)
     }
 }

@@ -57,7 +57,7 @@ private extension AIChatService {
     static func uniqueLiveObjects(_ objects: [CanvasObject]) -> [CanvasObject] {
         var seen = Set<UUID>()
         return objects.filter { object in
-            guard object.isVisible, !seen.contains(object.id) else { return false }
+            guard object.isCanvasContent, !seen.contains(object.id) else { return false }
             seen.insert(object.id)
             return true
         }

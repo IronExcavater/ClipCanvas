@@ -209,11 +209,11 @@ private extension AIChatCommandRouter {
         let attached = chat.sortedMessages
             .flatMap(\.sortedAttachments)
             .compactMap(\.canvasObject)
-            .filter(\.isVisible)
+            .filter(\.isCanvasContent)
         if !attached.isEmpty {
             return unique(attached)
         }
-        return workspace.canvasObjects.filter(\.isVisible)
+        return workspace.canvasObjects.filter(\.isCanvasContent)
     }
 
     static func targetClips(chat: AIChat, workspace: Workspace) -> [Clip] {

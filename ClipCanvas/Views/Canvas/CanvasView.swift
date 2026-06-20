@@ -23,6 +23,9 @@ struct CanvasView: View {
     var onManageTags: ([CanvasObject]) -> Void = { _ in }
     var onAskAI: ([CanvasObject]) -> Void = { _ in }
 
+    private let drawingWorldOrigin = CGPoint(x: 10_000, y: 10_000)
+    private let drawingWorldSize = CGSize(width: 20_000, height: 20_000)
+
     @Query private var allClips: [Clip]
     @State private var viewportOrigin: CGPoint = .zero
     @State private var canvasScale: CGFloat = 1.0
@@ -40,7 +43,7 @@ struct CanvasView: View {
 
     private var canvasObjects: [CanvasObject] {
         workspace.canvasObjects
-            .filter { $0.isVisible && $0.kind != .connector }
+            .filter(\.isCanvasContent)
             .sorted { lhs, rhs in
                 let lhsOrder = zOrder[lhs.id] ?? lhs.zIndex
                 let rhsOrder = zOrder[rhs.id] ?? rhs.zIndex
@@ -51,7 +54,6 @@ struct CanvasView: View {
 
     var body: some View {
         GeometryReader { geo in
-            let drawingWorld = drawingWorld(in: geo)
             ZStack(alignment: .topLeading) {
                 CanvasDotGrid(
                     viewportOrigin: viewportOrigin,
@@ -91,8 +93,8 @@ struct CanvasView: View {
                     activeTool: drawingTool,
                     viewportOrigin: viewportOrigin,
                     canvasScale: canvasScale,
-                    worldOrigin: drawingWorld.origin,
-                    worldSize: drawingWorld.size
+                    worldOrigin: drawingWorldOrigin,
+                    worldSize: drawingWorldSize
                 )
                     .frame(width: geo.size.width, height: geo.size.height)
                     .allowsHitTesting(mode == .draw)
@@ -719,20 +721,6 @@ struct CanvasView: View {
             forObjectSizes: canvasObjects.map { CGSize(width: $0.width, height: $0.height) },
             viewportSize: viewportSize,
             scale: canvasScale
-        )
-    }
-
-    private func drawingWorld(in geo: GeometryProxy) -> (origin: CGPoint, size: CGSize) {
-        let bounds = canvasBounds(viewportSize: geo.size)
-        let viewportDiagonal = hypot(
-            geo.size.width / max(canvasScale, 0.001),
-            geo.size.height / max(canvasScale, 0.001)
-        )
-        let margin = max(viewportDiagonal, 800)
-        let offset = bounds.radius + margin
-        return (
-            CGPoint(x: offset, y: offset),
-            CGSize(width: offset * 2, height: offset * 2)
         )
     }
 

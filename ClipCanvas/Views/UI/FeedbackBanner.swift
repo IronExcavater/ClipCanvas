@@ -2,14 +2,15 @@ import SwiftUI
 
 struct FeedbackBanner: View {
     let message: String
+    var kind: FeedbackKind?
 
-    private var kind: FeedbackKind { FeedbackKind(message: message) }
+    private var resolvedKind: FeedbackKind { kind ?? FeedbackKind(message: message) }
 
     var body: some View {
         HStack(spacing: 8) {
-            Image(systemName: kind.systemImage)
+            Image(systemName: resolvedKind.systemImage)
                 .font(.system(size: 14, weight: .semibold))
-                .foregroundStyle(kind.tint)
+                .foregroundStyle(resolvedKind.tint)
             Text(message)
                 .font(.subheadline.weight(.semibold))
                 .lineLimit(1)
@@ -24,7 +25,7 @@ struct FeedbackBanner: View {
     }
 }
 
-private enum FeedbackKind {
+enum FeedbackKind: Equatable {
     case success
     case failure
     case question

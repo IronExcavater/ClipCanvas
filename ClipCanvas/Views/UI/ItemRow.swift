@@ -59,7 +59,6 @@ struct SelectionIndicator: View {
         Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
             .font(.system(size: 20, weight: .semibold))
             .foregroundStyle(isSelected ? Color.accentColor : .secondary)
-            .padding(.top, 3)
             .animation(.easeInOut(duration: 0.15), value: isSelected)
     }
 }

@@ -68,7 +68,6 @@ struct CanvasDrawToolSettingsPanel: View {
                     .frame(width: 34, alignment: .trailing)
             }
         }
-        .padding(.horizontal, 20)
         .allowsHitTesting(true)
     }
 

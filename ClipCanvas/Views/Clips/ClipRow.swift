@@ -44,17 +44,18 @@ struct ClipRow: View {
         .onTapGesture(perform: primaryAction)
         .accessibilityAddTraits(.isButton)
         .swipeActions(edge: .leading) {
-            Button(action: { ClipActionService.togglePin(clip) }) {
-                Image(systemName: clip.isPinned ? "pin.slash" : "pin")
+            AppSwipeIconButton(
+                systemImage: clip.isPinned ? "pin.slash" : "pin",
+                tint: .orange,
+                accessibilityLabel: clip.isPinned ? "Unpin" : "Pin"
+            ) {
+                ClipActionService.togglePin(clip)
             }
-            .tint(.orange)
-            .accessibilityLabel(clip.isPinned ? "Unpin" : "Pin")
         }
         .swipeActions(edge: .trailing) {
-            Button(role: .destructive, action: { ClipActionService.softDelete(clip) }) {
-                Image(systemName: "trash")
+            AppSwipeIconButton(systemImage: "trash", role: .destructive, accessibilityLabel: "Delete") {
+                ClipActionService.softDelete(clip)
             }
-            .accessibilityLabel("Delete")
         }
         .contextMenu {
             Button("Copy", systemImage: "doc.on.doc") { ClipActionService.copy(clip) }

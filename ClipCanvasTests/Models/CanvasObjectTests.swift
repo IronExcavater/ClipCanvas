@@ -48,6 +48,16 @@ import Testing
         #expect(workspace.canvasObjects.map(\.id).contains(object.id))
     }
 
+    @Test func canvasContentExcludesInfrastructureObjects() {
+        let note = CanvasObject(kind: .stickyNote, x: 0, y: 0, width: 220, height: 140)
+        let drawing = CanvasObject(kind: .drawing, x: 0, y: 0, width: 1, height: 1)
+        let connector = CanvasObject(kind: .connector, x: 0, y: 0, width: 1, height: 1)
+
+        #expect(note.isCanvasContent)
+        #expect(!drawing.isCanvasContent)
+        #expect(!connector.isCanvasContent)
+    }
+
     @Test func clipBackedObjectReferencesClipWithoutCopyingContent() {
         let clip = Clip(content: "Original clipboard text", origin: .clipboard)
         let object = CanvasObject(

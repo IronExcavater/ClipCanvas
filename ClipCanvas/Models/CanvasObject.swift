@@ -190,6 +190,10 @@ extension CanvasObject {
         return clip?.deletedAt == nil
     }
 
+    var isCanvasContent: Bool {
+        isVisible && kind != .connector && kind != .drawing
+    }
+
     func markUpdated(at date: Date = Date()) {
         updatedAt = date
     }

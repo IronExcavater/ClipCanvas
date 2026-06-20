@@ -30,13 +30,10 @@ struct TrashItemRow: View {
         }
         .onTapGesture { if isSelecting { onTap() } }
         .swipeActions(edge: .leading) {
-            Button(action: onRestore) { Image(systemName: "arrow.counterclockwise") }
-                .tint(.green)
-                .accessibilityLabel("Restore")
+            AppSwipeIconButton(systemImage: "arrow.counterclockwise", tint: .green, accessibilityLabel: "Restore", action: onRestore)
         }
         .swipeActions(edge: .trailing) {
-            Button(role: .destructive, action: onDeleteForever) { Image(systemName: "trash") }
-                .accessibilityLabel("Delete Forever")
+            AppSwipeIconButton(systemImage: "trash", role: .destructive, accessibilityLabel: "Delete Forever", action: onDeleteForever)
         }
         .contextMenu {
             if let onAddToCanvas {

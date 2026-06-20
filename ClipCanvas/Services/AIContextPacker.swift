@@ -63,7 +63,7 @@ enum AIContextPacker {
         recentClips: [Clip]
     ) -> AIContextSnapshot {
         let preset = AIModelPresetService.preset(for: mode)
-        let liveObjects = workspace.canvasObjects.filter(\.isVisible)
+        let liveObjects = workspace.canvasObjects.filter(\.isCanvasContent)
         let objectByID = Dictionary(uniqueKeysWithValues: liveObjects.map { ($0.id, $0) })
         var items: [AIContextItem] = []
         var seenKeys = Set<String>()
@@ -72,7 +72,7 @@ enum AIContextPacker {
         for attachment in attachments(from: chat) {
             let item: AIContextItem?
             if let object = attachment.canvasObject {
-                guard object.isVisible else { continue }
+                guard object.isCanvasContent else { continue }
                 item = self.item(for: object, source: .attachment)
             } else if let clip = attachment.clip {
                 item = self.item(for: clip, source: .attachment)

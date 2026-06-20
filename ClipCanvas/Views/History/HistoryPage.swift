@@ -138,7 +138,7 @@ struct HistoryPage: View {
 
     private func handlePrimaryAction(_ clip: Clip) {
         if expandedClipID == clip.id { expandedClipID = nil }
-        else { ClipActionService.copy(clip); expandedClipID = clip.id; showFeedback("Copied") }
+        else { ClipActionService.copy(clip); expandedClipID = clip.id; showFeedback("Copied", kind: .success) }
     }
 
     private func clearHistory() {
@@ -152,8 +152,8 @@ struct HistoryPage: View {
         selection.end()
     }
 
-    private func showFeedback(_ message: String) {
-        feedbackPresenter.show(message, duration: .seconds(1.5))
+    private func showFeedback(_ message: String, kind: FeedbackKind? = nil) {
+        feedbackPresenter.show(message, kind: kind, duration: .seconds(1.5))
     }
 }
 

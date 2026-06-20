@@ -87,6 +87,24 @@ struct AppToolbarCircleButton: View {
     }
 }
 
+struct AppSwipeIconButton: View {
+    let systemImage: String
+    var tint: Color?
+    var role: ButtonRole?
+    let accessibilityLabel: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(role: role, action: action) {
+            Image(systemName: systemImage)
+        }
+        .if(tint != nil) { view in
+            view.tint(tint ?? .accentColor)
+        }
+        .accessibilityLabel(accessibilityLabel)
+    }
+}
+
 /// A small system icon in a coloured circle — used consistently in list rows throughout the app.
 struct AppIconBadge: View {
     let systemImage: String

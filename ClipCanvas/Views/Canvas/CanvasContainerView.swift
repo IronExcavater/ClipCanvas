@@ -50,6 +50,7 @@ struct CanvasContainerView: View {
     @State var isCanvasSearchActive = false
     @State var isImagePickerPresented = false
     @State var selectedPhotoItem: PhotosPickerItem?
+    @State var isLoadingPersistedDrawing = false
     @State private var confirmingClearCanvas = false
     @FocusState var renameFocused: Bool
     @FocusState var searchFocused: Bool
@@ -177,14 +178,7 @@ struct CanvasContainerView: View {
             .ignoresSafeArea(.container, edges: .bottom)
 
             if let tool = drawToolSettings {
-                VStack(spacing: 0) {
-                    Color.clear
-                        .contentShape(Rectangle())
-                        .onTapGesture {
-                            withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
-                                drawToolSettings = nil
-                            }
-                        }
+                CanvasBottomOverlay(bottomPadding: 82, onDismiss: dismissDrawToolSettings) {
                     CanvasDrawToolSettingsPanel(
                         tool: tool,
                         color: drawColor(for: tool),
@@ -193,21 +187,23 @@ struct CanvasContainerView: View {
                         onChangeWidth: { setDrawWidth($0, for: tool) },
                         onDismiss: { drawToolSettings = nil }
                     )
-                    .padding(.bottom, 82)
                 }
                 .transition(.move(edge: .bottom).combined(with: .opacity))
                 .zIndex(7)
-                .ignoresSafeArea(.container, edges: .bottom)
             }
 
             if let clips = tagClips {
-                CanvasTagPanel(clips: clips, onDismiss: { tagClips = nil })
+                CanvasBottomOverlay(onDismiss: { tagClips = nil }) {
+                    CanvasTagPanel(clips: clips, onDismiss: { tagClips = nil })
+                }
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .zIndex(8)
             }
 
             if let objects = colorObjects {
-                CanvasColorPanel(objects: objects, onDismiss: { colorObjects = nil })
+                CanvasBottomOverlay(onDismiss: { colorObjects = nil }) {
+                    CanvasColorPanel(objects: objects, onDismiss: { colorObjects = nil })
+                }
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .zIndex(9)
             }
@@ -234,6 +230,7 @@ struct CanvasContainerView: View {
         .focusedSceneValue(\.canvasCommandActions, canvasCommandActions)
         .onAppear {
             context.undoManager = undoManager
+            loadPersistedDrawing()
             startClipboardListening()
         }
         .onDisappear {
@@ -253,6 +250,12 @@ struct CanvasContainerView: View {
             } else {
                 stopClipboardListening()
             }
+        }
+        .onChange(of: workspace.id) { _, _ in
+            loadPersistedDrawing()
+        }
+        .onChange(of: activeDrawing) { _, drawing in
+            persistActiveDrawing(drawing)
         }
         // Tapping the canvas background deselects everything - also exit inline editing
         // so the keyboard dismisses instead of staying up with no selected card.
@@ -299,7 +302,7 @@ struct CanvasContainerView: View {
 
     private var selectedInspectorObjects: [CanvasObject] {
         orderedCanvasObjects(matching: selectedObjectIDs)
-            .filter { $0.kind != .connector }
+            .filter(\.isCanvasContent)
     }
 
     private func shouldUseInspector(width: CGFloat) -> Bool {
@@ -324,6 +327,12 @@ struct CanvasContainerView: View {
             get: { usesInspector ? nil : activeAIChat },
             set: { activeAIChat = $0 }
         )
+    }
+
+    private func dismissDrawToolSettings() {
+        withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
+            drawToolSettings = nil
+        }
     }
 
     private var canvasCommandActions: CanvasCommandActions {
@@ -399,15 +408,14 @@ struct CanvasContainerView: View {
     }
 
     var visibleCanvasObjectCount: Int {
-        workspace.canvasObjects.filter { $0.isVisible && $0.kind != .connector }.count
+        workspace.canvasObjects.filter(\.isCanvasContent).count
     }
 
     var canvasSearchResultCount: Int {
         let query = canvasSearch.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         guard !query.isEmpty else { return visibleCanvasObjectCount }
         return workspace.canvasObjects.filter { object in
-            object.isVisible
-            && object.kind != .connector
+            object.isCanvasContent
             && canvasObject(object, matchesSearch: query)
         }.count
     }

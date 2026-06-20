@@ -67,3 +67,35 @@ struct CanvasOverlayPanel<Content: View>: View {
         .contentShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
     }
 }
+
+struct CanvasBottomOverlay<Content: View>: View {
+    var horizontalPadding: CGFloat = 18
+    var bottomPadding: CGFloat = 92
+    let onDismiss: () -> Void
+    @ViewBuilder let content: Content
+
+    init(
+        horizontalPadding: CGFloat = 18,
+        bottomPadding: CGFloat = 92,
+        onDismiss: @escaping () -> Void,
+        @ViewBuilder content: () -> Content
+    ) {
+        self.horizontalPadding = horizontalPadding
+        self.bottomPadding = bottomPadding
+        self.onDismiss = onDismiss
+        self.content = content()
+    }
+
+    var body: some View {
+        VStack(spacing: 0) {
+            Color.clear
+                .contentShape(Rectangle())
+                .onTapGesture(perform: onDismiss)
+
+            content
+                .padding(.horizontal, horizontalPadding)
+                .padding(.bottom, bottomPadding)
+        }
+        .ignoresSafeArea(.container, edges: .bottom)
+    }
+}

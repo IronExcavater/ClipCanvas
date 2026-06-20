@@ -5,6 +5,7 @@ import SwiftUI
 struct FeedbackItem: Identifiable, Equatable {
     let id: UUID
     let message: String
+    var kind: FeedbackKind?
 }
 
 @MainActor
@@ -16,11 +17,12 @@ final class FeedbackPresenter {
     @discardableResult
     func show(
         _ message: String,
+        kind: FeedbackKind? = nil,
         duration: Duration = .seconds(1.7),
         autoDismiss: Bool = true
     ) -> FeedbackItem {
         hideTask?.cancel()
-        let next = FeedbackItem(id: UUID(), message: message)
+        let next = FeedbackItem(id: UUID(), message: message, kind: kind)
         withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
             item = next
         }
@@ -52,7 +54,7 @@ struct FeedbackOverlayModifier: ViewModifier {
         content
             .overlay(alignment: .top) {
                 if let item = presenter.item {
-                    FeedbackBanner(message: item.message)
+                    FeedbackBanner(message: item.message, kind: item.kind)
                         .id(item.id)
                         .padding(.top, topPadding)
                         .transition(

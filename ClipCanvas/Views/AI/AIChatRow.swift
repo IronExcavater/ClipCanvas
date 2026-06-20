@@ -12,10 +12,9 @@ struct AIChatPreviewRow: View {
         }
         .onTapGesture(perform: onOpen)
         .swipeActions(edge: .trailing, allowsFullSwipe: true) {
-            Button(role: .destructive) { chat.softDelete() } label: {
-                Image(systemName: "trash")
+            AppSwipeIconButton(systemImage: "trash", role: .destructive, accessibilityLabel: "Delete") {
+                chat.softDelete()
             }
-            .accessibilityLabel("Delete")
         }
         .contextMenu {
             Button("Delete", systemImage: "trash", role: .destructive) { chat.softDelete() }

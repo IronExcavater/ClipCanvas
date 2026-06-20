@@ -5,13 +5,13 @@ extension CanvasContainerView {
 
     func paste() {
         guard let content = ClipboardService.readContent() else {
-            showFeedback("Clipboard is empty")
+            showFeedback("Clipboard is empty", kind: .info)
             return
         }
         let (clip, isNew) = Clip.findOrMake(from: content, origin: .clipboard, in: context)
         if isNew { context.insert(clip) }
         workspace.place(clip: clip, at: workspace.nextPosition(around: visibleViewportCenter))
-        showFeedback("Pasted")
+        showFeedback("Pasted", kind: .success)
     }
 
     func startClipboardListening() {
@@ -42,6 +42,9 @@ extension CanvasContainerView {
     func captureClipboardContent(_ content: ClipboardContent) {
         let (clip, isNew) = Clip.findOrMake(from: content, origin: .clipboard, in: context)
         if isNew { context.insert(clip) }
-        showFeedback(isNew ? "Captured from clipboard" : "Clipboard already saved")
+        showFeedback(
+            isNew ? "Captured from clipboard" : "Clipboard already saved",
+            kind: isNew ? .success : .info
+        )
     }
 }

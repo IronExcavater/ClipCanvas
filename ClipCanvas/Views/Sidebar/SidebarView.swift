@@ -39,7 +39,7 @@ struct SidebarView: View {
     }
 
     private var activeWorkspaceVisibleCardCount: Int {
-        activeWorkspace?.canvasObjects.filter { $0.isVisible && $0.kind != .connector }.count ?? 0
+        activeWorkspace?.canvasObjects.filter(\.isCanvasContent).count ?? 0
     }
 
     var body: some View {

@@ -1,4 +1,5 @@
 import Testing
+import SwiftUI
 @testable import ClipCanvas
 
 @Suite struct MarkdownPreviewTests {
@@ -31,5 +32,36 @@ import Testing
         } else {
             Issue.record("Expected ordered list item to render as a bullet preview")
         }
+    }
+
+    @Test func rendersHighlightsWithoutMarkers() {
+        let attributed = MarkdownPreview.attributedString(for: "Ship ==highlighted **text**== today")
+
+        #expect(String(attributed.characters) == "Ship highlighted text today")
+        #expect(attributed.runs.contains { $0.backgroundColor != nil })
+    }
+
+    @Test func rendersBoldItalicCombinationWithoutMarkers() {
+        let attributed = MarkdownPreview.attributedString(for: "***Important*** and *quiet*")
+
+        #expect(String(attributed.characters) == "Important and quiet")
+        #expect(attributed.runs.contains { run in
+            run.inlinePresentationIntent?.contains(.stronglyEmphasized) == true
+            && run.inlinePresentationIntent?.contains(.emphasized) == true
+        })
+    }
+
+    @Test func preservesUnmatchedMarkersLiterally() {
+        let attributed = MarkdownPreview.attributedString(for: "Keep ==unfinished and **open")
+
+        #expect(String(attributed.characters) == "Keep ==unfinished and **open")
+    }
+
+    @Test func rendersMarkdownLinksAsTappableText() throws {
+        let attributed = MarkdownPreview.attributedString(for: "Open [Card](clipcanvas://object/00000000-0000-0000-0000-000000000001)")
+
+        #expect(String(attributed.characters) == "Open Card")
+        let link = try #require(attributed.runs.compactMap(\.link).first)
+        #expect(link.absoluteString == "clipcanvas://object/00000000-0000-0000-0000-000000000001")
     }
 }

@@ -62,7 +62,7 @@ struct WorkspaceRow: View {
     }
 
     private var cardCountText: String {
-        let count = workspace.canvasObjects.filter(\.isVisible).count
+        let count = workspace.canvasObjects.filter(\.isCanvasContent).count
         return "\(count)"
     }
 }

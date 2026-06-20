@@ -22,4 +22,12 @@ import Testing
 
         #expect(presenter.item == nil)
     }
+
+    @Test func explicitFeedbackKindIsStored() {
+        let presenter = FeedbackPresenter()
+
+        presenter.show("Clipboard is empty", kind: .info, autoDismiss: false)
+
+        #expect(presenter.item?.kind == .info)
+    }
 }

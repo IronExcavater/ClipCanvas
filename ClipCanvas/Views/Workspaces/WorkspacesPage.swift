@@ -57,15 +57,14 @@ struct WorkspacesPage: View {
                 )
                 .appListItemRowInsets(vertical: 3)
                 .swipeActions(edge: .leading) {
-                    Button { beginRename(ws) } label: { Image(systemName: "pencil") }
-                        .tint(.blue)
-                        .accessibilityLabel("Rename")
+                    AppSwipeIconButton(systemImage: "pencil", tint: .blue, accessibilityLabel: "Rename") {
+                        beginRename(ws)
+                    }
                 }
                 .swipeActions(edge: .trailing) {
-                    Button(role: .destructive) { WorkspaceActionService.softDelete(ws, among: workspaces) } label: {
-                        Image(systemName: "trash")
+                    AppSwipeIconButton(systemImage: "trash", role: .destructive, accessibilityLabel: "Delete") {
+                        WorkspaceActionService.softDelete(ws, among: workspaces)
                     }
-                    .accessibilityLabel("Delete")
                 }
             }
         }
