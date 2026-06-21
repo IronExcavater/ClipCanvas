@@ -29,6 +29,8 @@ struct CanvasToolbar: View {
     var onDrawTool: (CanvasDrawTool) -> Void = { _ in }
     var onDrawToolSettings: (CanvasDrawTool) -> Void = { _ in }
 
+    @Namespace private var glassNamespace
+
     private var configuration: CanvasToolbarConfiguration {
         CanvasToolbarConfiguration.make(
             selectedCount: selectedCount,
@@ -41,15 +43,16 @@ struct CanvasToolbar: View {
     private let iconSize: CGFloat = 17
 
     var body: some View {
-        HStack(spacing: 2) {
-            ForEach(configuration.items, id: \.self) { item in
-                toolbarItem(item)
-                    .transition(.opacity.combined(with: .scale(scale: 0.92)))
+        AppGlassEffectContainer(spacing: 2) {
+            HStack(spacing: 2) {
+                ForEach(configuration.items, id: \.self) { item in
+                    toolbarItem(item)
+                        .transition(.opacity.combined(with: .scale(scale: 0.92)))
+                }
             }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .glassCapsule()
         .contentShape(Capsule())
         .onTapGesture {}
         .padding(.horizontal, 20)
@@ -60,7 +63,7 @@ struct CanvasToolbar: View {
 
     @ViewBuilder
     private func toolbarItem(_ item: CanvasToolbarItem) -> some View {
-        Group {
+        let content = Group {
             switch item {
             case .paste:
                 toolButton("clipboard", action: onPaste)
@@ -117,6 +120,12 @@ struct CanvasToolbar: View {
         .accessibilityLabel(item.label)
         .accessibilityHidden(item == .divider)
         .help(item.label)
+
+        if item == .divider {
+            content
+        } else {
+            content.glassMorphItem(id: item, in: glassNamespace)
+        }
     }
 
     private func modeButton(_ icon: String, for target: CanvasMode) -> some View {

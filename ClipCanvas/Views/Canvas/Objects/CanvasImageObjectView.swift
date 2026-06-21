@@ -23,7 +23,7 @@ struct CanvasImageObjectView: View {
                 onToggleExpandedSize: onToggleExpandedSize
             )
             .padding(2)
-            .background(.regularMaterial, in: Circle())
+            .background { AppGlassSurface(shape: .circle, interactive: true) }
             .shadow(color: .black.opacity(0.14), radius: 8, y: 3)
             .padding(5)
         }

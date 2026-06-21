@@ -98,3 +98,34 @@ private extension View {
         }
     }
 }
+
+/// Groups several glass items so adjacent shapes optically blend and morph together
+/// (iOS 26 Liquid Glass). Pre-26, items just sit on one shared capsule, matching the
+/// old flat look.
+struct AppGlassEffectContainer<Content: View>: View {
+    var spacing: CGFloat = 2
+    @ViewBuilder var content: () -> Content
+
+    var body: some View {
+        if #available(iOS 26, *) {
+            GlassEffectContainer(spacing: spacing) { content() }
+        } else {
+            content().glassCapsule()
+        }
+    }
+}
+
+extension View {
+    /// Makes a toolbar-style item a real Liquid Glass shape that can morph against its
+    /// siblings inside an `AppGlassEffectContainer` as the item set changes. No-op pre-26.
+    @ViewBuilder
+    func glassMorphItem<ID: Hashable>(tint: Color? = nil, interactive: Bool = true, id: ID, in namespace: Namespace.ID) -> some View {
+        if #available(iOS 26, *) {
+            self
+                .appGlassEffect(tint: tint, interactive: interactive, in: .circle)
+                .glassEffectID(id, in: namespace)
+        } else {
+            self
+        }
+    }
+}
