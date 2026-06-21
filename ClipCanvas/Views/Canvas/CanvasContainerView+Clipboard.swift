@@ -33,7 +33,12 @@ extension CanvasContainerView {
     // A single check on launch/foreground rather than a continuous poll - polling the
     // pasteboard in the background triggers the system "Allow Paste" prompt on every
     // change, which is what the clipboard-monitoring toggle exists to avoid.
+    //
+    // Skipped under the test runner: xcodebuild test launches this app as the unit
+    // test host, so .onAppear still fires - reading the real pasteboard there pops
+    // the OS-level "Allow Paste" alert with no automation to dismiss it, hanging the run.
     func checkClipboardOnForeground() {
+        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
         guard clipboardMonitoringEnabled else { return }
         guard let content = ClipboardService.readContent() else { return }
         defer { lastClipboardFingerprint = content.fingerprint }
