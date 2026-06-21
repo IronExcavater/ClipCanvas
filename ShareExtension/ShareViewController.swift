@@ -18,6 +18,11 @@ final class ShareViewController: PlatformViewController {
         extractAndSave()
     }
     #elseif canImport(AppKit)
+    // No storyboard/nib backs this controller, so AppKit needs an explicit view.
+    override func loadView() {
+        view = NSView()
+    }
+
     override func viewDidAppear() {
         super.viewDidAppear()
         extractAndSave()
