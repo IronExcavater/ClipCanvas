@@ -3,7 +3,9 @@ import SwiftUI
 struct AppConfirmationOverlay: View {
     let title: String
     var message: String?
+    var cancelTitle = "Cancel"
     var destructiveTitle = "Delete"
+    var isDestructive = true
     let onConfirm: () -> Void
     let onCancel: () -> Void
 
@@ -27,13 +29,13 @@ struct AppConfirmationOverlay: View {
                 }
 
                 HStack(spacing: 10) {
-                    Button("Cancel", action: onCancel)
+                    Button(cancelTitle, action: onCancel)
                         .buttonStyle(AppConfirmationButtonStyle())
 
-                    Button(role: .destructive, action: onConfirm) {
+                    Button(role: isDestructive ? .destructive : nil, action: onConfirm) {
                         Text(destructiveTitle)
                     }
-                    .buttonStyle(AppConfirmationButtonStyle(tint: .red))
+                    .buttonStyle(AppConfirmationButtonStyle(tint: isDestructive ? .red : Color.accentColor))
                 }
             }
             .padding(18)

@@ -46,6 +46,8 @@ struct CanvasContainerView: View {
     @State private var measuredTopChromeHeight: CGFloat = 60
     @State var lastClipboardFingerprint: String?
     @AppStorage("settings.clipboardMonitoringEnabled") var clipboardMonitoringEnabled = true
+    @AppStorage("settings.hasNudgedClipboardPermission") var hasNudgedClipboardPermission = false
+    @State var showClipboardPermissionNudge = false
     @State var canvasSearch = ""
     @State var isCanvasSearchActive = false
     @State var isImagePickerPresented = false
@@ -224,6 +226,24 @@ struct CanvasContainerView: View {
                     onCancel: { confirmingClearCanvas = false }
                 )
                 .zIndex(30)
+            }
+
+            if showClipboardPermissionNudge {
+                AppConfirmationOverlay(
+                    title: "Stop the clipboard prompt?",
+                    message: "iOS just asked to allow pasting from other apps. Open Settings → ClipCanvas → Paste from Other Apps and set it to Allow, and it won't ask again.",
+                    cancelTitle: "Not Now",
+                    destructiveTitle: "Open Settings",
+                    isDestructive: false,
+                    onConfirm: {
+                        showClipboardPermissionNudge = false
+                        #if canImport(UIKit)
+                        UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
+                        #endif
+                    },
+                    onCancel: { showClipboardPermissionNudge = false }
+                )
+                .zIndex(31)
             }
 
         }

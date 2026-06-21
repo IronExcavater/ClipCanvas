@@ -16,6 +16,9 @@ struct SettingsPage: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
                 #if canImport(UIKit)
+                Text("Still being asked to allow pasting? Open Settings → ClipCanvas → Paste from Other Apps and set it to Allow — iOS won't ask again after that.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
                 Button {
                     UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
                 } label: {

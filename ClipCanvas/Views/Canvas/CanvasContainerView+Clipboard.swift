@@ -42,6 +42,16 @@ extension CanvasContainerView {
         guard clipboardMonitoringEnabled else { return }
         guard let content = ClipboardService.readContent() else { return }
         defer { lastClipboardFingerprint = content.fingerprint }
+        #if canImport(UIKit)
+        // The OS "Allow Paste" alert fires as a side effect of the readContent() call
+        // above. iOS keeps re-asking unless the user flips Settings -> ClipCanvas ->
+        // Paste from Other Apps to Allow - that toggle only appears after the first ask,
+        // so nudge the user toward it right after this first successful read.
+        if !hasNudgedClipboardPermission {
+            hasNudgedClipboardPermission = true
+            showClipboardPermissionNudge = true
+        }
+        #endif
         guard content.fingerprint != lastClipboardFingerprint,
               !ClipboardService.wasRecentlyImported(content) else { return }
         captureClipboardContent(content)
