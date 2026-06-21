@@ -44,8 +44,8 @@ struct CanvasContainerView: View {
     @State var highlighterWidth: CGFloat = 20
     @State var eraserWidth: CGFloat = 34
     @State private var measuredTopChromeHeight: CGFloat = 60
-    @State var clipboardWatcherTask: Task<Void, Never>?
     @State var lastClipboardFingerprint: String?
+    @AppStorage("settings.clipboardMonitoringEnabled") var clipboardMonitoringEnabled = true
     @State var canvasSearch = ""
     @State var isCanvasSearchActive = false
     @State var isImagePickerPresented = false
@@ -163,6 +163,8 @@ struct CanvasContainerView: View {
                     onArrangeSelection: { zoomCommand = .arrangeSelection },
                     onDuplicate: duplicateSelected,
                     onColor: showSelectedColors,
+                    onCopyToClipboard: copySelectedToClipboard,
+                    onPasteFromClipboard: pasteClipboardIntoSelected,
                     onFormatBold: { noteTextCommand = NoteTextCommand(kind: .bold) },
                     onFormatItalic: { noteTextCommand = NoteTextCommand(kind: .italic) },
                     onFormatBullet: { noteTextCommand = NoteTextCommand(kind: .bullet) },
@@ -233,10 +235,7 @@ struct CanvasContainerView: View {
         .onAppear {
             context.undoManager = undoManager
             loadPersistedDrawing()
-            startClipboardListening()
-        }
-        .onDisappear {
-            stopClipboardListening()
+            checkClipboardOnForeground()
         }
         .onChange(of: mode) { _, newMode in
             if newMode != .edit {
@@ -248,10 +247,14 @@ struct CanvasContainerView: View {
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active {
-                startClipboardListening()
-            } else {
-                stopClipboardListening()
+                checkClipboardOnForeground()
             }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .copyToCanvasRequested)) { _ in
+            paste()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .sharedTextReceived)) { note in
+            if let text = note.object as? String { addSharedText(text) }
         }
         .onChange(of: workspace.id) { _, _ in
             loadPersistedDrawing()

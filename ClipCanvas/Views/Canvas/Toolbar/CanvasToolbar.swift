@@ -15,6 +15,8 @@ struct CanvasToolbar: View {
     let onArrangeSelection: () -> Void
     let onDuplicate: () -> Void
     let onColor: () -> Void
+    let onCopyToClipboard: () -> Void
+    let onPasteFromClipboard: () -> Void
     let onFormatBold: () -> Void
     let onFormatItalic: () -> Void
     let onFormatBullet: () -> Void
@@ -82,6 +84,10 @@ struct CanvasToolbar: View {
                 toolButton("plus.square.on.square", action: onDuplicate)
             case .color:
                 toolButton("paintpalette", action: onColor)
+            case .copyToClipboard:
+                toolButton("doc.on.doc", action: onCopyToClipboard)
+            case .pasteFromClipboard:
+                toolButton("doc.on.clipboard", action: onPasteFromClipboard)
             case .formatBold:
                 toolButton("bold", action: onFormatBold)
             case .formatItalic:

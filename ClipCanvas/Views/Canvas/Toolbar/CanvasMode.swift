@@ -43,6 +43,8 @@ nonisolated enum CanvasToolbarItem: Hashable {
     case arrangeSelection
     case duplicate
     case color
+    case copyToClipboard
+    case pasteFromClipboard
     case formatBold
     case formatItalic
     case formatBullet
@@ -68,6 +70,8 @@ nonisolated enum CanvasToolbarItem: Hashable {
         case .arrangeSelection: "Arrange"
         case .duplicate: "Duplicate"
         case .color: "Color"
+        case .copyToClipboard: "Copy to Clipboard"
+        case .pasteFromClipboard: "Paste from Clipboard"
         case .formatBold: "Bold"
         case .formatItalic: "Italic"
         case .formatBullet: "Bullets"
@@ -166,6 +170,10 @@ nonisolated struct CanvasToolbarConfiguration: Hashable {
                     if selectionKind == .clip || selectionKind == .image {
                         items.append(.details)
                     }
+                }
+                items.append(.copyToClipboard)
+                if selectedCount == 1, selectionKind == .text || selectionKind == .clip {
+                    items.append(.pasteFromClipboard)
                 }
                 items.append(contentsOf: [.duplicate, .arrangeSelection, .delete])
                 return CanvasToolbarConfiguration(items: items)

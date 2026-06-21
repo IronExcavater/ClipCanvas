@@ -1,11 +1,29 @@
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct SettingsPage: View {
     @AppStorage("settings.trashRetentionDays") private var trashRetentionDays = TrashRetentionService.defaultRetentionDays
     @AppStorage(OpenAIConfiguration.apiKeyUserDefaultsKey) private var openAIAPIKey = ""
+    @AppStorage("settings.clipboardMonitoringEnabled") private var clipboardMonitoringEnabled = true
 
     var body: some View {
         List {
+            Section("Clipboard") {
+                Toggle("Monitor Clipboard", isOn: $clipboardMonitoringEnabled)
+                Text("When on, ClipCanvas checks your clipboard when the app opens or returns to the foreground and saves new copies to your history.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                #if canImport(UIKit)
+                Button {
+                    UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
+                } label: {
+                    Label("Open System Settings", systemImage: "gear")
+                }
+                #endif
+            }
+
             Section("AI") {
                 SecureField("OpenAI API key", text: $openAIAPIKey)
                     .textContentType(.password)

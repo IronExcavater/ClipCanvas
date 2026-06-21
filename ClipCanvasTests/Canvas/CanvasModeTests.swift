@@ -37,6 +37,8 @@ import Testing
             .askAI,
             .editContent,
             .details,
+            .copyToClipboard,
+            .pasteFromClipboard,
             .duplicate,
             .arrangeSelection,
             .delete
@@ -49,6 +51,8 @@ import Testing
         #expect(configuration.items == [
             .askAI,
             .editContent,
+            .copyToClipboard,
+            .pasteFromClipboard,
             .duplicate,
             .arrangeSelection,
             .delete
@@ -60,6 +64,7 @@ import Testing
 
         #expect(configuration.items == [
             .askAI,
+            .copyToClipboard,
             .duplicate,
             .arrangeSelection,
             .delete
