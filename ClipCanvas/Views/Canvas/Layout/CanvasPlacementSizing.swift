@@ -115,6 +115,7 @@ enum CanvasPlacementSizing {
         if clip?.type == .image {
             return imageSize(for: proposed, aspectRatio: aspectRatio, snapsToGrid: snapsToGrid)
         }
+        guard snapsToGrid else { return clampedSize(proposed) }
         return clampedSize(snap(
             proposed,
             widthStep: characterWidth,
