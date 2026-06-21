@@ -1,5 +1,10 @@
 import CoreGraphics
 import Foundation
+#if canImport(UIKit)
+import UIKit
+#elseif canImport(AppKit)
+import AppKit
+#endif
 
 enum CanvasPlacementSizing {
     static let characterWidth: CGFloat = 8
@@ -23,17 +28,37 @@ enum CanvasPlacementSizing {
 
     static func toggledSize(for object: CanvasObject, availableScreenWidth: CGFloat? = nil) -> CGSize {
         if isExpanded(width: object.width, height: object.height) { return minimumSize }
-        return expandedSize(for: object.clip, fallbackText: object.text, availableScreenWidth: availableScreenWidth)
+        return expandedSize(
+            for: object.clip,
+            fallbackText: object.text,
+            availableScreenWidth: availableScreenWidth,
+            aspectRatio: imageAspectRatio(for: object.clip)
+        )
     }
 
     static func expandedSize(for clip: Clip?, availableScreenWidth: CGFloat? = nil) -> CGSize {
-        expandedSize(for: clip, fallbackText: nil, availableScreenWidth: availableScreenWidth)
+        expandedSize(
+            for: clip,
+            fallbackText: nil,
+            availableScreenWidth: availableScreenWidth,
+            aspectRatio: imageAspectRatio(for: clip)
+        )
     }
 
-    static func expandedSize(for clip: Clip?, fallbackText: String?, availableScreenWidth: CGFloat? = nil) -> CGSize {
+    static func expandedSize(
+        for clip: Clip?,
+        fallbackText: String?,
+        availableScreenWidth: CGFloat? = nil,
+        aspectRatio: CGFloat? = nil
+    ) -> CGSize {
         if clip?.type == .image {
             let width = min(max((availableScreenWidth ?? 360) - 48, 300), maximumSize.width)
-            return snappedSize(CGSize(width: width, height: min(width * 0.78, maximumSize.height)), for: clip)
+            let ratio = aspectRatio ?? 1.28
+            return snappedSize(
+                CGSize(width: width, height: width / max(ratio, 0.001)),
+                for: clip,
+                aspectRatio: ratio
+            )
         }
 
         let content = clip?.content.isEmpty == false ? (clip?.content ?? "") : (fallbackText ?? "")
@@ -73,17 +98,22 @@ enum CanvasPlacementSizing {
         return CGRect(x: frame.minX, y: y, width: targetSize.width, height: targetSize.height)
     }
 
-    static func previewSize(for session: CanvasResizeSession, scale: CGFloat) -> CGSize {
-        clampedSize(session.proposedSize(scale: scale))
+    static func previewSize(for session: CanvasResizeSession, scale: CGFloat, clip: Clip? = nil) -> CGSize {
+        snappedSize(session.proposedSize(scale: scale), for: clip, aspectRatio: imageAspectRatio(for: clip), snapsToGrid: false)
     }
 
     static func committedSize(for session: CanvasResizeSession, scale: CGFloat, clip: Clip?) -> CGSize {
-        snappedSize(session.proposedSize(scale: scale), for: clip)
+        snappedSize(session.proposedSize(scale: scale), for: clip, aspectRatio: imageAspectRatio(for: clip))
     }
 
-    static func snappedSize(_ proposed: CGSize, for clip: Clip?) -> CGSize {
+    static func snappedSize(
+        _ proposed: CGSize,
+        for clip: Clip?,
+        aspectRatio: CGFloat? = nil,
+        snapsToGrid: Bool = true
+    ) -> CGSize {
         if clip?.type == .image {
-            return clampedSize(snap(proposed, widthStep: 16, heightStep: 16, chrome: .zero))
+            return imageSize(for: proposed, aspectRatio: aspectRatio, snapsToGrid: snapsToGrid)
         }
         return clampedSize(snap(
             proposed,
@@ -116,6 +146,47 @@ enum CanvasPlacementSizing {
             width: proposed.width.clamped(to: minimumSize.width...maximumSize.width),
             height: proposed.height.clamped(to: minimumSize.height...maximumSize.height)
         )
+    }
+
+    private static func imageSize(for proposed: CGSize, aspectRatio: CGFloat?, snapsToGrid: Bool) -> CGSize {
+        let ratio = aspectRatio ?? max(proposed.width / max(proposed.height, 1), 0.001)
+        var width = proposed.width
+        var height = width / max(ratio, 0.001)
+
+        if height > maximumSize.height {
+            height = maximumSize.height
+            width = height * ratio
+        }
+        if width > maximumSize.width {
+            width = maximumSize.width
+            height = width / max(ratio, 0.001)
+        }
+        if width < minimumSize.width {
+            width = minimumSize.width
+            height = width / max(ratio, 0.001)
+        }
+        if height < minimumSize.height {
+            height = minimumSize.height
+            width = height * ratio
+        }
+
+        let clamped = clampedSize(CGSize(width: width, height: height))
+        guard snapsToGrid else { return clamped }
+        let snappedWidth = snapped(clamped.width, step: 16, chrome: 0)
+            .clamped(to: minimumSize.width...maximumSize.width)
+        let snappedHeight = (snappedWidth / max(ratio, 0.001))
+            .clamped(to: minimumSize.height...maximumSize.height)
+        return CGSize(width: snappedWidth, height: snappedHeight)
+    }
+
+    private static func imageAspectRatio(for clip: Clip?) -> CGFloat? {
+        guard clip?.type == .image,
+              let data = clip?.imageData,
+              let image = PlatformImage(data: data),
+              image.size.height > 0 else {
+            return nil
+        }
+        return image.size.width / image.size.height
     }
 
     private static func textSize(for text: String, width: CGFloat) -> CGSize {

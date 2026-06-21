@@ -35,16 +35,16 @@ import Testing
         #expect(workspace.canvasObjects.map(\.id).contains(object.id))
     }
 
-    @Test func workspaceCreatesFreeTextObjectAtCenter() {
+    @Test func workspaceCreatesTransparentNoteAtCenter() {
         let workspace = Workspace(name: "Board")
 
-        let object = workspace.createText(centeredAt: CGPoint(x: 300, y: 220), text: "Standalone heading")
+        let object = workspace.createTransparentNote(centeredAt: CGPoint(x: 300, y: 220), text: "Standalone heading")
 
-        #expect(object.kind == .text)
+        #expect(object.kind == .stickyNote)
         #expect(object.text == "Standalone heading")
         #expect(object.frame.midX == 300)
         #expect(object.frame.midY == 220)
-        #expect(object.style == .freeText)
+        #expect(object.style == .transparentNote)
         #expect(workspace.canvasObjects.map(\.id).contains(object.id))
     }
 

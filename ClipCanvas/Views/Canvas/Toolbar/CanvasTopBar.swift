@@ -19,17 +19,13 @@ struct CanvasTopBar: View {
     let onFitContent: () -> Void
     var onSearch: (() -> Void)? = nil
 
-    private func titleMaxWidth(in totalWidth: CGFloat) -> CGFloat {
+    private func titleMaxWidth(in totalWidth: CGFloat, editing: Bool) -> CGFloat {
         let horizontalPadding: CGFloat = 32
         let sideControls: CGFloat = 46 * 2
         let hStackSpacing: CGFloat = 12 * 2
         let minimumSpacerRoom: CGFloat = 16
-        return max(82, min(180, totalWidth - horizontalPadding - sideControls - hStackSpacing - minimumSpacerRoom))
-    }
-
-    private var renamePillWidth: CGFloat {
-        let estimated = CGFloat(max(renameText.count, 6)) * 11 + 34
-        return min(max(estimated, 94), 180)
+        let available = totalWidth - horizontalPadding - sideControls - hStackSpacing - minimumSpacerRoom
+        return editing ? max(118, available) : max(82, min(180, available))
     }
 
     var body: some View {
@@ -46,7 +42,7 @@ struct CanvasTopBar: View {
 
                     Spacer(minLength: 8)
 
-                    title(maxWidth: titleMaxWidth(in: proxy.size.width))
+                    title(maxWidth: titleMaxWidth(in: proxy.size.width, editing: isRenaming))
                         .layoutPriority(1)
                         .animation(.spring(response: 0.24, dampingFraction: 0.86), value: isRenaming)
                         .animation(.spring(response: 0.24, dampingFraction: 0.86), value: workspaceName)
@@ -105,7 +101,7 @@ struct CanvasTopBar: View {
                 .onDisappear {
                     if isRenaming { onCommitRename() }
                 }
-                .frame(width: min(renamePillWidth, maxWidth))
+                .frame(width: maxWidth)
                 .padding(.horizontal, 14)
                 .padding(.vertical, 8)
                 .background { WorkspaceTitleBackdrop() }
@@ -123,19 +119,36 @@ struct CanvasTopBar: View {
                 }
                 Button("Rename", systemImage: "pencil", action: onBeginRename)
             } label: {
-                Text(workspaceName)
-                    .font(.title3.weight(.semibold))
-                    .foregroundStyle(.primary)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                    .padding(.horizontal, 14)
-                    .padding(.vertical, 8)
-                    .frame(maxWidth: maxWidth)
-                    .background { WorkspaceTitleBackdrop() }
+                workspaceTitleLabel(maxWidth: maxWidth)
             }
             .buttonStyle(.plain)
             .simultaneousGesture(LongPressGesture(minimumDuration: 0.45).onEnded { _ in onBeginRename() })
         }
+    }
+
+    private func workspaceTitleLabel(maxWidth: CGFloat) -> some View {
+        ViewThatFits(in: .horizontal) {
+            workspaceTitleText
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background { WorkspaceTitleBackdrop() }
+                .fixedSize(horizontal: true, vertical: false)
+
+            workspaceTitleText
+                .frame(width: maxWidth - 28)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background { WorkspaceTitleBackdrop() }
+        }
+        .frame(maxWidth: maxWidth)
+    }
+
+    private var workspaceTitleText: some View {
+        Text(workspaceName)
+            .font(.title3.weight(.semibold))
+            .foregroundStyle(.primary)
+            .lineLimit(1)
+            .truncationMode(.tail)
     }
 }
 

@@ -21,6 +21,20 @@ import Testing
         ])
     }
 
+    @Test func chatTransformSkillCatalogMatchesBuiltInTextTransforms() {
+        let skills = AITransformSkill.allCases
+
+        #expect(skills.map(\.id) == [
+            "clip.cleanUp",
+            "clip.distill",
+            "clip.actionItems",
+            "clip.rewrite",
+            "clip.title",
+        ])
+        #expect(AITransformSkill.matching(message: "please make this a to-do list") == .actionItems)
+        #expect(AITransformSkill.matching(message: "summarize the selected cards") == .distill)
+    }
+
     @Test func cleanupUsesDeterministicFallbackWhenProviderUnavailable() async throws {
         let registry = TransformSkillRegistry(provider: FoundationTransformProvider(isAvailable: false))
         let result = try await registry.run(

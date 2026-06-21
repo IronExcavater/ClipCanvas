@@ -50,6 +50,8 @@ nonisolated struct CGPointCodable: Codable, Equatable {
 }
 
 nonisolated struct CanvasObjectStyle: Codable, Equatable {
+    static let transparentFillHex = "transparent"
+
     var fillHex: String
     var strokeHex: String?
     var textHex: String?
@@ -65,12 +67,29 @@ nonisolated struct CanvasObjectStyle: Codable, Equatable {
     )
 
     static let freeText = CanvasObjectStyle(
-        fillHex: "#FFFFFF",
+        fillHex: transparentFillHex,
         strokeHex: nil,
         textHex: "#1C1C1E",
         lineWidth: 0,
         fontSize: 19
     )
+
+    static let transparentNote = CanvasObjectStyle(
+        fillHex: transparentFillHex,
+        strokeHex: nil,
+        textHex: "#1C1C1E",
+        lineWidth: 0,
+        fontSize: 19
+    )
+
+    var hasTransparentFill: Bool {
+        Self.isTransparentFill(fillHex)
+    }
+
+    static func isTransparentFill(_ hex: String) -> Bool {
+        let normalized = hex.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        return normalized == transparentFillHex || normalized == "#00000000" || normalized == "00000000"
+    }
 }
 
 nonisolated struct CanvasConnectorEndpoint: Codable, Equatable {

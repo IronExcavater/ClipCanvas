@@ -35,7 +35,6 @@ enum ZoomCommand: Equatable {
 nonisolated enum CanvasToolbarItem: Hashable {
     case paste
     case newNote
-    case newText
     case insertImage
     case askAI
     case details
@@ -61,7 +60,6 @@ nonisolated enum CanvasToolbarItem: Hashable {
         switch self {
         case .paste: "Paste"
         case .newNote: "Card"
-        case .newText: "Text"
         case .insertImage: "Insert Image"
         case .askAI: "Ask AI"
         case .details: "Details"
@@ -155,7 +153,6 @@ nonisolated struct CanvasToolbarConfiguration: Hashable {
             return CanvasToolbarConfiguration(items: [
                 .closeMode,
                 .newNote,
-                .newText,
                 .insertImage,
             ])
 
@@ -176,7 +173,6 @@ nonisolated struct CanvasToolbarConfiguration: Hashable {
             return CanvasToolbarConfiguration(items: [
                 .askAI,
                 .newNote,
-                .newText,
                 .insertImage,
                 .mode(.draw)
             ])

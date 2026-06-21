@@ -41,7 +41,9 @@ struct CanvasObjectView: View {
             }
         }
         .background {
-            if usesStickySurface {
+            if usesTransparentSurface {
+                Color.clear
+            } else if usesStickySurface {
                 ZStack {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .fill(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground))
@@ -57,7 +59,10 @@ struct CanvasObjectView: View {
             }
         }
         .overlay {
-            if usesStickySurface {
+            if usesTransparentSurface {
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .stroke(isSelected ? Color.accentColor : Color.clear, lineWidth: 2)
+            } else if usesStickySurface {
                 if isSelected {
                     RoundedRectangle(cornerRadius: 12, style: .continuous)
                         .stroke(Color.accentColor, lineWidth: 2)
@@ -71,9 +76,9 @@ struct CanvasObjectView: View {
             }
         }
         .shadow(
-            color: .black.opacity(object.kind == .text ? 0 : (isSelected ? 0.16 : 0.08)),
-            radius: object.kind == .text ? 0 : (isSelected ? 10 : 5),
-            y: object.kind == .text ? 0 : (isSelected ? 4 : 2)
+            color: .black.opacity(usesTransparentSurface || object.kind == .text ? 0 : (isSelected ? 0.16 : 0.08)),
+            radius: usesTransparentSurface || object.kind == .text ? 0 : (isSelected ? 10 : 5),
+            y: usesTransparentSurface || object.kind == .text ? 0 : (isSelected ? 4 : 2)
         )
         .contentShape(Rectangle())
         .gesture(tapGesture)
@@ -136,7 +141,7 @@ struct CanvasObjectView: View {
                     .lineLimit(nil)
                     .multilineTextAlignment(.leading)
                     .frame(maxWidth: .infinity, maxHeight: usesStickySurface ? .infinity : nil,
-                           alignment: usesStickySurface ? .center : .topLeading)
+                           alignment: usesTransparentSurface ? .topLeading : (usesStickySurface ? .center : .topLeading))
             }
         }
     }
@@ -191,6 +196,10 @@ struct CanvasObjectView: View {
 
     private var usesStickySurface: Bool {
         object.kind == .stickyNote || object.kind == .clipNote
+    }
+
+    private var usesTransparentSurface: Bool {
+        object.style.hasTransparentFill
     }
 
     private var usesEditableText: Bool {

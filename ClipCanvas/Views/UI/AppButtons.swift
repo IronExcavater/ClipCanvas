@@ -190,10 +190,12 @@ extension View {
         self
             .listStyle(.sidebar)
             .contentMargins(.horizontal, 14, for: .scrollContent)
+            .appListRowSpacing(6)
         #else
         self
             .listStyle(.plain)
             .contentMargins(.horizontal, 14, for: .scrollContent)
+            .appListRowSpacing(6)
         #endif
     }
 
@@ -212,9 +214,9 @@ extension View {
         }
     }
 
-    func appListItemRowInsets(horizontal: CGFloat = 0, vertical: CGFloat = 2) -> some View {
+    func appListItemRowInsets(horizontal: CGFloat = 0, vertical: CGFloat = 0) -> some View {
         self
-            .listRowInsets(EdgeInsets(top: vertical, leading: horizontal, bottom: vertical, trailing: horizontal))
+            .listRowInsets(EdgeInsets(top: 0, leading: horizontal, bottom: 0, trailing: horizontal))
             .listRowSeparator(.hidden)
             .listRowBackground(Color.clear)
     }

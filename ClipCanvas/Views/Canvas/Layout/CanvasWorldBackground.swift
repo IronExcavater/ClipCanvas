@@ -24,25 +24,18 @@ struct CanvasDotGrid: View, Animatable {
     var body: some View {
         Canvas { ctx, size in
             let scale = max(canvasScale, 0.001)
-            let radius = min(max(1.18 * scale, 0.65), 2.2)
-            let visibleMinX = viewportOrigin.x - spacing
-            let visibleMinY = viewportOrigin.y - spacing
-            let visibleMaxX = viewportOrigin.x + size.width / scale + spacing
-            let visibleMaxY = viewportOrigin.y + size.height / scale + spacing
-            let startColumn = Int(floor(visibleMinX / spacing))
-            let endColumn = Int(ceil(visibleMaxX / spacing))
-            let startRow = Int(floor(visibleMinY / spacing))
-            let endRow = Int(ceil(visibleMaxY / spacing))
+            let densityStep = CGFloat(max(1, Int(ceil(7 / max(spacing * scale, 0.001)))))
+            let worldSpacing = spacing * densityStep
+            let screenSpacing = worldSpacing * scale
+            let phaseX = positiveRemainder(-viewportOrigin.x * scale, screenSpacing)
+            let phaseY = positiveRemainder(-viewportOrigin.y * scale, screenSpacing)
+            let radius = (1.05 * sqrt(scale)).clamped(to: 0.62...1.75)
+            let opacity = (0.24 + min(scale, 1.4) * 0.08).clamped(to: 0.22...0.36)
 
-            for column in startColumn...endColumn {
-                let worldX = CGFloat(column) * spacing
-                let screenX = (worldX - viewportOrigin.x) * scale
-
-                for row in startRow...endRow {
-                    let worldY = CGFloat(row) * spacing
-                    let screenY = (worldY - viewportOrigin.y) * scale
-                    let opacity = dotOpacity(at: CGPoint(x: worldX, y: worldY))
-
+            var screenX = phaseX - screenSpacing
+            while screenX <= size.width + screenSpacing {
+                var screenY = phaseY - screenSpacing
+                while screenY <= size.height + screenSpacing {
                     ctx.fill(
                         Path(ellipseIn: CGRect(
                             x: screenX - radius,
@@ -50,22 +43,21 @@ struct CanvasDotGrid: View, Animatable {
                             width: radius * 2,
                             height: radius * 2
                         )),
-                        with: .color(.secondary.opacity(opacity))
+                        with: .color(.secondary.opacity(Double(opacity)))
                     )
+                    screenY += screenSpacing
                 }
+                screenX += screenSpacing
             }
         }
         .background { CanvasWorldSurface() }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
-    private func dotOpacity(at point: CGPoint) -> Double {
-        let distanceFromOrigin = hypot(point.x, point.y)
-        let fadeStart = boundsRadius * 0.56
-        let fadeEnd = boundsRadius
-        let progress = ((distanceFromOrigin - fadeStart) / max(fadeEnd - fadeStart, 1)).clamped(to: 0...1)
-        let eased = progress * progress * (3 - 2 * progress)
-        return 0.48 - eased * 0.45
+    private func positiveRemainder(_ value: CGFloat, _ divisor: CGFloat) -> CGFloat {
+        guard divisor > 0 else { return 0 }
+        let result = value.truncatingRemainder(dividingBy: divisor)
+        return result >= 0 ? result : result + divisor
     }
 }
 
@@ -96,7 +88,7 @@ struct EmptyCanvasHint: View {
             Text("Nothing here yet")
                 .font(.headline)
                 .foregroundStyle(.primary)
-            Text("Add a card, text, or image")
+            Text("Add a card or image")
                 .font(.caption)
                 .foregroundStyle(.secondary)
         }

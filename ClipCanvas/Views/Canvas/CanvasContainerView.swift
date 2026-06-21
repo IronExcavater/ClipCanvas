@@ -117,6 +117,9 @@ struct CanvasContainerView: View {
                 },
                 onAskAI: { objects in
                     openAIChat(attaching: objects)
+                },
+                onRunAIAction: { skill, objects in
+                    runAIAction(skill, on: objects)
                 }
             )
             .ignoresSafeArea()
@@ -152,7 +155,6 @@ struct CanvasContainerView: View {
                     isEditing: editingObjectID != nil,
                     onPaste: paste,
                     onCreateNote: createNoteAtViewCenter,
-                    onCreateText: createTextAtViewCenter,
                     onAskAI: openRecentOrNewAIChat,
                     onInsertImage: insertImageFromLibrary,
                     onDetails: showSelectedDetails,

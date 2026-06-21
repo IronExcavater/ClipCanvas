@@ -9,6 +9,20 @@ nonisolated enum ChatRole: String, Codable {
 nonisolated enum AIChatMode: String, Codable, CaseIterable {
     case quick
     case thinking
+
+    var displayName: String {
+        switch self {
+        case .quick: "Quick"
+        case .thinking: "Thinking"
+        }
+    }
+
+    var systemImage: String {
+        switch self {
+        case .quick: "bolt.fill"
+        case .thinking: "brain"
+        }
+    }
 }
 
 nonisolated enum ChatMessageStatus: String, Codable, CaseIterable {
@@ -71,6 +85,11 @@ final class AIChat: Identifiable {
     var mode: AIChatMode {
         get { AIChatMode(rawValue: modeRaw) ?? .quick }
         set { modeRaw = newValue.rawValue }
+    }
+
+    func setMode(_ mode: AIChatMode) {
+        self.mode = mode
+        updatedAt = Date()
     }
 
     var sortedMessages: [ChatMessage] {

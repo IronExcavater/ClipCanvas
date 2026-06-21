@@ -51,6 +51,7 @@ extension View {
             .scrollContentBackground(.hidden)
             .contentMargins(.top, 0, for: .scrollContent)
             .contentMargins(.horizontal, 14, for: .scrollContent)
+            .appListRowSpacing(8)
     }
 
     /// Standard toolbar options button (ellipsis circle) used on list pages.
@@ -59,6 +60,17 @@ extension View {
             ToolbarItem(placement: .primaryAction) {
                 Menu(content: { self }, label: label)
             }
+        }
+    }
+}
+
+extension View {
+    @ViewBuilder
+    func appListRowSpacing(_ spacing: CGFloat) -> some View {
+        if #available(iOS 17.0, macOS 14.0, *) {
+            self.listRowSpacing(spacing)
+        } else {
+            self
         }
     }
 }

@@ -111,8 +111,6 @@ struct AIChatsPage: View {
         }
         .buttonStyle(.plain)
         .accessibilityLabel("New Chat")
-        .opacity(chatSelection.isActive ? 0 : 1)
-        .disabled(chatSelection.isActive)
     }
 
     private func handleTap(_ chat: AIChat) {
@@ -183,6 +181,7 @@ private struct AIChatRow: View {
             AppSwipeIconButton(systemImage: "trash", role: .destructive, accessibilityLabel: "Delete", action: onDelete)
         }
         .contextMenu {
+            AIChatModeMenu(chat: chat)
             Button("Rename", systemImage: "pencil", action: onRename)
             Button("Delete", systemImage: "trash", role: .destructive, action: onDelete)
         }

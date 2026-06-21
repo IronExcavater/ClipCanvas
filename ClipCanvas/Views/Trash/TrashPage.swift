@@ -129,8 +129,6 @@ struct TrashPage: View {
                         Button("Delete All", systemImage: "trash", role: .destructive) { confirmingDeleteAll = true }
                     } label: { AppCircleIconLabel(systemImage: AppSymbol.options) }
                     .accessibilityLabel("Recently deleted options")
-                    .opacity(selection.isActive ? 0 : 1)
-                    .disabled(selection.isActive)
                 }
             }
         }

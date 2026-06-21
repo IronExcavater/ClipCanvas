@@ -8,6 +8,7 @@ struct CanvasTagPanel: View {
         CanvasOverlayPanel(
             title: clips.count > 1 ? "\(clips.count) clips selected" : "Tags",
             systemImage: "tag",
+            showsDragIndicator: false,
             onDismiss: onDismiss
         ) {
             ScrollView {

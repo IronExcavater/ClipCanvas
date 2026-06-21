@@ -24,7 +24,7 @@ struct CanvasDrawingLayer: UIViewRepresentable {
         canvas.delegate = context.coordinator
         canvas.tool = activeTool
         canvas.drawing = drawing
-        applyViewport(to: canvas)
+        applyViewport(to: canvas, animated: false)
         return canvas
     }
 
@@ -33,10 +33,7 @@ struct CanvasDrawingLayer: UIViewRepresentable {
         uiView.contentSize = worldSize
         uiView.minimumZoomScale = canvasScale
         uiView.maximumZoomScale = canvasScale
-        if abs(uiView.zoomScale - canvasScale) > 0.001 {
-            uiView.setZoomScale(canvasScale, animated: false)
-        }
-        applyViewport(to: uiView)
+        applyViewport(to: uiView, animated: context.transaction.animation != nil)
         if uiView.drawing != drawing {
             context.coordinator.isApplyingSwiftUIUpdate = true
             uiView.drawing = drawing
@@ -65,15 +62,31 @@ struct CanvasDrawingLayer: UIViewRepresentable {
         }
     }
 
-    private func applyViewport(to canvas: PKCanvasView) {
+    private func applyViewport(to canvas: PKCanvasView, animated: Bool) {
         let nextOffset = CGPoint(
             x: (viewportOrigin.x + worldOrigin.x) * canvasScale,
             y: (viewportOrigin.y + worldOrigin.y) * canvasScale
         )
-        guard hypot(canvas.contentOffset.x - nextOffset.x, canvas.contentOffset.y - nextOffset.y) > 0.5 else {
-            return
+
+        let applyChanges = {
+            if abs(canvas.zoomScale - canvasScale) > 0.001 {
+                canvas.zoomScale = canvasScale
+            }
+            if hypot(canvas.contentOffset.x - nextOffset.x, canvas.contentOffset.y - nextOffset.y) > 0.5 {
+                canvas.contentOffset = nextOffset
+            }
         }
-        canvas.setContentOffset(nextOffset, animated: false)
+
+        if animated {
+            UIView.animate(
+                withDuration: 0.22,
+                delay: 0,
+                options: [.beginFromCurrentState, .allowUserInteraction, .curveEaseInOut],
+                animations: applyChanges
+            )
+        } else {
+            applyChanges()
+        }
     }
 }
 #elseif canImport(AppKit)

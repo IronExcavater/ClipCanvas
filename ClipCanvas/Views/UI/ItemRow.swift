@@ -54,11 +54,12 @@ extension EnvironmentValues {
 /// A selection checkbox used inside ItemRow when multi-select is active.
 struct SelectionIndicator: View {
     let isSelected: Bool
+    let tint: Color
 
     var body: some View {
         Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
             .font(.system(size: 20, weight: .semibold))
-            .foregroundStyle(isSelected ? Color.accentColor : .secondary)
+            .foregroundStyle(isSelected ? tint : tint.opacity(0.52))
             .animation(.easeInOut(duration: 0.15), value: isSelected)
     }
 }

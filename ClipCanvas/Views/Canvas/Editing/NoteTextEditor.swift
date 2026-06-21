@@ -73,12 +73,16 @@ struct NoteTextEditor: UIViewRepresentable {
         weak var textView: UITextView?
         private var hasExited = false
         private var lastCommandID: UUID?
+        private static let boldItalicPattern = try? NSRegularExpression(
+            pattern: #"(?<!\*)\*\*\*(?!\*)(.+?)(?<!\*)\*\*\*(?!\*)"#,
+            options: .dotMatchesLineSeparators
+        )
         private static let boldPattern = try? NSRegularExpression(
-            pattern: #"\*\*(.+?)\*\*"#,
+            pattern: #"(?<!\*)\*\*(?!\*)(.+?)(?<!\*)\*\*(?!\*)"#,
             options: .dotMatchesLineSeparators
         )
         private static let italicPattern = try? NSRegularExpression(
-            pattern: #"(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)"#,
+            pattern: #"(?<!\*)\*(?![\*\s])(.+?)(?<![\*\s])\*(?!\*)"#,
             options: .dotMatchesLineSeparators
         )
         private static let highlightPattern = try? NSRegularExpression(
@@ -90,7 +94,7 @@ struct NoteTextEditor: UIViewRepresentable {
             options: .dotMatchesLineSeparators
         )
         private static let bulletPattern = try? NSRegularExpression(
-            pattern: #"(?m)^(\s*)[-*]\s+"#,
+            pattern: #"(?m)^(\s*)(?:[-*]|\d+\.)\s+"#,
             options: []
         )
 
@@ -156,6 +160,14 @@ struct NoteTextEditor: UIViewRepresentable {
                 .foregroundColor: UIColor.label
             ])
             applyInlineFontMarkdown(
+                pattern: Self.boldItalicPattern,
+                to: attr,
+                in: plain,
+                range: nsRange,
+                traits: [.traitBold, .traitItalic],
+                markerLength: 3
+            )
+            applyInlineFontMarkdown(
                 pattern: Self.boldPattern,
                 to: attr,
                 in: plain,
@@ -217,16 +229,13 @@ struct NoteTextEditor: UIViewRepresentable {
 
         private func markdownBodyRange(for selectedRange: NSRange, in ns: NSString) -> NSRange {
             let lineRange = ns.lineRange(for: selectedRange)
-            guard lineRange.length >= 2 else { return selectedRange }
+            guard lineRange.length >= 1 else { return selectedRange }
             let line = ns.substring(with: lineRange)
-            let markerLength: Int
-            if line.hasPrefix("- ") || line.hasPrefix("* ") {
-                markerLength = 2
-            } else {
+            guard let bodyOffset = bulletBodyOffset(in: line) else {
                 return selectedRange
             }
 
-            let bodyStart = lineRange.location + markerLength
+            let bodyStart = lineRange.location + bodyOffset
             if selectedRange.length == 0 {
                 return NSRange(location: max(selectedRange.location, bodyStart), length: 0)
             }
@@ -245,9 +254,11 @@ struct NoteTextEditor: UIViewRepresentable {
             if keepsTrailingNewline { lines.removeLast() }
             let replacement = lines.map { line in
                 guard !line.trimmingCharacters(in: .whitespaces).isEmpty else { return line }
-                if line.hasPrefix("- ") { return String(line.dropFirst(2)) }
-                if line.hasPrefix("* ") { return String(line.dropFirst(2)) }
-                return "- \(line)"
+                let leading = line.prefix { $0 == " " || $0 == "\t" }
+                let body = line.dropFirst(leading.count)
+                if body.hasPrefix("- ") { return String(leading) + String(body.dropFirst(2)) }
+                if body.hasPrefix("* ") { return String(leading) + String(body.dropFirst(2)) }
+                return "\(leading)- \(body)"
             }
             .joined(separator: "\n") + (keepsTrailingNewline ? "\n" : "")
             textView.text = ns.replacingCharacters(in: range, with: replacement)
@@ -305,11 +316,18 @@ struct NoteTextEditor: UIViewRepresentable {
         private func applyBulletAttributes(to attr: NSMutableAttributedString, in plain: String, range: NSRange) {
             Self.bulletPattern?.enumerateMatches(in: plain, range: range) { match, _, _ in
                 guard let match else { return }
-                attr.addAttributes(hiddenMarkerAttributes, range: match.range)
+                let indentLength = match.range(at: 1).length
+                let markerRange = NSRange(
+                    location: match.range.location + indentLength,
+                    length: max(0, match.range.length - indentLength)
+                )
+                attr.addAttributes(hiddenMarkerAttributes, range: markerRange)
 
                 let paragraph = NSMutableParagraphStyle()
-                paragraph.headIndent = 18
-                paragraph.firstLineHeadIndent = 0
+                let level = min(indentLength / 2, 3)
+                let indent = CGFloat(level) * 16
+                paragraph.headIndent = indent + 20
+                paragraph.firstLineHeadIndent = indent
                 paragraph.paragraphSpacing = 2
                 if #available(iOS 15.0, *) {
                     paragraph.textLists = [NSTextList(markerFormat: .disc, options: 0)]
@@ -317,6 +335,31 @@ struct NoteTextEditor: UIViewRepresentable {
                 let lineRange = (plain as NSString).lineRange(for: match.range)
                 attr.addAttribute(.paragraphStyle, value: paragraph, range: lineRange)
             }
+        }
+
+        private func bulletBodyOffset(in line: String) -> Int? {
+            let leading = line.prefix { $0 == " " || $0 == "\t" }.count
+            let body = line.dropFirst(leading)
+            if body.hasPrefix("- ") || body.hasPrefix("* ") {
+                return leading + 2
+            }
+            var numberLength = 0
+            for character in body {
+                guard character.isNumber else { break }
+                numberLength += 1
+            }
+            if numberLength > 0 {
+                let dotIndex = body.index(body.startIndex, offsetBy: numberLength)
+                if dotIndex < body.endIndex {
+                    let spaceIndex = body.index(after: dotIndex)
+                    if spaceIndex < body.endIndex,
+                       body[dotIndex] == ".",
+                       body[spaceIndex].isWhitespace {
+                        return leading + numberLength + 2
+                    }
+                }
+            }
+            return nil
         }
 
         private var hiddenMarkerAttributes: [NSAttributedString.Key: Any] {
@@ -418,8 +461,12 @@ struct NoteTextEditor: View {
             text = text
                 .components(separatedBy: .newlines)
                 .map { line in
-                    guard !line.isEmpty else { return line }
-                    return line.hasPrefix("- ") ? String(line.dropFirst(2)) : "- \(line)"
+                    guard !line.trimmingCharacters(in: .whitespaces).isEmpty else { return line }
+                    let leading = line.prefix { $0 == " " || $0 == "\t" }
+                    let body = line.dropFirst(leading.count)
+                    if body.hasPrefix("- ") { return String(leading) + String(body.dropFirst(2)) }
+                    if body.hasPrefix("* ") { return String(leading) + String(body.dropFirst(2)) }
+                    return "\(leading)- \(body)"
                 }
                 .joined(separator: "\n")
         }

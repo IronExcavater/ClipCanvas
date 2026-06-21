@@ -49,7 +49,12 @@ final class Workspace: SoftDeletable, Identifiable {
     }
 
     @discardableResult
-    func createNote(centeredAt center: CGPoint, size: CGSize, text: String = "") -> CanvasObject {
+    func createNote(
+        centeredAt center: CGPoint,
+        size: CGSize,
+        text: String = "",
+        style: CanvasObjectStyle = .default
+    ) -> CanvasObject {
         let object = CanvasObject(
             kind: .stickyNote,
             workspace: self,
@@ -57,7 +62,8 @@ final class Workspace: SoftDeletable, Identifiable {
             y: center.y - size.height / 2,
             width: size.width,
             height: size.height,
-            text: text
+            text: text,
+            style: style
         )
         object.zIndex = Double(canvasObjects.count)
         canvasObjects.append(object)
@@ -66,21 +72,15 @@ final class Workspace: SoftDeletable, Identifiable {
     }
 
     @discardableResult
-    func createText(centeredAt center: CGPoint, text: String = "") -> CanvasObject {
+    func createTransparentNote(centeredAt center: CGPoint, text: String = "") -> CanvasObject {
         let size = CGSize(width: 280, height: 96)
-        let object = CanvasObject(
-            kind: .text,
-            workspace: self,
-            x: center.x - size.width / 2,
-            y: center.y - size.height / 2,
-            width: size.width,
-            height: size.height,
-            text: text,
-            style: .freeText
-        )
-        object.zIndex = Double(canvasObjects.count)
-        canvasObjects.append(object)
-        updatedAt = Date()
+        return createNote(centeredAt: center, size: size, text: text, style: .transparentNote)
+    }
+
+    @discardableResult
+    func createText(centeredAt center: CGPoint, text: String = "") -> CanvasObject {
+        let object = createTransparentNote(centeredAt: center, text: text)
+        object.kind = .text
         return object
     }
 

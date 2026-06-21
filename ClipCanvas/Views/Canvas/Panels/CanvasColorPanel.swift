@@ -5,6 +5,7 @@ struct CanvasColorPanel: View {
     let onDismiss: () -> Void
 
     private let presets = [
+        CanvasObjectStyle.transparentFillHex,
         "#FFF3B0", "#FFD166", "#FF9800", "#4CAF50",
         "#2196F3", "#9C27B0", "#E91E63", "#FFFFFF"
     ]
@@ -13,6 +14,7 @@ struct CanvasColorPanel: View {
         CanvasOverlayPanel(
             title: objects.count > 1 ? "\(objects.count) cards selected" : "Note Color",
             systemImage: "paintpalette",
+            showsDragIndicator: false,
             onDismiss: onDismiss
         ) {
             LazyVGrid(
@@ -56,7 +58,7 @@ private struct ColorSwatch: View {
     var body: some View {
         Button(action: action) {
             Circle()
-                .fill(Color(hex: hex) ?? .accentColor)
+                .fill(fill)
                 .frame(width: 38, height: 38)
                 .overlay {
                     Circle()
@@ -64,6 +66,13 @@ private struct ColorSwatch: View {
                             isSelected ? Color.primary.opacity(0.82) : Color.primary.opacity(0.12),
                             lineWidth: isSelected ? 2.5 : 1
                         )
+                }
+                .overlay {
+                    if isTransparent {
+                        Image(systemName: "circle.lefthalf.filled")
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundStyle(.secondary)
+                    }
                 }
                 .overlay {
                     if isSelected {
@@ -74,6 +83,17 @@ private struct ColorSwatch: View {
                 }
         }
         .buttonStyle(.plain)
-        .accessibilityLabel("Set note color \(hex)")
+        .accessibilityLabel("Set note color \(isTransparent ? "Transparent" : hex)")
+    }
+
+    private var isTransparent: Bool {
+        CanvasObjectStyle.isTransparentFill(hex)
+    }
+
+    private var fill: Color {
+        if isTransparent {
+            return Color.primary.opacity(0.035)
+        }
+        return Color(hex: hex) ?? .accentColor
     }
 }

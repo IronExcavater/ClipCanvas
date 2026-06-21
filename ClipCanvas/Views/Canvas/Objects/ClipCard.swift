@@ -6,6 +6,7 @@ import UIKit
 struct ClipCard: View {
     let clip: Clip
     var fillColor: Color?
+    var isTransparentSurface = false
     let isSelected: Bool
     var showsContent = true
     let onTap: () -> Void
@@ -59,7 +60,11 @@ struct ClipCard: View {
                     .stroke(Color.accentColor, lineWidth: 2)
             }
         }
-        .shadow(color: .black.opacity(isSelected ? 0.16 : 0.09), radius: isSelected ? 10 : 6, y: isSelected ? 4 : 2)
+        .shadow(
+            color: .black.opacity(isTransparentSurface ? 0 : (isSelected ? 0.16 : 0.09)),
+            radius: isTransparentSurface ? 0 : (isSelected ? 10 : 6),
+            y: isTransparentSurface ? 0 : (isSelected ? 4 : 2)
+        )
         .contentShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
         .gesture(tapGesture)
         .animation(.spring(response: 0.18, dampingFraction: 0.8), value: isSelected)
@@ -163,8 +168,12 @@ struct ClipCard: View {
 
     private var cardSurface: some View {
         ZStack {
-            Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground)
-            (fillColor ?? primaryColor).opacity(0.18)
+            if isTransparentSurface {
+                Color.clear
+            } else {
+                Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground)
+                (fillColor ?? primaryColor).opacity(0.18)
+            }
         }
     }
 

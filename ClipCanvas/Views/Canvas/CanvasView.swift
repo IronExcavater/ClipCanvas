@@ -22,6 +22,7 @@ struct CanvasView: View {
     var onShowDetails: (CanvasObject) -> Void = { _ in }
     var onManageTags: ([CanvasObject]) -> Void = { _ in }
     var onAskAI: ([CanvasObject]) -> Void = { _ in }
+    var onRunAIAction: (AITransformSkill, [CanvasObject]) -> Void = { _, _ in }
 
     private let drawingWorldOrigin = CGPoint(x: 10_000, y: 10_000)
     private let drawingWorldSize = CGSize(width: 20_000, height: 20_000)
@@ -59,19 +60,6 @@ struct CanvasView: View {
                     viewportOrigin: viewportOrigin,
                     canvasScale: canvasScale,
                     boundsRadius: canvasBounds(viewportSize: geo.size).radius
-                )
-                .transaction { transaction in
-                    if isPanningCanvas || isPinchingCanvas {
-                        transaction.animation = nil
-                    }
-                }
-                .animation(
-                    isPanningCanvas ? nil : .smooth(duration: 0.22),
-                    value: viewportOrigin
-                )
-                .animation(
-                    isPinchingCanvas ? nil : .spring(response: 0.26, dampingFraction: 0.84),
-                    value: canvasScale
                 )
                 .contentShape(Rectangle())
                 .gesture(canvasTapGesture(in: geo))
@@ -163,7 +151,7 @@ struct CanvasView: View {
                 CanvasImageObjectView(
                     clip: clip,
                     isSelected: isSelected,
-                    showsContent: canvasScale >= 0.25 || isSelected || isDragging,
+                    showsContent: true,
                     onTap: { handleTap(for: object, in: geo) },
                     onDoubleTap: { handleDoubleTap(for: object, in: geo) },
                     onResize: { updateResizePreview(for: object, translation: $0) },
@@ -176,6 +164,7 @@ struct CanvasView: View {
                 ClipCard(
                     clip: clip,
                     fillColor: Color(hex: object.style.fillHex),
+                    isTransparentSurface: object.style.hasTransparentFill,
                     isSelected: isSelected,
                     showsContent: canvasScale >= 0.34 || isSelected || isDragging,
                     onTap: { handleTap(for: object, in: geo) },
@@ -235,6 +224,7 @@ struct CanvasView: View {
             .opacity(isOverlaid ? 0 : searchOpacity(for: object))
             .allowsHitTesting(!isOverlaid)
             .gesture(objectDragGesture(for: object, in: geo))
+            .simultaneousGesture(objectLongPressSelectionGesture(for: object))
             .contextMenu {
                 objectContextMenu(for: object, in: geo)
             }
@@ -249,30 +239,43 @@ struct CanvasView: View {
             }
         }
 
-        if object.clip != nil {
+        if object.clip != nil || canEditText(object) {
             Button("Info", systemImage: "info.circle") {
-                selectedObjectIDs = [object.id]
-                onShowDetails(object)
+                let target = clipBackedObjectForActions(object)
+                selectObjectForMenu(target)
+                onShowDetails(target)
             }
 
             Button("Tags", systemImage: "tag") {
-                selectedObjectIDs = [object.id]
-                onManageTags([object])
+                let target = clipBackedObjectForActions(object)
+                selectObjectForMenu(target)
+                onManageTags([target])
             }
         }
 
         Button("Ask AI", systemImage: "sparkles") {
-            selectedObjectIDs = [object.id]
+            selectObjectForMenu(object)
             onAskAI([object])
         }
 
+        if canRunAIActions(on: object) {
+            Menu("AI Transforms", systemImage: "wand.and.sparkles") {
+                ForEach(AITransformSkill.allCases) { skill in
+                    Button(skill.title, systemImage: skill.systemImage) {
+                        selectObjectForMenu(object)
+                        onRunAIAction(skill, [object])
+                    }
+                }
+            }
+        }
+
         Button("Duplicate", systemImage: "plus.square.on.square") {
-            selectedObjectIDs = [object.id]
+            selectObjectForMenu(object)
             duplicate(object, in: geo)
         }
 
         Button("Delete", systemImage: "trash", role: .destructive) {
-            selectedObjectIDs = [object.id]
+            selectObjectForMenu(object)
             delete(object)
         }
     }
@@ -404,6 +407,14 @@ struct CanvasView: View {
             }
     }
 
+    private func objectLongPressSelectionGesture(for object: CanvasObject) -> some Gesture {
+        LongPressGesture(minimumDuration: 0.35, maximumDistance: 12)
+            .onEnded { _ in
+                guard editingObjectID == nil else { return }
+                selectObjectForMenu(object)
+            }
+    }
+
     // MARK: - Zoom
 
     private func handleZoom(_ command: ZoomCommand, in geo: GeometryProxy) {
@@ -482,9 +493,13 @@ struct CanvasView: View {
 
     private func displaySize(for object: CanvasObject) -> CGSize {
         guard let session = activeResize, session.objectID == object.id else {
-            return CGSize(width: object.width, height: object.height)
+            let size = CGSize(width: object.width, height: object.height)
+            if object.clip?.type == .image {
+                return CanvasPlacementSizing.snappedSize(size, for: object.clip, snapsToGrid: false)
+            }
+            return size
         }
-        return CanvasPlacementSizing.previewSize(for: session, scale: canvasScale)
+        return CanvasPlacementSizing.previewSize(for: session, scale: canvasScale, clip: object.clip)
     }
 
     private func toggleExpandedSize(for object: CanvasObject, in geo: GeometryProxy) {
@@ -557,6 +572,11 @@ struct CanvasView: View {
         object.kind == .image || object.clip?.type == .image
     }
 
+    private func canRunAIActions(on object: CanvasObject) -> Bool {
+        if object.clip?.type == .image { return false }
+        return object.clip != nil || canEditText(object)
+    }
+
     private func imageAspectRatio(for object: CanvasObject) -> CGFloat? {
         guard let data = object.clip?.imageData,
               let image = PlatformImage(data: data),
@@ -603,6 +623,7 @@ struct CanvasView: View {
                     ClipCard(
                         clip: clip,
                         fillColor: Color(hex: object.style.fillHex),
+                        isTransparentSurface: object.style.hasTransparentFill,
                         isSelected: true,
                         showsContent: true,
                         onTap: { if editingObjectID != object.id { beginEditing(object, in: geo) } },
@@ -757,6 +778,22 @@ struct CanvasView: View {
         } else {
             selectedObjectIDs.insert(object.id)
         }
+    }
+
+    private func selectObjectForMenu(_ object: CanvasObject) {
+        selectedObjectIDs = [object.id]
+        bringToFront(object.id)
+    }
+
+    private func clipBackedObjectForActions(_ object: CanvasObject) -> CanvasObject {
+        guard object.clip == nil, canEditText(object) else { return object }
+        let clip = Clip(content: object.text, origin: .typed)
+        context.insert(clip)
+        object.clip = clip
+        object.kind = .clipNote
+        object.text = ""
+        object.markUpdated()
+        return object
     }
 
     private func dragObjectIDs(startingFrom object: CanvasObject) -> Set<UUID> {

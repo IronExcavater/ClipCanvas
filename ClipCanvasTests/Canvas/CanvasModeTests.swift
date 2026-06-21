@@ -15,7 +15,6 @@ import Testing
         #expect(configuration.items == [
             .askAI,
             .newNote,
-            .newText,
             .insertImage,
             .mode(.draw)
         ])
@@ -27,7 +26,6 @@ import Testing
         #expect(configuration.items == [
             .closeMode,
             .newNote,
-            .newText,
             .insertImage,
         ])
     }
@@ -86,7 +84,6 @@ import Testing
         #expect(configuration.items == [
             .closeMode,
             .newNote,
-            .newText,
             .insertImage,
         ])
     }
@@ -97,7 +94,6 @@ import Testing
         #expect(configuration.items == [
             .closeMode,
             .newNote,
-            .newText,
             .insertImage,
         ])
     }

@@ -76,8 +76,6 @@ struct WorkspacesPage: View {
                 Button(action: createWorkspace) { AppCircleIconLabel(systemImage: "plus") }
                     .buttonStyle(.plain)
                     .accessibilityLabel("New Workspace")
-                    .opacity(selection.isActive ? 0 : 1)
-                    .disabled(selection.isActive)
             }
         }
     }

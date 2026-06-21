@@ -85,13 +85,6 @@ extension CanvasContainerView {
         showFeedback("New note", kind: .success)
     }
 
-    func createTextAtViewCenter() {
-        let object = workspace.createText(centeredAt: visibleViewportCenter)
-        selectedObjectIDs = [object.id]
-        editingObjectID = object.id
-        showFeedback("New text", kind: .success)
-    }
-
     func insertImageFromLibrary() {
         isImagePickerPresented = true
     }
@@ -182,6 +175,24 @@ extension CanvasContainerView {
 
     func askAIAboutVisibleCards() {
         openAIChat(attaching: orderedCanvasObjects(matching: visibleObjectIDs))
+    }
+
+    func runAIAction(_ skill: AITransformSkill, on objects: [CanvasObject]) {
+        let result = AITransformActionService.apply(
+            skill,
+            to: objects,
+            workspace: workspace,
+            in: context,
+            source: .user
+        )
+        if result.success {
+            selectedObjectIDs = result.changedObjectIDs.isEmpty
+                ? Set(objects.map(\.id))
+                : Set(result.changedObjectIDs)
+            showFeedback(skill.completion(for: result), kind: .success)
+        } else {
+            showFeedback(result.message, kind: .failure)
+        }
     }
 
     func openAIChat(attaching objects: [CanvasObject]) {

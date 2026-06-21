@@ -10,24 +10,30 @@ struct CanvasImageObjectView: View {
     let onResizeEnded: () -> Void
     let onToggleExpandedSize: () -> Void
 
+    private let cornerRadius: CGFloat = 12
+
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
             content
+                .clipShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
 
             CanvasResizeHandle(
                 onResize: onResize,
                 onResizeEnded: onResizeEnded,
                 onToggleExpandedSize: onToggleExpandedSize
             )
+            .padding(2)
+            .background(.regularMaterial, in: Circle())
+            .shadow(color: .black.opacity(0.14), radius: 8, y: 3)
+            .padding(5)
         }
-        .background(Color.platformSystemBackground.opacity(0.30), in: RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .background(Color.platformSystemBackground.opacity(0.30), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .overlay {
-            RoundedRectangle(cornerRadius: 8, style: .continuous)
-                .stroke(isSelected ? Color.accentColor : Color.primary.opacity(0.10), lineWidth: isSelected ? 2.5 : 1)
+            RoundedRectangle(cornerRadius: cornerRadius, style: .continuous)
+                .stroke(isSelected ? Color.accentColor : Color.primary.opacity(0.10), lineWidth: isSelected ? 2 : 1)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
         .shadow(color: .black.opacity(isSelected ? 0.16 : 0.08), radius: isSelected ? 10 : 5, y: isSelected ? 4 : 2)
-        .contentShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
+        .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .gesture(tapGesture)
         .animation(.spring(response: 0.18, dampingFraction: 0.8), value: isSelected)
     }

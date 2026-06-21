@@ -13,9 +13,9 @@ enum AIChatCommandRouter {
         let command = Command(message: userMessage.content)
 
         switch command {
-        case .transform(let skillID, let completion):
-            let result = runTransform(skillID: skillID, chat: chat, workspace: workspace, message: assistantMessage, in: context)
-            finish(assistantMessage, content: completion(result))
+        case .transform(let skill):
+            let result = runTransform(skillID: skill.id, chat: chat, workspace: workspace, message: assistantMessage, in: context)
+            finish(assistantMessage, content: skill.completion(for: result))
         case .arrangeGrid:
             let objects = targetObjects(chat: chat, workspace: workspace)
             guard !objects.isEmpty else {
@@ -75,6 +75,46 @@ enum AIChatCommandRouter {
                 in: context
             )
             finish(assistantMessage, content: result.success ? "Duplicated \(count(result.changedObjectIDs, singular: "card", plural: "cards"))." : result.message)
+        case .move(let deltaX, let deltaY):
+            let objects = targetObjects(chat: chat, workspace: workspace)
+            guard !objects.isEmpty else {
+                finish(assistantMessage, content: "Attach or select canvas cards before asking me to move them.")
+                return
+            }
+            let arguments = WorkspaceMoveObjectsArguments(
+                objectIDs: objects.map(\.id),
+                deltaX: deltaX,
+                deltaY: deltaY
+            )
+            let result = execute(
+                toolName: "canvas_move_objects",
+                workspaceID: workspace.id,
+                arguments: arguments,
+                message: assistantMessage,
+                in: context
+            )
+            finish(assistantMessage, content: result.success ? "Moved \(count(result.changedObjectIDs, singular: "card", plural: "cards"))." : result.message)
+        case .resize(let delta):
+            let objects = targetObjects(chat: chat, workspace: workspace)
+            guard !objects.isEmpty else {
+                finish(assistantMessage, content: "Attach or select canvas cards before asking me to resize them.")
+                return
+            }
+            let sizes = objects.map { object in
+                WorkspaceObjectSize(
+                    objectID: object.id,
+                    width: max(CanvasPlacementSizing.minimumSize.width, object.width + delta),
+                    height: max(CanvasPlacementSizing.minimumSize.height, object.height + delta)
+                )
+            }
+            let result = execute(
+                toolName: "canvas_resize_objects",
+                workspaceID: workspace.id,
+                arguments: WorkspaceResizeObjectsArguments(sizes: sizes),
+                message: assistantMessage,
+                in: context
+            )
+            finish(assistantMessage, content: result.success ? "Resized \(count(result.changedObjectIDs, singular: "card", plural: "cards"))." : result.message)
         case .delete:
             let objects = targetObjects(chat: chat, workspace: workspace)
             guard !objects.isEmpty else {
@@ -98,39 +138,27 @@ enum AIChatCommandRouter {
 
 private extension AIChatCommandRouter {
     enum Command {
-        case transform(String, (WorkspaceActionResult) -> String)
+        case transform(AITransformSkill)
         case arrangeGrid
         case createNote(String)
         case duplicate
+        case move(deltaX: Double, deltaY: Double)
+        case resize(delta: Double)
         case delete
         case askModel
 
         init(message: String) {
             let lower = message.lowercased()
-            if lower.contains("clean up") || lower.contains("cleanup") || lower.contains("tidy") {
-                self = .transform("clip.cleanUp") { result in
-                    result.success ? "Cleaned up \(AIChatCommandRouter.count(result.changedClipIDs, singular: "note", plural: "notes"))." : result.message
-                }
-            } else if lower.contains("action item") || lower.contains("todo") || lower.contains("to-do") {
-                self = .transform("clip.actionItems") { result in
-                    result.success ? "Converted \(AIChatCommandRouter.count(result.changedClipIDs, singular: "note", plural: "notes")) into action items." : result.message
-                }
-            } else if lower.contains("distill") || lower.contains("summarize") || lower.contains("summary") {
-                self = .transform("clip.distill") { result in
-                    result.success ? "Distilled \(AIChatCommandRouter.count(result.changedClipIDs, singular: "note", plural: "notes"))." : result.message
-                }
-            } else if lower.contains("rewrite") {
-                self = .transform("clip.rewrite") { result in
-                    result.success ? "Rewrote \(AIChatCommandRouter.count(result.changedClipIDs, singular: "note", plural: "notes"))." : result.message
-                }
-            } else if lower.contains("title") {
-                self = .transform("clip.title") { result in
-                    result.success ? "Generated titles for \(AIChatCommandRouter.count(result.changedClipIDs, singular: "note", plural: "notes"))." : result.message
-                }
+            if let skill = AITransformSkill.matching(message: message) {
+                self = .transform(skill)
             } else if lower.contains("arrange") || lower.contains("grid") {
                 self = .arrangeGrid
             } else if lower.contains("duplicate") || lower.contains("copy this card") || lower.contains("copy these cards") {
                 self = .duplicate
+            } else if lower.contains("move") || lower.contains("nudge") || lower.contains("reposition") {
+                self = .move(deltaX: Self.horizontalDelta(from: lower), deltaY: Self.verticalDelta(from: lower))
+            } else if lower.contains("resize") || lower.contains("bigger") || lower.contains("larger") || lower.contains("smaller") {
+                self = .resize(delta: (lower.contains("smaller") || lower.contains("shrink")) ? -48 : 48)
             } else if lower.contains("delete") || lower.contains("remove this card") || lower.contains("remove these cards") {
                 self = .delete
             } else if let noteText = Self.noteText(from: message) {
@@ -149,6 +177,19 @@ private extension AIChatCommandRouter {
             let suffix = message[range.upperBound...]
                 .trimmingCharacters(in: CharacterSet(charactersIn: " :.-\n\t"))
             return suffix.isEmpty ? "New note" : suffix
+        }
+
+        private static func horizontalDelta(from lower: String) -> Double {
+            if lower.contains("left") { return -80 }
+            if lower.contains("right") { return 80 }
+            if !lower.contains("up") && !lower.contains("down") { return 48 }
+            return 0
+        }
+
+        private static func verticalDelta(from lower: String) -> Double {
+            if lower.contains("up") { return -80 }
+            if lower.contains("down") { return 80 }
+            return 0
         }
     }
 

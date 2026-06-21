@@ -17,6 +17,7 @@ struct AIChatPreviewRow: View {
             }
         }
         .contextMenu {
+            AIChatModeMenu(chat: chat)
             Button("Delete", systemImage: "trash", role: .destructive) { chat.softDelete() }
         }
     }
@@ -34,12 +35,27 @@ struct AIChatListRowHeader: View {
             metadata: [
                 AppListRowMetadata("bubble.left.fill", value: "\(chat.sortedMessages.count)", monospaced: true),
                 AppListRowMetadata("square.on.square", value: "\(AIChatListRowStyle.attachmentCount(for: chat))", monospaced: true),
-                AppListRowMetadata(chat.mode == .thinking ? "brain" : "bolt.fill",
-                                   value: chat.mode == .thinking ? "Deep" : "Quick")
+                AppListRowMetadata(chat.mode.systemImage, value: chat.mode.displayName)
             ],
             date: chat.updatedAt,
             dateSuffix: " ago"
         )
+    }
+}
+
+struct AIChatModeMenu: View {
+    let chat: AIChat
+
+    var body: some View {
+        Menu("Mode", systemImage: chat.mode.systemImage) {
+            ForEach(AIChatMode.allCases, id: \.self) { mode in
+                Button {
+                    chat.setMode(mode)
+                } label: {
+                    Label(mode.displayName, systemImage: chat.mode == mode ? "checkmark" : mode.systemImage)
+                }
+            }
+        }
     }
 }
 

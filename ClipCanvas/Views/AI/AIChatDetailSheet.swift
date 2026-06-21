@@ -1,5 +1,8 @@
 import SwiftData
 import SwiftUI
+#if canImport(UIKit)
+import UIKit
+#endif
 
 struct AIChatDetailSheet: View {
     @Bindable var chat: AIChat
@@ -25,8 +28,7 @@ struct AIChatDetailView: View {
     var onClose: (() -> Void)?
 
     @State private var input = ""
-    @State private var inputHeight: CGFloat = 42
-    @State private var inputEditorID = UUID()
+    @State private var inputHeight: CGFloat = 38
     @State private var isSending = false
     @State private var isRenaming = false
     @State private var renameText = ""
@@ -72,6 +74,7 @@ struct AIChatDetailView: View {
                 }
                 ToolbarItem(placement: .primaryAction) {
                     Menu {
+                        Button("New Chat", systemImage: "plus.bubble") { createNewChat() }
                         Button("Rename", systemImage: "pencil") { beginRename() }
                         Button("Delete Chat", systemImage: "trash", role: .destructive) {
                             confirmingDelete = true
@@ -128,10 +131,12 @@ struct AIChatDetailView: View {
                     ForEach(chat.sortedMessages) { message in
                         AIChatMessageBubble(message: message)
                             .id(message.id)
+                            .transition(.opacity.combined(with: .move(edge: .bottom)))
                     }
                 }
                 .padding(16)
                 .padding(.bottom, 8)
+                .animation(.easeInOut(duration: 0.18), value: chat.sortedMessages.count)
             }
             .onChange(of: chat.sortedMessages.count) { _, _ in
                 if let id = chat.sortedMessages.last?.id {
@@ -145,6 +150,8 @@ struct AIChatDetailView: View {
 
     private var inputBar: some View {
         HStack(alignment: .bottom, spacing: 10) {
+            aiOptionsButton
+
             markdownInput
 
             Button(action: send) {
@@ -158,43 +165,58 @@ struct AIChatDetailView: View {
             .disabled(!canSend)
             .accessibilityLabel("Send")
         }
-        .padding(.horizontal, 14)
-        .padding(.top, 10)
-        .padding(.bottom, 14)
-        .background {
-            AppGlassSurface(shape: .rect(cornerRadius: 0))
-        }
+        .padding(.horizontal, 12)
+        .padding(.top, 8)
+        .padding(.bottom, 12)
         .ignoresSafeArea(.container, edges: .bottom)
+    }
+
+    private var aiOptionsButton: some View {
+        Menu {
+            ForEach(AIChatMode.allCases, id: \.self) { mode in
+                Button {
+                    chat.setMode(mode)
+                } label: {
+                    Label(mode.displayName, systemImage: chat.mode == mode ? "checkmark" : mode.systemImage)
+                }
+            }
+
+            Menu("Skills", systemImage: "wand.and.sparkles") {
+                ForEach(AITransformSkill.allCases) { skill in
+                    Button {
+                        send(skill: skill)
+                    } label: {
+                        Label(skill.title, systemImage: skill.systemImage)
+                    }
+                    .disabled(isSending)
+                }
+            }
+        } label: {
+            AppToolbarCircleLabel(systemImage: chat.mode.systemImage, size: 36, symbolSize: 15)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("AI options")
     }
 
     private var markdownInput: some View {
         ZStack(alignment: .topLeading) {
-            NoteTextEditor(
-                initialText: input,
-                fontSize: 15,
-                command: nil,
-                onCommit: { input = $0 },
-                onExitEditing: {},
-                onSizeChange: { size in
-                    inputHeight = (size.height + 4).clamped(to: 42...138)
-                }
-            )
-            .id(inputEditorID)
-            .frame(minHeight: 42, maxHeight: inputHeight)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
+            AIChatGrowingTextView(text: $input, calculatedHeight: $inputHeight)
+                .frame(height: inputHeight)
+                .padding(.horizontal, 12)
+                .padding(.vertical, 9)
 
             if input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
                 Text("Message")
                     .font(.body)
                     .foregroundStyle(.secondary)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 12)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 9)
+                    .padding(.top, 1)
                     .allowsHitTesting(false)
             }
         }
         .frame(maxWidth: .infinity)
-        .glassPanel(cornerRadius: 18, shadow: false, interactive: true)
+        .glassPanel(cornerRadius: 16, shadow: false, interactive: true)
     }
 
     private func beginRename() {
@@ -224,17 +246,32 @@ struct AIChatDetailView: View {
         close()
     }
 
+    private func createNewChat() {
+        let workspace = chat.workspace ?? activeWorkspace
+        linkedChat = AIChatService.createChat(in: context, workspace: workspace)
+    }
+
     private func send() {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        sendMessage(trimmed, clearInput: true)
+    }
 
-        input = ""
-        inputEditorID = UUID()
+    private func send(skill: AITransformSkill) {
+        guard !isSending else { return }
+        sendMessage(skill.prompt, clearInput: false)
+    }
+
+    private func sendMessage(_ text: String, clearInput: Bool) {
+        if clearInput {
+            input = ""
+            inputHeight = 38
+        }
         if chat.messages.isEmpty {
-            chat.title = String(trimmed.prefix(42))
+            chat.title = String(text.prefix(42))
         }
 
-        let user = ChatMessage(role: .user, content: trimmed)
+        let user = ChatMessage(role: .user, content: text)
         user.chat = chat
         chat.messages.append(user)
         context.insert(user)
@@ -288,7 +325,91 @@ struct AIChatDetailView: View {
         }
         return .discarded
     }
+
+    private var activeWorkspace: Workspace? {
+        workspaces.first(where: \.isActive) ?? workspaces.first
+    }
 }
+
+#if canImport(UIKit)
+private struct AIChatGrowingTextView: UIViewRepresentable {
+    @Binding var text: String
+    @Binding var calculatedHeight: CGFloat
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(text: $text, calculatedHeight: $calculatedHeight)
+    }
+
+    func makeUIView(context: Context) -> UITextView {
+        let textView = UITextView()
+        textView.delegate = context.coordinator
+        textView.backgroundColor = .clear
+        textView.textColor = .label
+        textView.font = .preferredFont(forTextStyle: .body)
+        textView.adjustsFontForContentSizeCategory = true
+        textView.textContainerInset = .zero
+        textView.textContainer.lineFragmentPadding = 0
+        textView.isScrollEnabled = true
+        textView.showsVerticalScrollIndicator = false
+        textView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        textView.setContentHuggingPriority(.defaultLow, for: .horizontal)
+        context.coordinator.textView = textView
+        context.coordinator.recalculateHeight()
+        return textView
+    }
+
+    func updateUIView(_ uiView: UITextView, context: Context) {
+        if uiView.text != text {
+            uiView.text = text
+        }
+        uiView.font = .preferredFont(forTextStyle: .body)
+        context.coordinator.recalculateHeight()
+    }
+
+    final class Coordinator: NSObject, UITextViewDelegate {
+        @Binding var text: String
+        @Binding var calculatedHeight: CGFloat
+        weak var textView: UITextView?
+
+        init(text: Binding<String>, calculatedHeight: Binding<CGFloat>) {
+            _text = text
+            _calculatedHeight = calculatedHeight
+        }
+
+        func textViewDidChange(_ textView: UITextView) {
+            text = textView.text
+            recalculateHeight()
+        }
+
+        func recalculateHeight() {
+            guard let textView else { return }
+            let width = max(textView.bounds.width, 1)
+            let size = textView.sizeThatFits(CGSize(width: width, height: .greatestFiniteMagnitude))
+            let next = size.height.clamped(to: 22...118)
+            guard abs(calculatedHeight - next) > 0.5 else { return }
+            DispatchQueue.main.async { [weak self] in
+                self?.calculatedHeight = next
+            }
+        }
+    }
+}
+#else
+private struct AIChatGrowingTextView: View {
+    @Binding var text: String
+    @Binding var calculatedHeight: CGFloat
+
+    var body: some View {
+        TextEditor(text: $text)
+            .font(.body)
+            .scrollContentBackground(.hidden)
+            .background(Color.clear)
+            .onChange(of: text) { _, value in
+                let lines = max(value.components(separatedBy: .newlines).count, 1)
+                calculatedHeight = CGFloat(lines * 22).clamped(to: 22...118)
+            }
+    }
+}
+#endif
 
 private struct AIChatMessageBubble: View {
     let message: ChatMessage
@@ -318,6 +439,12 @@ private struct AIChatMessageBubble: View {
                         }
                     if !isUser { Spacer(minLength: 44) }
                 }
+            } else if message.status == .streaming {
+                HStack {
+                    AIChatThinkingBubble()
+                    Spacer(minLength: 44)
+                }
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
             }
 
             ForEach(message.sortedAttachments) { attachment in
@@ -332,10 +459,13 @@ private struct AIChatMessageBubble: View {
                 HStack {
                     if isUser { Spacer(minLength: 44) }
                     AIChatToolEventRow(event: event)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
                     if !isUser { Spacer(minLength: 44) }
                 }
             }
         }
+        .animation(.easeInOut(duration: 0.18), value: message.sortedToolEvents.count)
+        .animation(.easeInOut(duration: 0.18), value: message.statusRaw)
     }
 
     private var bubbleShape: UnevenRoundedRectangle {
@@ -353,6 +483,33 @@ private struct AIChatMessageBubble: View {
     private var assistantBubbleColor: Color {
         Color.adaptive(light: PlatformColor.secondarySystemBackground, dark: PlatformColor.secondarySystemBackground)
             .opacity(0.92)
+    }
+}
+
+private struct AIChatThinkingBubble: View {
+    var body: some View {
+        HStack(spacing: 8) {
+            ProgressView()
+                .controlSize(.mini)
+            Text("Working")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.secondary)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 9)
+        .background(
+            Color.adaptive(light: PlatformColor.secondarySystemBackground, dark: PlatformColor.secondarySystemBackground)
+                .opacity(0.92),
+            in: UnevenRoundedRectangle(
+                cornerRadii: RectangleCornerRadii(
+                    topLeading: 18,
+                    bottomLeading: 4,
+                    bottomTrailing: 16,
+                    topTrailing: 18
+                ),
+                style: .continuous
+            )
+        )
     }
 }
 

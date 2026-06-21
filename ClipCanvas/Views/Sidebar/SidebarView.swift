@@ -113,27 +113,32 @@ struct SidebarView: View {
                 }
             }
 
-            Menu {
-                ForEach(workspaces) { workspace in
-                    Button {
-                        activateWorkspace(workspace)
-                    } label: {
-                        Label(
-                            workspace.name,
-                            systemImage: workspace.id == activeWorkspace?.id ? "checkmark" : "folder"
-                        )
+            HStack(spacing: 8) {
+                Menu {
+                    ForEach(workspaces) { workspace in
+                        Button {
+                            activateWorkspace(workspace)
+                        } label: {
+                            Label(
+                                workspace.name,
+                                systemImage: workspace.id == activeWorkspace?.id ? "checkmark" : "folder"
+                            )
+                        }
                     }
+                } label: {
+                    SidebarActiveWorkspaceSummary(
+                        name: activeWorkspace?.name ?? "Choose a workspace",
+                        cardCount: activeWorkspaceVisibleCardCount,
+                        chatCount: activeWorkspaceChatCount,
+                        updatedAt: activeWorkspace?.updatedAt
+                    )
                 }
-            } label: {
-                SidebarActiveWorkspaceSummary(
-                    name: activeWorkspace?.name ?? "Choose a workspace",
-                    cardCount: activeWorkspaceVisibleCardCount,
-                    chatCount: activeWorkspaceChatCount,
-                    updatedAt: activeWorkspace?.updatedAt
-                )
+                .buttonStyle(.plain)
+                .accessibilityLabel("Switch Workspace")
+
+                sidebarNavButton(destination: WorkspacesPage(), systemImage: "rectangle.3.group")
+                    .accessibilityLabel("Workspaces")
             }
-            .buttonStyle(.plain)
-            .accessibilityLabel("Switch Workspace")
         }
         .padding(.top, 4)
         .padding(.bottom, 10)

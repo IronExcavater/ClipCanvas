@@ -235,23 +235,19 @@ struct AppListRowHeader: View {
                 leadingIcon
                     .padding(.top, 1)
 
-                VStack(alignment: .leading, spacing: 6) {
-                    HStack(alignment: .firstTextBaseline, spacing: 6) {
-                        MarkdownPreview(text: title)
-                            .font(.subheadline.weight(.semibold))
-                            .lineLimit(lineLimit)
-                            .foregroundStyle(.primary)
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    MarkdownPreview(text: title)
+                        .font(.subheadline.weight(.semibold))
+                        .lineLimit(lineLimit)
+                        .foregroundStyle(.primary)
 
-                        if pinned {
-                            Image(systemName: "pin.fill")
-                                .font(.system(size: 10, weight: .semibold))
-                                .foregroundStyle(color)
-                        }
-
-                        Spacer(minLength: 0)
+                    if pinned {
+                        Image(systemName: "pin.fill")
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundStyle(color)
                     }
 
-                    metadataRow
+                    Spacer(minLength: 0)
                 }
                 .frame(maxWidth: .infinity, alignment: .leading)
             }
@@ -263,17 +259,25 @@ struct AppListRowHeader: View {
                     .lineLimit(3)
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
+
+            if hasMetadata {
+                metadataRow
+            }
         }
     }
 
     @ViewBuilder
     private var leadingIcon: some View {
         if isSelecting {
-            SelectionIndicator(isSelected: isSelected)
+            SelectionIndicator(isSelected: isSelected, tint: color)
                 .frame(width: 22, height: 22)
         } else {
             AppIconBadge(systemImage: systemImage, color: color)
         }
+    }
+
+    private var hasMetadata: Bool {
+        !metadata.isEmpty || date != nil
     }
 
     private var metadataRow: some View {

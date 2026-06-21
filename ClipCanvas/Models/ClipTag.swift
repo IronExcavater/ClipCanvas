@@ -79,11 +79,17 @@ extension Clip {
 
 extension Color {
     init?(hex: String) {
+        if CanvasObjectStyle.isTransparentFill(hex) {
+            self = .clear
+            return
+        }
         let h = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
-        guard h.count == 6, let value = UInt64(h, radix: 16) else { return nil }
-        let r = Double((value >> 16) & 0xFF) / 255
-        let g = Double((value >> 8) & 0xFF) / 255
-        let b = Double(value & 0xFF) / 255
-        self.init(red: r, green: g, blue: b)
+        guard (h.count == 6 || h.count == 8), let value = UInt64(h, radix: 16) else { return nil }
+        let hasAlpha = h.count == 8
+        let r = Double((value >> (hasAlpha ? 24 : 16)) & 0xFF) / 255
+        let g = Double((value >> (hasAlpha ? 16 : 8)) & 0xFF) / 255
+        let b = Double((value >> (hasAlpha ? 8 : 0)) & 0xFF) / 255
+        let a = hasAlpha ? Double(value & 0xFF) / 255 : 1
+        self.init(red: r, green: g, blue: b, opacity: a)
     }
 }

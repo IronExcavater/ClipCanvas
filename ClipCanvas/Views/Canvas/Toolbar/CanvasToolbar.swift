@@ -7,7 +7,6 @@ struct CanvasToolbar: View {
     var isEditing: Bool = false
     let onPaste: () -> Void
     let onCreateNote: () -> Void
-    let onCreateText: () -> Void
     let onAskAI: () -> Void
     var onInsertImage: () -> Void = {}
     let onDetails: () -> Void
@@ -65,8 +64,6 @@ struct CanvasToolbar: View {
                 toolButton("clipboard", action: onPaste)
             case .newNote:
                 toolButton("note.text.badge.plus", action: onCreateNote)
-            case .newText:
-                toolButton("textformat", action: onCreateText)
             case .insertImage:
                 toolButton("photo.badge.plus", action: onInsertImage)
             case .askAI:
@@ -164,27 +161,18 @@ struct CanvasToolbar: View {
             ZStack {
                 Circle().fill(selected ? Color.accentColor : Color.clear)
                 if let color = toolSwatchColor(for: tool) {
-                    VStack(spacing: 0) {
-                        Spacer(minLength: 0)
-                        PencilKitToolGlyph(
-                            tool: tool,
-                            color: color,
-                            isSelected: selected
-                        )
-                        .frame(width: 25, height: 25)
-                        Spacer(minLength: 0)
-                        Capsule()
-                            .fill(Color(platformColor: color))
-                            .frame(width: 16, height: 3)
-                            .padding(.bottom, 7)
-                    }
+                    Image(systemName: tool.systemImage)
+                        .font(.system(size: iconSize, weight: .semibold))
+                        .foregroundStyle(selected ? .white : .primary)
+                    Circle()
+                        .fill(Color(platformColor: color))
+                        .frame(width: 7, height: 7)
+                        .overlay(Circle().stroke(selected ? Color.white.opacity(0.78) : Color.platformSystemBackground, lineWidth: 1))
+                        .offset(x: 11, y: 11)
                 } else {
-                    PencilKitToolGlyph(
-                        tool: tool,
-                        color: nil,
-                        isSelected: selected
-                    )
-                    .frame(width: 25, height: 25)
+                    Image(systemName: tool.systemImage)
+                        .font(.system(size: iconSize, weight: .semibold))
+                        .foregroundStyle(selected ? .white : .primary)
                 }
             }
             .frame(width: buttonSize, height: buttonSize)

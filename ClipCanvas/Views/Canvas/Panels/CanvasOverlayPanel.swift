@@ -3,6 +3,7 @@ import SwiftUI
 struct CanvasOverlayPanel<Content: View>: View {
     var title: String?
     var systemImage: String?
+    var showsDragIndicator = true
     var onDismiss: (() -> Void)?
     var maxWidth: CGFloat = 420
     @ViewBuilder let content: Content
@@ -10,12 +11,14 @@ struct CanvasOverlayPanel<Content: View>: View {
     init(
         title: String? = nil,
         systemImage: String? = nil,
+        showsDragIndicator: Bool = true,
         maxWidth: CGFloat = 420,
         onDismiss: (() -> Void)? = nil,
         @ViewBuilder content: () -> Content
     ) {
         self.title = title
         self.systemImage = systemImage
+        self.showsDragIndicator = showsDragIndicator
         self.maxWidth = maxWidth
         self.onDismiss = onDismiss
         self.content = content()
@@ -23,10 +26,12 @@ struct CanvasOverlayPanel<Content: View>: View {
 
     var body: some View {
         VStack(spacing: 12) {
-            Capsule()
-                .fill(Color.primary.opacity(0.20))
-                .frame(width: 38, height: 5)
-                .padding(.top, 2)
+            if showsDragIndicator {
+                Capsule()
+                    .fill(Color.primary.opacity(0.20))
+                    .frame(width: 38, height: 5)
+                    .padding(.top, 2)
+            }
 
             if title != nil || onDismiss != nil {
                 HStack(spacing: 8) {

@@ -20,7 +20,7 @@ struct CanvasDrawToolSettingsPanel: View {
     var body: some View {
         CanvasOverlayPanel(
             title: tool.displayName,
-            systemImage: tool.systemImage,
+            showsDragIndicator: false,
             maxWidth: 390,
             onDismiss: onDismiss
         ) {
@@ -48,11 +48,6 @@ struct CanvasDrawToolSettingsPanel: View {
             }
 
             HStack(spacing: 12) {
-                Image(systemName: tool.systemImage)
-                    .font(.system(size: 15, weight: .semibold))
-                    .foregroundStyle(.secondary)
-                    .frame(width: 22)
-
                 Slider(
                     value: Binding(
                         get: { Double(width) },

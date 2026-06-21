@@ -159,9 +159,7 @@ private struct ClipContentPanel: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             if clip.type == .image {
-                Label("Image note", systemImage: "photo")
-                    .font(.callout.weight(.semibold))
-                    .foregroundStyle(.secondary)
+                ClipDetailImagePreview(clip: clip)
             } else if isEditing {
                 formattingBar
                 NoteTextEditor(
@@ -207,6 +205,44 @@ private struct ClipContentPanel: View {
         .buttonStyle(.plain)
         .glassPanel(cornerRadius: 16, shadow: false, interactive: true)
         .accessibilityLabel(kind.accessibilityName)
+    }
+}
+
+private struct ClipDetailImagePreview: View {
+    let clip: Clip
+
+    var body: some View {
+        Group {
+            if let data = clip.imageData, let image = PlatformImage(data: data) {
+                platformImage(image)
+                    .frame(maxWidth: .infinity)
+                    .frame(minHeight: 180, maxHeight: 420)
+                    .background(Color.black.opacity(0.04), in: RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+                    .overlay {
+                        RoundedRectangle(cornerRadius: 18, style: .continuous)
+                            .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+                    }
+            } else {
+                Label("Image unavailable", systemImage: "photo")
+                    .font(.callout.weight(.semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, minHeight: 160)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func platformImage(_ image: PlatformImage) -> some View {
+        #if canImport(UIKit)
+        Image(uiImage: image)
+            .resizable()
+            .scaledToFit()
+        #elseif canImport(AppKit)
+        Image(nsImage: image)
+            .resizable()
+            .scaledToFit()
+        #endif
     }
 }
 
