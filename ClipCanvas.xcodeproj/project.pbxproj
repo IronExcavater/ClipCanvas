@@ -6,7 +6,18 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		11240E13C3104475584857B2 /* ShareExtension.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = AC20297ACC1D80F60499079A /* ShareExtension.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+/* End PBXBuildFile section */
+
 /* Begin PBXContainerItemProxy section */
+		4077550735C92861BA7B5A38 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = A57CC9412FB3190D00130378 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = C0698DE549267B9B6EF1A9C5;
+			remoteInfo = ShareExtension;
+		};
 		A57CC9AB2FB3429800130378 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = A57CC9412FB3190D00130378 /* Project object */;
@@ -16,9 +27,24 @@
 		};
 /* End PBXContainerItemProxy section */
 
+/* Begin PBXCopyFilesBuildPhase section */
+		A4E83409410F188B766358B8 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				11240E13C3104475584857B2 /* ShareExtension.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
 /* Begin PBXFileReference section */
 		A57CC9492FB3190D00130378 /* ClipCanvas.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = ClipCanvas.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A57CC9A72FB3429800130378 /* ClipCanvasTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = ClipCanvasTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		AC20297ACC1D80F60499079A /* ShareExtension.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = ShareExtension.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
@@ -28,6 +54,13 @@
 				Info.plist,
 			);
 			target = A57CC9482FB3190D00130378 /* ClipCanvas */;
+		};
+		B993CAC502ED8DC5A3A7CEDA /* Exceptions for "ShareExtension" folder in "ShareExtension" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = C0698DE549267B9B6EF1A9C5 /* ShareExtension */;
 		};
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
@@ -43,6 +76,14 @@
 		A57CC9A82FB3429800130378 /* ClipCanvasTests */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = ClipCanvasTests;
+			sourceTree = "<group>";
+		};
+		E13395A7F605F7E8CD7F17F4 /* ShareExtension */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				B993CAC502ED8DC5A3A7CEDA /* Exceptions for "ShareExtension" folder in "ShareExtension" target */,
+			);
+			path = ShareExtension;
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -62,6 +103,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		C815E7CB8E457D46556F0AA9 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -70,6 +118,7 @@
 			children = (
 				A57CC94B2FB3190D00130378 /* ClipCanvas */,
 				A57CC9A82FB3429800130378 /* ClipCanvasTests */,
+				E13395A7F605F7E8CD7F17F4 /* ShareExtension */,
 				A57CC94A2FB3190D00130378 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -79,6 +128,7 @@
 			children = (
 				A57CC9492FB3190D00130378 /* ClipCanvas.app */,
 				A57CC9A72FB3429800130378 /* ClipCanvasTests.xctest */,
+				AC20297ACC1D80F60499079A /* ShareExtension.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -93,10 +143,12 @@
 				A57CC9452FB3190D00130378 /* Sources */,
 				A57CC9462FB3190D00130378 /* Frameworks */,
 				A57CC9472FB3190D00130378 /* Resources */,
+				A4E83409410F188B766358B8 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				1AB25C4D85E644323DBC335B /* PBXTargetDependency */,
 			);
 			fileSystemSynchronizedGroups = (
 				A57CC94B2FB3190D00130378 /* ClipCanvas */,
@@ -131,6 +183,28 @@
 			productReference = A57CC9A72FB3429800130378 /* ClipCanvasTests.xctest */;
 			productType = "com.apple.product-type.bundle.unit-test";
 		};
+		C0698DE549267B9B6EF1A9C5 /* ShareExtension */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 6A525C11BB8874C49E2A4C8B /* Build configuration list for PBXNativeTarget "ShareExtension" */;
+			buildPhases = (
+				0020D1C5B571FBDD7837DEA5 /* Sources */,
+				C815E7CB8E457D46556F0AA9 /* Frameworks */,
+				F9900A890E39AFB706371703 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				E13395A7F605F7E8CD7F17F4 /* ShareExtension */,
+			);
+			name = ShareExtension;
+			packageProductDependencies = (
+			);
+			productName = ShareExtension;
+			productReference = AC20297ACC1D80F60499079A /* ShareExtension.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -147,6 +221,9 @@
 					A57CC9A62FB3429800130378 = {
 						CreatedOnToolsVersion = 26.4.1;
 						TestTargetID = A57CC9482FB3190D00130378;
+					};
+					C0698DE549267B9B6EF1A9C5 = {
+						CreatedOnToolsVersion = 26.4.1;
 					};
 				};
 			};
@@ -166,6 +243,7 @@
 			targets = (
 				A57CC9482FB3190D00130378 /* ClipCanvas */,
 				A57CC9A62FB3429800130378 /* ClipCanvasTests */,
+				C0698DE549267B9B6EF1A9C5 /* ShareExtension */,
 			);
 		};
 /* End PBXProject section */
@@ -179,6 +257,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		A57CC9A52FB3429800130378 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F9900A890E39AFB706371703 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -202,6 +287,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		0020D1C5B571FBDD7837DEA5 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -209,6 +301,11 @@
 			isa = PBXTargetDependency;
 			target = A57CC9482FB3190D00130378 /* ClipCanvas */;
 			targetProxy = A57CC9AB2FB3429800130378 /* PBXContainerItemProxy */;
+		};
+		1AB25C4D85E644323DBC335B /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = C0698DE549267B9B6EF1A9C5 /* ShareExtension */;
+			targetProxy = 4077550735C92861BA7B5A38 /* PBXContainerItemProxy */;
 		};
 /* End PBXTargetDependency section */
 
@@ -469,6 +566,72 @@
 			};
 			name = Release;
 		};
+		BA6B5D13A8846BB6BB56EB19 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = F9STLRRG3B;
+				"ENABLE_APP_SANDBOX[sdk=macosx*]" = YES;
+				"ENABLE_HARDENED_RUNTIME[sdk=macosx*]" = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ShareExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = au.com.ironbyte.ClipCanvas.ShareExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				XROS_DEPLOYMENT_TARGET = 26.4;
+			};
+			name = Debug;
+		};
+		8E4CED4E96A99C5EA1ABD882 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = ShareExtension/ShareExtension.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = F9STLRRG3B;
+				"ENABLE_APP_SANDBOX[sdk=macosx*]" = YES;
+				"ENABLE_HARDENED_RUNTIME[sdk=macosx*]" = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = ShareExtension/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 26.4;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 26.2;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = au.com.ironbyte.ClipCanvas.ShareExtension;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = auto;
+				SKIP_INSTALL = YES;
+				SUPPORTED_PLATFORMS = "iphoneos iphonesimulator macosx xros xrsimulator";
+				SWIFT_APPROACHABLE_CONCURRENCY = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_UPCOMING_FEATURE_MEMBER_IMPORT_VISIBILITY = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2,7";
+				XROS_DEPLOYMENT_TARGET = 26.4;
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -495,6 +658,15 @@
 			buildConfigurations = (
 				A57CC9AE2FB3429800130378 /* Debug */,
 				A57CC9AF2FB3429800130378 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		6A525C11BB8874C49E2A4C8B /* Build configuration list for PBXNativeTarget "ShareExtension" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BA6B5D13A8846BB6BB56EB19 /* Debug */,
+				8E4CED4E96A99C5EA1ABD882 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

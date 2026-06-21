@@ -67,10 +67,14 @@ extension View {
 extension View {
     @ViewBuilder
     func appListRowSpacing(_ spacing: CGFloat) -> some View {
-        if #available(iOS 17.0, macOS 14.0, *) {
+        #if canImport(UIKit)
+        if #available(iOS 17.0, *) {
             self.listRowSpacing(spacing)
         } else {
             self
         }
+        #else
+        self
+        #endif
     }
 }

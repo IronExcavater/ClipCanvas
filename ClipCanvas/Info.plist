@@ -6,5 +6,18 @@
 	<array>
 		<string>remote-notification</string>
 	</array>
+	<key>UIApplicationShortcutItems</key>
+	<array>
+		<dict>
+			<key>UIApplicationShortcutItemIconSymbolName</key>
+			<string>doc.on.clipboard</string>
+			<key>UIApplicationShortcutItemSubtitle</key>
+			<string>Paste into active workspace</string>
+			<key>UIApplicationShortcutItemTitle</key>
+			<string>Copy to Canvas</string>
+			<key>UIApplicationShortcutItemType</key>
+			<string>au.com.ironbyte.ClipCanvas.copyToCanvas</string>
+		</dict>
+	</array>
 </dict>
 </plist>
