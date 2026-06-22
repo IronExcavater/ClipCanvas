@@ -39,24 +39,14 @@ struct ClipRow: View {
                 }
 
                 if isExpanded {
-                    MarkdownPreview(
-                        text: displayPreview,
-                        revealedSensitiveParts: revealStore.revealedPartIDs,
-                        onSensitivePartTapped: revealStore.toggle
-                    )
-                        .font(.callout)
-                        .foregroundStyle(.primary.opacity(0.78))
-                        .lineLimit(6)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .transition(.opacity.combined(with: .move(edge: .top)))
-                }
-
-                if !clip.tags.isEmpty {
+                    expandedContent
+                } else if !clip.tags.isEmpty {
                     rowFooter
                 }
             }
         }
         .onTapGesture(perform: primaryAction)
+        .animation(.easeInOut(duration: 0.2), value: isExpanded)
         .accessibilityAddTraits(.isButton)
         .swipeActions(edge: .leading) {
             AppSwipeIconButton(
@@ -163,6 +153,44 @@ struct ClipRow: View {
         VStack(alignment: .leading, spacing: 4) {
             TagPillRow(tags: Array(clip.tags), limit: 3, size: compact ? .compact : .regular)
         }
+    }
+
+    private var expandedContent: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Divider()
+                .opacity(0.42)
+                .padding(.bottom, 10)
+
+            VStack(alignment: .leading, spacing: 10) {
+                MarkdownPreview(
+                    text: displayPreview,
+                    revealedSensitiveParts: revealStore.revealedPartIDs,
+                    onSensitivePartTapped: revealStore.toggle
+                )
+                .font(.callout)
+                .foregroundStyle(.primary.opacity(0.86))
+                .lineLimit(18)
+                .multilineTextAlignment(.leading)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                if !clip.tags.isEmpty {
+                    TagPillRow(tags: Array(clip.tags), limit: 6, size: .regular)
+                        .padding(.top, 2)
+                }
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 11)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background {
+                RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    .fill(Color.primary.opacity(0.035))
+            }
+        }
+        .padding(.top, 1)
+        .transition(.asymmetric(
+            insertion: .opacity.combined(with: .scale(scale: 0.985, anchor: .top)),
+            removal: .opacity
+        ))
     }
 
     private static func plainRowPreview(from text: String, fallback: String) -> String {

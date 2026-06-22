@@ -17,7 +17,11 @@ struct CanvasInspectorPanel: View {
     var body: some View {
         Group {
             if let activeAIChat {
-                AIChatDetailView(chat: activeAIChat, onClose: onCloseChat)
+                AIChatDetailView(
+                    chat: activeAIChat,
+                    selectedCanvasObjectIDs: Set(selectedObjects.map(\.id)),
+                    onClose: onCloseChat
+                )
             } else if let detailClip {
                 ClipDetailView(clip: detailClip, onClose: onCloseDetail)
             } else {

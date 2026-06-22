@@ -132,7 +132,7 @@ struct CanvasContainerView: View {
                 },
                 onWillMutateCanvas: captureCanvasUndoSnapshot
             )
-            .ignoresSafeArea(.container)
+            .canvasContentSafeAreaBehavior()
 
             VStack(spacing: 0) {
                 topChrome
@@ -198,7 +198,7 @@ struct CanvasContainerView: View {
                     onDrawToolSettings: toggleDrawToolSettings
                 )
             }
-            .ignoresSafeArea(.container, edges: [.bottom, .horizontal])
+            .canvasOverlaySafeAreaBehavior()
 
             if let tool = drawToolSettings {
                 CanvasBottomOverlay(bottomPadding: drawingSettingsBottomPadding, onDismiss: dismissDrawToolSettings) {
@@ -338,7 +338,8 @@ struct CanvasContainerView: View {
         .modifier(
             CanvasContainerSheetPresenter(
                 detailClip: detailSheetBinding(usesInspector: usesInspector),
-                activeAIChat: chatSheetBinding(usesInspector: usesInspector)
+                activeAIChat: chatSheetBinding(usesInspector: usesInspector),
+                selectedCanvasObjectIDs: selectedObjectIDs
             )
         )
     }
@@ -568,6 +569,26 @@ struct CanvasContainerView: View {
     }
 }
 
+private extension View {
+    @ViewBuilder
+    func canvasContentSafeAreaBehavior() -> some View {
+        #if os(macOS)
+        self.ignoresSafeArea(.container, edges: [.top, .bottom])
+        #else
+        self.ignoresSafeArea(.container)
+        #endif
+    }
+
+    @ViewBuilder
+    func canvasOverlaySafeAreaBehavior() -> some View {
+        #if os(macOS)
+        self.ignoresSafeArea(.container, edges: .bottom)
+        #else
+        self.ignoresSafeArea(.container, edges: [.bottom, .horizontal])
+        #endif
+    }
+}
+
 private struct CanvasSearchPill: View {
     @Binding var search: String
     let resultCount: Int
@@ -629,6 +650,7 @@ private struct CanvasTopChromeHeightPreferenceKey: PreferenceKey {
 private struct CanvasContainerSheetPresenter: ViewModifier {
     @Binding var detailClip: Clip?
     @Binding var activeAIChat: AIChat?
+    let selectedCanvasObjectIDs: Set<UUID>
 
     func body(content: Content) -> some View {
         content
@@ -636,7 +658,7 @@ private struct CanvasContainerSheetPresenter: ViewModifier {
                 ClipDetailSheet(clip: clip)
             }
             .sheet(item: $activeAIChat) { chat in
-                AIChatDetailSheet(chat: chat)
+                AIChatDetailSheet(chat: chat, selectedCanvasObjectIDs: selectedCanvasObjectIDs)
             }
     }
 }

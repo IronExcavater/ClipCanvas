@@ -9,6 +9,7 @@ struct RootView: View {
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var activeAIChat: AIChat?
     @State private var sidebarPath: [SidebarDestination] = []
+    @State private var macSidebarDestination: SidebarDestination?
 
     var body: some View {
         GeometryReader { proxy in
@@ -102,28 +103,31 @@ struct RootView: View {
     #if os(macOS)
     private func macSplitLayout(prefersInspector: Bool) -> some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            NavigationStack(path: $sidebarPath) {
-                SidebarView(
-                    onClose: { columnVisibility = .detailOnly },
-                    onOpenAIChat: { activeAIChat = $0 },
-                    navigationPath: $sidebarPath
-                )
-                .navigationDestination(for: SidebarDestination.self) { destination in
-                    SidebarDestinationContent(destination: destination)
-                }
-            }
+            SidebarView(
+                onClose: nil,
+                onOpenAIChat: { activeAIChat = $0 },
+                navigationPath: $sidebarPath,
+                macSelection: $macSidebarDestination
+            )
             .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 340)
         } detail: {
-            CanvasHost(
-                onToggleSidebar: {
-                    withAnimation {
-                        columnVisibility = columnVisibility == .all ? .detailOnly : .all
-                    }
-                },
-                prefersInspector: false,
-                showsSidebarButton: false
-            )
+            if let macSidebarDestination {
+                NavigationStack {
+                    SidebarDestinationContent(destination: macSidebarDestination)
+                }
+            } else {
+                CanvasHost(
+                    onToggleSidebar: {
+                        withAnimation {
+                            columnVisibility = columnVisibility == .all ? .detailOnly : .all
+                        }
+                    },
+                    prefersInspector: false,
+                    showsSidebarButton: false
+                )
+            }
         }
+        .toolbar(removing: .sidebarToggle)
     }
     #endif
 
@@ -154,11 +158,13 @@ struct RootView: View {
                 sidebarOpen = false
                 columnVisibility = .detailOnly
                 activeAIChat = nil
+                macSidebarDestination = nil
             case .clip:
                 sidebarPath = [.history]
                 sidebarOpen = true
                 columnVisibility = .all
                 activeAIChat = nil
+                macSidebarDestination = .history
             case .chat:
                 sidebarPath.removeAll()
                 sidebarOpen = true

@@ -6,17 +6,23 @@ import UIKit
 
 struct AIChatDetailSheet: View {
     @Bindable var chat: AIChat
+    var selectedCanvasObjectIDs: Set<UUID> = []
 
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        AIChatDetailView(chat: chat, onClose: { dismiss() })
+        AIChatDetailView(
+            chat: chat,
+            selectedCanvasObjectIDs: selectedCanvasObjectIDs,
+            onClose: { dismiss() }
+        )
             .appSheetPresentationDetents()
     }
 }
 
 struct AIChatDetailView: View {
     @Bindable var chat: AIChat
+    var selectedCanvasObjectIDs: Set<UUID> = []
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
@@ -285,6 +291,7 @@ struct AIChatDetailView: View {
         user.chat = chat
         chat.messages.append(user)
         context.insert(user)
+        attachSelectedCanvasObjects(to: user)
 
         let assistant = ChatMessage(role: .assistant, content: "")
         assistant.status = .streaming
@@ -297,6 +304,23 @@ struct AIChatDetailView: View {
         Task {
             await AIChatCommandRouter.respond(to: user, with: assistant, in: context)
             isSending = false
+        }
+    }
+
+    private func attachSelectedCanvasObjects(to message: ChatMessage) {
+        let selected = canvasObjects
+            .filter { selectedCanvasObjectIDs.contains($0.id) && $0.isCanvasContent }
+            .sorted { lhs, rhs in
+                if lhs.zIndex == rhs.zIndex { return lhs.createdAt < rhs.createdAt }
+                return lhs.zIndex < rhs.zIndex
+            }
+        guard !selected.isEmpty else { return }
+
+        for object in selected {
+            let attachment = ChatAttachment(object: object)
+            attachment.message = message
+            message.attachments.append(attachment)
+            context.insert(attachment)
         }
     }
 

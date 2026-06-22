@@ -49,6 +49,28 @@ import Testing
         #expect(input.contains("Attached canvas card, content: Attached launch detail"))
     }
 
+    @Test func currentUserMessageAttachmentsAreIncludedInModelInput() {
+        let workspace = Workspace(name: "Research")
+        let card = workspace.createNote(
+            centeredAt: CGPoint(x: 100, y: 100),
+            size: CGSize(width: 220, height: 140),
+            text: "Selected card detail"
+        )
+        let chat = AIChat(title: "Question")
+        chat.workspace = workspace
+        let prompt = ChatMessage(role: .user, content: "Use the selected card")
+        prompt.chat = chat
+        chat.messages.append(prompt)
+        let attachment = ChatAttachment(object: card)
+        attachment.message = prompt
+        prompt.attachments.append(attachment)
+
+        let input = AIChatPromptBuilder.input(for: prompt, chat: chat, workspace: workspace)
+
+        #expect(input.contains("Attached canvas card, content: Selected card detail"))
+        #expect(input.contains("User request:\nUse the selected card"))
+    }
+
     @Test func attachedPrivateClipsDoNotExposeContentInModelInput() {
         let workspace = Workspace(name: "Research")
         let clip = Clip(

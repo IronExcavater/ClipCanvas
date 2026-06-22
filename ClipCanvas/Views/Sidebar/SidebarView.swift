@@ -20,6 +20,7 @@ struct SidebarView: View {
     var isOpen = true
     var onOpenAIChat: ((AIChat) -> Void)?
     @Binding var navigationPath: [SidebarDestination]
+    var macSelection: Binding<SidebarDestination?>? = nil
     @State private var iCloudStatus: ICloudProfileStatus = .checking
 
     @Query(
@@ -147,6 +148,21 @@ struct SidebarView: View {
                     .buttonStyle(.plain)
                     .accessibilityLabel("Switch Workspace")
                 } else {
+                    #if os(macOS)
+                    Button {
+                        macSelection?.wrappedValue = nil
+                    } label: {
+                        SidebarActiveWorkspaceSummary(
+                            name: activeWorkspace?.name ?? "Choose a workspace",
+                            cardCount: activeWorkspaceVisibleCardCount,
+                            chatCount: activeWorkspaceChatCount,
+                            updatedAt: activeWorkspace?.updatedAt,
+                            showsDisclosure: false
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Open Canvas")
+                    #else
                     SidebarActiveWorkspaceSummary(
                         name: activeWorkspace?.name ?? "Choose a workspace",
                         cardCount: activeWorkspaceVisibleCardCount,
@@ -154,6 +170,7 @@ struct SidebarView: View {
                         updatedAt: activeWorkspace?.updatedAt,
                         showsDisclosure: false
                     )
+                    #endif
                 }
 
                 sidebarNavButton(destination: .workspaces, systemImage: "rectangle.3.group")
@@ -186,10 +203,10 @@ struct SidebarView: View {
                     #if canImport(UIKit)
                     UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
                     #else
-                    navigationPath.append(.iCloudProfile)
+                    open(destination: .iCloudProfile)
                     #endif
                 } else {
-                    navigationPath.append(.iCloudProfile)
+                    open(destination: .iCloudProfile)
                 }
             } label: {
                 iCloudProfile
@@ -243,12 +260,23 @@ struct SidebarView: View {
     }
 
     private func sidebarNavButton(destination: SidebarDestination, systemImage: String) -> some View {
+        #if os(macOS)
+        Button {
+            open(destination: destination)
+        } label: {
+            Image(systemName: systemImage)
+                .font(.system(size: 18, weight: .semibold))
+                .foregroundStyle(.primary)
+        }
+        .buttonStyle(BlendedIconButtonStyle())
+        #else
         NavigationLink(value: destination) {
             Image(systemName: systemImage)
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(.primary)
         }
         .buttonStyle(BlendedIconButtonStyle())
+        #endif
     }
 
     private var iCloudStatusText: String {
@@ -294,8 +322,19 @@ struct SidebarView: View {
         onClose?()
     }
 
+    private func open(destination: SidebarDestination) {
+        #if os(macOS)
+        macSelection?.wrappedValue = destination
+        #else
+        navigationPath.append(destination)
+        #endif
+    }
+
     private func activateWorkspace(_ workspace: Workspace) {
         WorkspaceActionService.activate(workspace, among: workspaces)
+        #if os(macOS)
+        macSelection?.wrappedValue = nil
+        #endif
     }
 
     private func createChat() {
