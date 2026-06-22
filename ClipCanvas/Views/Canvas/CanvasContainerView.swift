@@ -13,7 +13,6 @@ struct CanvasContainerView: View {
     var showsSidebarButton = true
 
     @Environment(\.modelContext) var context
-    @Environment(\.undoManager) private var undoManager
     @Environment(\.scenePhase) private var scenePhase
     @Query(
         filter: #Predicate<Workspace> { $0.deletedAt == nil },
@@ -140,12 +139,6 @@ struct CanvasContainerView: View {
 
                 if editingObjectID == nil {
                     HStack {
-                        CanvasUndoControls(
-                            onUndo: { undoManager?.undo() },
-                            onRedo: { undoManager?.redo() }
-                        )
-                        .padding(.leading, 14)
-                        .padding(.bottom, 12)
                         Spacer()
                         CanvasZoomControls(
                             scale: visibleScale,
@@ -263,7 +256,6 @@ struct CanvasContainerView: View {
         .animation(.spring(response: 0.28, dampingFraction: 0.86), value: editingObjectID)
         .focusedSceneValue(\.canvasCommandActions, canvasCommandActions)
         .onAppear {
-            context.undoManager = undoManager
             loadPersistedDrawing()
             prepareClipboardAccessOnLaunch()
             consumePendingCanvasRoute()
