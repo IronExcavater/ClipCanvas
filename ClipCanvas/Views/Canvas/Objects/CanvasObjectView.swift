@@ -105,7 +105,7 @@ struct CanvasObjectView: View {
     @ViewBuilder
     private var content: some View {
         if !showsContent {
-            Color.clear
+            CanvasTextSquigglePlaceholder()
         } else if isEditing, usesEditableText {
             NoteTextEditor(
                 initialText: editingText,

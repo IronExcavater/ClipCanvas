@@ -5,7 +5,7 @@ import Foundation
 // can't call into the running app's SwiftUI state directly. The main app drains this on
 // every foreground (see ClipCanvasApp's scenePhase handling).
 enum PendingCanvasActionStore {
-    private static let appGroupID = "group.au.com.ironbyte.ClipCanvas"
+    private static let appGroupID = "group.au.com.ironbyte.clipcanvas.app"
     private static var shared: UserDefaults { UserDefaults(suiteName: appGroupID) ?? .standard }
 
     private static let pendingCopyKey = "clipcanvas.pendingCopyToCanvas"

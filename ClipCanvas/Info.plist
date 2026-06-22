@@ -16,7 +16,7 @@
 			<key>UIApplicationShortcutItemTitle</key>
 			<string>Copy to Canvas</string>
 			<key>UIApplicationShortcutItemType</key>
-			<string>au.com.ironbyte.ClipCanvas.copyToCanvas</string>
+			<string>au.com.ironbyte.clipcanvas.app.copyToCanvas</string>
 		</dict>
 	</array>
 </dict>

@@ -81,7 +81,7 @@ struct ClipCard: View {
     private var content: some View {
         Group {
             if !showsContent {
-                Color.clear
+                CanvasTextSquigglePlaceholder()
             } else if isEditing, clip.type != .image {
                 NoteTextEditor(
                     initialText: editingText,
@@ -169,6 +169,8 @@ struct CanvasNoteTagFooter: View {
 
 
 struct ResizeHandle: View {
+    var tint: Color = .secondary
+
     var body: some View {
         Canvas { ctx, size in
             let count = 3
@@ -179,12 +181,48 @@ struct ResizeHandle: View {
                 var path = Path()
                 path.move(to: CGPoint(x: size.width - offset - spacing, y: size.height))
                 path.addLine(to: CGPoint(x: size.width, y: size.height - offset - spacing))
-                ctx.stroke(path, with: .color(.secondary.opacity(0.55)), lineWidth: lineWidth)
+                ctx.stroke(path, with: .color(tint.opacity(0.78)), lineWidth: lineWidth)
             }
         }
         .frame(width: 28, height: 28)
         .padding(6)
         .contentShape(Rectangle())
+    }
+}
+
+struct CanvasTextSquigglePlaceholder: View {
+    var body: some View {
+        Canvas { ctx, size in
+            let rows = max(2, min(7, Int(size.height / 18)))
+            let amplitude: CGFloat = 1.8
+            let rowHeight = max(size.height / CGFloat(rows + 1), 12)
+
+            for row in 0..<rows {
+                let y = CGFloat(row + 1) * rowHeight
+                let widthFactor = row == rows - 1 ? 0.58 : 0.88
+                let lineWidth = max(size.width * widthFactor, 20)
+                var path = Path()
+                path.move(to: CGPoint(x: 0, y: y))
+
+                var x: CGFloat = 0
+                while x < lineWidth {
+                    let nextX = min(x + 10, lineWidth)
+                    path.addQuadCurve(
+                        to: CGPoint(x: nextX, y: y),
+                        control: CGPoint(x: (x + nextX) / 2, y: y + (row.isMultiple(of: 2) ? amplitude : -amplitude))
+                    )
+                    x = nextX
+                }
+
+                ctx.stroke(
+                    path,
+                    with: .color(.primary.opacity(0.18)),
+                    style: StrokeStyle(lineWidth: 2.1, lineCap: .round, lineJoin: .round)
+                )
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        .accessibilityHidden(true)
     }
 }
 

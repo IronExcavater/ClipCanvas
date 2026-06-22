@@ -18,7 +18,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate {
         completionHandler: @escaping (Bool) -> Void
     ) {
         switch shortcutItem.type {
-        case "au.com.ironbyte.ClipCanvas.copyToCanvas":
+        case "au.com.ironbyte.clipcanvas.app.copyToCanvas":
             // Write to the App Group first in case SwiftUI hasn't initialised yet.
             PendingCanvasActionStore.requestCopyToCanvas()
             // Also post a notification so the canvas picks it up immediately if already running.

@@ -18,7 +18,7 @@ final class FeedbackPresenter {
     func show(
         _ message: String,
         kind: FeedbackKind? = nil,
-        duration: Duration = .seconds(1.7),
+        duration: Duration? = nil,
         autoDismiss: Bool = true
     ) -> FeedbackItem {
         hideTask?.cancel()
@@ -28,8 +28,9 @@ final class FeedbackPresenter {
         }
 
         if autoDismiss {
+            let resolvedDuration = duration ?? Self.duration(for: message)
             hideTask = Task { [weak self] in
-                try? await Task.sleep(for: duration)
+                try? await Task.sleep(for: resolvedDuration)
                 self?.dismiss(id: next.id)
             }
         }
@@ -43,6 +44,12 @@ final class FeedbackPresenter {
         withAnimation(.easeInOut(duration: 0.18)) {
             item = nil
         }
+    }
+
+    private static func duration(for message: String) -> Duration {
+        let trimmed = message.trimmingCharacters(in: .whitespacesAndNewlines)
+        let extra = Double(trimmed.count) * 0.028
+        return .seconds(min(max(1.7 + extra, 1.7), 5.2))
     }
 }
 

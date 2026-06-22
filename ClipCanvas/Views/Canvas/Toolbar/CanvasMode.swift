@@ -153,8 +153,6 @@ nonisolated struct CanvasToolbarConfiguration: Hashable {
     ) -> CanvasToolbarConfiguration {
         if isEditing {
             return CanvasToolbarConfiguration(items: [
-                .askAI,
-                .copyToClipboard,
                 .closeMode,
                 .formatPanel,
                 .formatList,
@@ -162,6 +160,7 @@ nonisolated struct CanvasToolbarConfiguration: Hashable {
                 .formatLink,
                 .formatOutdent,
                 .formatIndent,
+                .color,
                 .formatBold,
                 .formatItalic,
                 .formatUnderline,

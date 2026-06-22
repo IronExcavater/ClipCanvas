@@ -19,9 +19,10 @@ struct CanvasResizeHandle: View {
     let onResize: (CGSize) -> Void
     let onResizeEnded: () -> Void
     let onToggleExpandedSize: () -> Void
+    var tint: Color = .secondary
 
     var body: some View {
-        ResizeHandle()
+        ResizeHandle(tint: tint)
             .onTapGesture(count: 2, perform: onToggleExpandedSize)
             .highPriorityGesture(
                 DragGesture(minimumDistance: 6, coordinateSpace: .global)

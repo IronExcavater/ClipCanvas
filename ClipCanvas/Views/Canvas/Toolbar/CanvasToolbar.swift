@@ -41,6 +41,7 @@ struct CanvasToolbar: View {
     @State private var linkURL = ""
     @State private var linkDisplayText = ""
     @State private var enabledInlineFormats: Set<CanvasToolbarItem> = []
+    @AppStorage(ClipboardService.accessEnabledKey) private var clipboardAccessEnabled = false
 
     private let buttonSize: CGFloat = 50
     private let iconSize: CGFloat = 19
@@ -53,6 +54,17 @@ struct CanvasToolbar: View {
             selectionKind: selectionKind,
             isEditing: isEditing
         )
+    }
+
+    private var visibleItems: [CanvasToolbarItem] {
+        configuration.items.filter { item in
+            switch item {
+            case .paste, .copyToClipboard, .pasteFromClipboard:
+                return clipboardAccessEnabled
+            default:
+                return true
+            }
+        }
     }
 
     var body: some View {
@@ -77,8 +89,9 @@ struct CanvasToolbar: View {
     private var toolbarShell: some View {
         GeometryReader { proxy in
             let maxPanelWidth = max(proxy.size.width, 280)
-            let compactWidth = min(maxPanelWidth, CGFloat(configuration.items.count) * buttonSize + CGFloat(max(configuration.items.count - 1, 0)) * 8 + 20)
-            let panelWidth = configuration.items.count > 6 ? maxPanelWidth : compactWidth
+            let itemCount = visibleItems.count
+            let compactWidth = min(maxPanelWidth, CGFloat(itemCount) * buttonSize + CGFloat(max(itemCount - 1, 0)) * 8 + 20)
+            let panelWidth = itemCount > 6 ? maxPanelWidth : compactWidth
 
             HStack {
                 Spacer(minLength: 0)
@@ -92,7 +105,7 @@ struct CanvasToolbar: View {
 
     @ViewBuilder
     private func toolbarContent(width panelWidth: CGFloat) -> some View {
-        let isPaged = configuration.items.count > 6
+        let isPaged = visibleItems.count > 6
         let contentWidth = max(panelWidth - 20, 1)
         let spacing = isPaged ? max((contentWidth - buttonSize * visiblePagedTools) / visiblePagedTools, 6) : 8
 
@@ -101,7 +114,7 @@ struct CanvasToolbar: View {
                 pagedToolbar(spacing: spacing)
             } else {
                 HStack(spacing: spacing) {
-                    ForEach(configuration.items, id: \.self) { item in
+                    ForEach(visibleItems, id: \.self) { item in
                         toolbarItem(item)
                     }
                 }
@@ -118,7 +131,7 @@ struct CanvasToolbar: View {
     private func pagedToolbar(spacing: CGFloat) -> some View {
         ScrollView(.horizontal) {
             HStack(spacing: spacing) {
-                ForEach(configuration.items, id: \.self) { item in
+                ForEach(visibleItems, id: \.self) { item in
                     toolbarItem(item)
                         .frame(width: buttonSize)
                 }
@@ -168,7 +181,7 @@ struct CanvasToolbar: View {
             case .delete: destructiveButton("trash", action: onDelete)
             case .divider: AppDivider()
             case .mode(let canvasMode): modeButton(canvasMode.systemImage, for: canvasMode)
-            case .closeMode: toolButton("xmark", action: onCloseMode)
+            case .closeMode: backToolButton(action: onCloseMode)
             case .drawPen: drawToolButton(.pen)
             case .drawHighlighter: drawToolButton(.highlighter)
             case .drawEraser: drawToolButton(.eraser)
@@ -218,6 +231,21 @@ struct CanvasToolbar: View {
     private func toolButton(_ icon: String, action: @escaping () -> Void) -> some View {
         Button(action: action) { toolLabel(icon) }
             .buttonStyle(.plain)
+    }
+
+    private func backToolButton(action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            ZStack {
+                Circle()
+                    .fill(Color.accentColor.opacity(0.14))
+                Image(systemName: "chevron.backward")
+                    .font(.system(size: iconSize, weight: .semibold))
+                    .foregroundStyle(Color.accentColor)
+            }
+            .frame(width: buttonSize, height: buttonSize)
+            .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
     }
 
     private func toggleToolButton(_ icon: String, item: CanvasToolbarItem, action: @escaping () -> Void) -> some View {

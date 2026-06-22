@@ -168,6 +168,22 @@ final class Clip: SoftDeletable, Identifiable {
         updateSensitivity(.normal, reason: nil)
     }
 
+    func duplicateForCanvas(origin: ClipOrigin? = nil) -> Clip {
+        let copy = Clip(
+            content: content,
+            imageData: imageData,
+            imageUTI: imageUTI,
+            origin: origin ?? self.origin,
+            sensitivity: sensitivity,
+            sensitivityReason: sensitivityReason,
+            color: color
+        )
+        copy.expiresAt = expiresAt
+        copy.isPinned = false
+        copy.tags = tags
+        return copy
+    }
+
     // MARK: - Type detection
 
     static func detect(content: String, imageData: Data?) -> ClipType {

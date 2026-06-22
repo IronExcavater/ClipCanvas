@@ -19,6 +19,32 @@ nonisolated enum CanvasGridLayout {
         max(1, Int(ceil(sqrt(Double(itemCount)))))
     }
 
+    static func compactColumnCount<ID: Hashable>(
+        for items: [CanvasGridLayoutItem<ID>],
+        targetAspectRatio: CGFloat = 1.35,
+        spacing: CGSize = defaultSpacing
+    ) -> Int {
+        guard !items.isEmpty else { return 1 }
+
+        let maxColumns = items.count
+        var bestColumns = balancedColumnCount(for: items.count)
+        var bestScore = CGFloat.greatestFiniteMagnitude
+
+        for columns in 1...maxColumns {
+            let size = contentSize(for: items, columns: columns, spacing: spacing)
+            guard size.width > 0, size.height > 0 else { continue }
+            let aspectScore = abs((size.width / size.height) - targetAspectRatio)
+            let columnPenalty = CGFloat(columns) * 0.012
+            let score = aspectScore + columnPenalty
+            if score < bestScore {
+                bestScore = score
+                bestColumns = columns
+            }
+        }
+
+        return bestColumns
+    }
+
     static func frames<ID: Hashable>(
         for items: [CanvasGridLayoutItem<ID>],
         columns: Int,

@@ -54,4 +54,24 @@ nonisolated enum CanvasViewportFitting {
             rubberBand: false
         )
     }
+
+    static func origin(
+        centeredOn frame: CGRect,
+        viewportSize: CGSize,
+        scale: CGFloat,
+        bounds: CanvasRadiusBounds
+    ) -> CGPoint {
+        let proposed = CanvasViewportBounds.origin(
+            forCenter: CGPoint(x: frame.midX, y: frame.midY),
+            viewportSize: viewportSize,
+            scale: scale
+        )
+        return CanvasViewportBounds.boundedOrigin(
+            proposed,
+            viewportSize: viewportSize,
+            scale: scale,
+            bounds: bounds,
+            rubberBand: false
+        )
+    }
 }

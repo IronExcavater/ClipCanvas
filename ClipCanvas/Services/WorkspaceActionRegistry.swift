@@ -297,10 +297,15 @@ private extension WorkspaceActionRegistry {
         let arguments = try decode(WorkspaceDuplicateObjectsArguments.self, from: request)
         let selected = objects(ids: arguments.objectIDs, in: workspace)
         let copies = selected.map { original in
+            let copiedClip = original.clip?.duplicateForCanvas()
+            if let copiedClip {
+                context.insert(copiedClip)
+            }
+
             let copy = CanvasObject(
                 kind: original.kind,
                 workspace: workspace,
-                clip: original.clip,
+                clip: copiedClip,
                 x: original.x + arguments.offsetX,
                 y: original.y + arguments.offsetY,
                 width: original.width,

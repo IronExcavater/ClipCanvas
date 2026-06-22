@@ -357,12 +357,12 @@ private struct ClipInfoRow: View {
     }
 
     var body: some View {
-        LabeledContent {
-            Text(value)
-                .foregroundStyle(.primary)
-        } label: {
+        HStack(spacing: 12) {
             Label(title, systemImage: icon)
                 .foregroundStyle(.primary.opacity(0.68))
+            Spacer(minLength: 12)
+            Text(value)
+                .foregroundStyle(.primary)
         }
         .font(.footnote)
     }
@@ -372,12 +372,12 @@ private struct ClipUpdatedRow: View {
     let date: Date
 
     var body: some View {
-        LabeledContent {
-            RelativeAgeText(date: date, prefix: "Updated ", suffix: " ago", emptyText: "Updated just now")
-                .foregroundStyle(.primary)
-        } label: {
+        HStack(spacing: 12) {
             Label("Last Updated", systemImage: "clock")
                 .foregroundStyle(.primary.opacity(0.68))
+            Spacer(minLength: 12)
+            RelativeAgeText(date: date, prefix: "Updated ", suffix: " ago", emptyText: "Updated just now")
+                .foregroundStyle(.primary)
         }
         .font(.footnote)
     }
@@ -403,32 +403,32 @@ private struct ClipDetailActionToolbar: View {
     let onDelete: () -> Void
 
     var body: some View {
-        ScrollView(.horizontal) {
-            HStack(spacing: 10) {
-                action("Copy", icon: "doc.on.doc", action: onCopy)
-                    .disabled(!canCopy)
-                ShareLink(item: shareText) {
-                    actionLabel("Share", icon: "square.and.arrow.up")
-                }
-                .buttonStyle(.plain)
-                if canEdit {
-                    action("Edit", icon: "character.cursor.ibeam", action: onEdit)
-                }
-                if canOpenLink {
-                    action("Open", icon: "safari", action: onOpen)
-                }
-                action("Canvas", icon: "square.and.arrow.down", action: onAddToCanvas)
-                    .disabled(!canAddToCanvas)
-                transformMenu
-                action(isPinned ? "Unpin" : "Pin", icon: isPinned ? "pin.slash" : "pin", action: onPin)
-                action(isPrivate ? "Unmark" : "Sensitive",
-                       icon: isPrivate ? "lock.open" : "lock",
-                       action: onSensitive)
-                action("Delete", icon: "trash", destructive: true, action: onDelete)
+        LazyVGrid(columns: actionColumns, alignment: .leading, spacing: 10) {
+            action("Copy", icon: "doc.on.doc", action: onCopy)
+                .disabled(!canCopy)
+            ShareLink(item: shareText) {
+                actionLabel("Share", icon: "square.and.arrow.up")
             }
-            .padding(.vertical, 2)
+            .buttonStyle(.plain)
+            if canEdit {
+                action("Edit", icon: "character.cursor.ibeam", action: onEdit)
+            }
+            if canOpenLink {
+                action("Open", icon: "safari", action: onOpen)
+            }
+            action("Canvas", icon: "square.and.arrow.down", action: onAddToCanvas)
+                .disabled(!canAddToCanvas)
+            transformMenu
+            action(isPinned ? "Unpin" : "Pin", icon: isPinned ? "pin.slash" : "pin", action: onPin)
+            action(isPrivate ? "Unmark" : "Sensitive",
+                   icon: isPrivate ? "lock.open" : "lock",
+                   action: onSensitive)
+            action("Delete", icon: "trash", destructive: true, action: onDelete)
         }
-        .scrollIndicators(.hidden)
+    }
+
+    private var actionColumns: [GridItem] {
+        [GridItem(.adaptive(minimum: 68, maximum: 86), spacing: 10)]
     }
 
     @ViewBuilder

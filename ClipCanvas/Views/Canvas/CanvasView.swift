@@ -460,21 +460,27 @@ struct CanvasView: View {
             return
         }
 
-        let minX = canvasObjects.map(\.x).min() ?? 0
-        let minY = canvasObjects.map(\.y).min() ?? 0
-        let maxX = canvasObjects.map { $0.x + $0.width }.max() ?? 0
-        let maxY = canvasObjects.map { $0.y + $0.height }.max() ?? 0
-        let contentWidth = max(maxX - minX, 1)
-        let contentHeight = max(maxY - minY, 1)
+        fit(frames: canvasObjects.map(\.frame), in: geo)
+    }
+
+    private func fit(frames: [CGRect], in geo: GeometryProxy) {
+        guard let union = frames.reduce(nil, { partial, frame in
+            partial?.union(frame) ?? frame
+        }) else { return }
+
+        let contentWidth = max(union.width, 1)
+        let contentHeight = max(union.height, 1)
         let availableWidth = max(geo.size.width - 80, 1)
         let availableHeight = max(geo.size.height - 180, 1)
         let next = CanvasScaleSteps.fitting(min(availableWidth / contentWidth, availableHeight / contentHeight))
         canvasScale = next
-        let proposedOrigin = CGPoint(
-            x: CGFloat(minX + contentWidth / 2) - geo.size.width / (2 * next),
-            y: CGFloat(minY + contentHeight / 2) - geo.size.height / (2 * next)
+        let bounds = canvasBounds(viewportSize: geo.size)
+        viewportOrigin = CanvasViewportFitting.origin(
+            centeredOn: union,
+            viewportSize: geo.size,
+            scale: next,
+            bounds: bounds
         )
-        viewportOrigin = boundedOrigin(proposedOrigin, viewportSize: geo.size, rubberBand: false)
     }
 
     private func updateResizePreview(for object: CanvasObject, translation: CGSize) {
@@ -523,8 +529,7 @@ struct CanvasView: View {
             bounds: bounds
         )
         let origin = CanvasViewportFitting.origin(
-            revealing: frame,
-            currentOrigin: viewportOrigin,
+            centeredOn: frame,
             viewportSize: geo.size,
             scale: canvasScale,
             bounds: bounds
@@ -762,7 +767,7 @@ struct CanvasView: View {
         }
         let frames = CanvasGridLayout.centeredFrames(
             for: items,
-            columns: CanvasGridLayout.balancedColumnCount(for: target.count),
+            columns: CanvasGridLayout.compactColumnCount(for: items),
             center: center
         )
 
@@ -775,7 +780,12 @@ struct CanvasView: View {
             object.markUpdated()
         }
 
-        if fitAfter { fitContent(in: geo) }
+        let arrangedFrames = frames.map { CGRect(origin: $0.origin, size: $0.size) }
+        if fitAfter {
+            fitContent(in: geo)
+        } else {
+            fit(frames: arrangedFrames, in: geo)
+        }
         updateVisibleObjectIDs(in: geo)
     }
 
@@ -833,10 +843,15 @@ struct CanvasView: View {
     }
 
     private func duplicate(_ object: CanvasObject, in geo: GeometryProxy) {
+        let copiedClip = object.clip?.duplicateForCanvas()
+        if let copiedClip {
+            context.insert(copiedClip)
+        }
+
         let copy = CanvasObject(
             kind: object.kind,
             workspace: workspace,
-            clip: object.clip,
+            clip: copiedClip,
             x: object.x + 28,
             y: object.y + 28,
             width: object.width,

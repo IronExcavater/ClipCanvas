@@ -5,7 +5,7 @@ extension CanvasContainerView {
 
     func paste() {
         guard clipboardAccessEnabled else {
-            showFeedback("Enable clipboard features in Settings to paste", kind: .info)
+            showFeedback("Clipboard is off", kind: .info)
             return
         }
         guard let content = ClipboardService.readContent() else {
@@ -80,7 +80,7 @@ extension CanvasContainerView {
 
     func copySelectedToClipboard() {
         guard clipboardAccessEnabled else {
-            showFeedback("Enable clipboard features in Settings to copy", kind: .info)
+            showFeedback("Clipboard is off", kind: .info)
             return
         }
         let objects = orderedCanvasObjects(matching: selectedObjectIDs)
@@ -88,7 +88,7 @@ extension CanvasContainerView {
         let clips = objects.compactMap(\.clip)
         if clips.count == objects.count {
             guard ClipActionService.copy(clips) else {
-                showFeedback("Enable clipboard features in Settings to copy", kind: .info)
+                showFeedback("Clipboard is off", kind: .info)
                 return
             }
             if iCloudClipboardSyncEnabled, let first = clips.first {
@@ -111,7 +111,7 @@ extension CanvasContainerView {
 
     func pasteClipboardIntoSelected() {
         guard clipboardAccessEnabled else {
-            showFeedback("Enable clipboard features in Settings to paste", kind: .info)
+            showFeedback("Clipboard is off", kind: .info)
             return
         }
         guard selectedObjectIDs.count == 1,

@@ -146,7 +146,7 @@ struct HistoryPage: View {
         else {
             expandedClipID = clip.id
             guard ClipActionService.copy(clip) else {
-                showFeedback("Enable clipboard features in Settings to copy", kind: .info)
+                showFeedback("Clipboard is off", kind: .info)
                 return
             }
             showFeedback("Copied", kind: .success)

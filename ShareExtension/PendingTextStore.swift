@@ -6,7 +6,7 @@ import Foundation
 // needs to write one key, so duplicating the App Group write is simpler than wiring up a
 // cross-target membership exception in project.pbxproj.
 enum PendingTextStore {
-    private static let appGroupID = "group.au.com.ironbyte.ClipCanvas"
+    private static let appGroupID = "group.au.com.ironbyte.clipcanvas.app"
     private static let pendingSharedTextKey = "clipcanvas.pendingSharedText"
 
     static func savePendingText(_ text: String) {

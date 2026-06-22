@@ -76,8 +76,6 @@ import Testing
         let configuration = CanvasToolbarConfiguration.make(selectedCount: 1, mode: .edit, isEditing: true)
 
         #expect(configuration.items == [
-            .askAI,
-            .copyToClipboard,
             .closeMode,
             .formatPanel,
             .formatList,
@@ -85,6 +83,7 @@ import Testing
             .formatLink,
             .formatOutdent,
             .formatIndent,
+            .color,
             .formatBold,
             .formatItalic,
             .formatUnderline,
