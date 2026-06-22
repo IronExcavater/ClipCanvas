@@ -67,7 +67,7 @@ struct CanvasInspectorPanel: View {
 
     private var actionGrid: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 74), spacing: 10)], spacing: 10) {
-            inspectorAction("Edit", systemImage: "character.cursor.ibeam", isEnabled: selectedObjects.count == 1, action: onEdit)
+            inspectorAction("Edit", systemImage: "character.cursor.ibeam", isEnabled: selectedObjects.count == 1 && selectedObjects.contains(where: \.canEditTextInInspector), action: onEdit)
             inspectorAction("Details", systemImage: "info.circle", isEnabled: selectedObjects.contains { $0.clip != nil }, action: onDetails)
             inspectorAction("Tags", systemImage: "tag", isEnabled: selectedObjects.contains { $0.clip != nil }, action: onTags)
             inspectorAction("Color", systemImage: "paintpalette", action: onColor)
@@ -162,6 +162,17 @@ struct CanvasInspectorPanel: View {
 }
 
 private extension CanvasObject {
+    var canEditTextInInspector: Bool {
+        switch kind {
+        case .stickyNote, .text:
+            true
+        case .clipNote:
+            clip?.type != .image
+        default:
+            false
+        }
+    }
+
     var inspectorTitle: String {
         let text = displayText.trimmingCharacters(in: .whitespacesAndNewlines)
         if !text.isEmpty { return text }

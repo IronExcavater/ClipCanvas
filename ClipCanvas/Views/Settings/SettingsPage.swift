@@ -7,8 +7,8 @@ struct SettingsPage: View {
     @AppStorage("settings.trashRetentionDays") private var trashRetentionDays = TrashRetentionService.defaultRetentionDays
     @AppStorage(OpenAIConfiguration.apiKeyUserDefaultsKey) private var openAIAPIKey = ""
     @AppStorage("settings.clipboardMonitoringEnabled") private var clipboardMonitoringEnabled = true
-    @AppStorage("settings.iCloudWorkspaceSyncEnabled") private var workspaceSyncEnabled = true
-    @AppStorage("settings.iCloudClipboardSyncEnabled") private var clipboardSyncEnabled = false
+    @AppStorage(ClipboardService.accessEnabledKey) private var clipboardAccessEnabled = false
+    @AppStorage("settings.iCloudClipboardSyncEnabled") private var iCloudClipboardSyncEnabled = false
     @AppStorage("settings.allowWorkspaceSharing") private var workspaceSharingEnabled = true
     @AppStorage("settings.includeImagesInShares") private var includeImagesInShares = true
 
@@ -18,25 +18,23 @@ struct SettingsPage: View {
                 NavigationLink(destination: ICloudProfilePage()) {
                     Label("Profile and Sync", systemImage: "person.crop.circle")
                 }
-                Toggle("Sync Workspaces", isOn: $workspaceSyncEnabled)
-                Toggle("Sync Clipboard Between Devices", isOn: $clipboardSyncEnabled)
             }
 
-            Section("Clipboard") {
+            Section {
+                Toggle("Enable Clipboard Features", isOn: $clipboardAccessEnabled)
                 Toggle("Monitor Clipboard", isOn: $clipboardMonitoringEnabled)
-                Text("When on, ClipCanvas checks your clipboard when the app opens or returns to the foreground and saves new copies to your history.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .disabled(!clipboardAccessEnabled)
                 #if canImport(UIKit)
-                Text("Still being asked to allow pasting? Open Settings → ClipCanvas → Paste from Other Apps and set it to Allow — iOS won't ask again after that.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
                 Button {
                     UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
                 } label: {
-                    Label("Open System Settings", systemImage: "gear")
+                    Label("Open System Settings", systemImage: AppSymbol.settings)
                 }
                 #endif
+            } header: {
+                Text("Clipboard")
+            } footer: {
+                Text(clipboardHint)
             }
 
             Section("Sharing") {
@@ -71,5 +69,23 @@ struct SettingsPage: View {
         .navigationTitle("Settings")
         .appInlineNavigationTitleDisplayMode()
         .buttonStyle(.plain)
+        .onChange(of: clipboardAccessEnabled) { _, enabled in
+            if !enabled {
+                clipboardMonitoringEnabled = false
+                iCloudClipboardSyncEnabled = false
+            }
+        }
+    }
+
+    private var clipboardHint: String {
+        #if canImport(UIKit)
+        clipboardAccessEnabled
+            ? "Controls all clipboard reads and writes. iOS may still ask for paste permission."
+            : "Clipboard tools, monitoring, copy, paste, history capture, and clipboard sync are disabled."
+        #else
+        clipboardAccessEnabled
+            ? "Controls all clipboard reads and writes."
+            : "Clipboard tools, monitoring, copy, paste, history capture, and clipboard sync are disabled."
+        #endif
     }
 }

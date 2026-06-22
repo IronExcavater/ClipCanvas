@@ -22,9 +22,9 @@ struct CanvasImageObjectView: View {
                 onResizeEnded: onResizeEnded,
                 onToggleExpandedSize: onToggleExpandedSize
             )
-            .padding(2)
-            .background { AppGlassSurface(shape: .circle, interactive: true) }
-            .shadow(color: .black.opacity(0.14), radius: 8, y: 3)
+            .background(.ultraThinMaterial, in: Circle())
+            .overlay(Circle().stroke(Color.primary.opacity(0.08), lineWidth: 1))
+            .shadow(color: .black.opacity(0.10), radius: 5, y: 2)
             .padding(5)
         }
         .background(Color.platformSystemBackground.opacity(0.30), in: RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))

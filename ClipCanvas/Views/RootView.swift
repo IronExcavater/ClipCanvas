@@ -8,6 +8,7 @@ struct RootView: View {
     @State private var sidebarOpen = false
     @State private var columnVisibility: NavigationSplitViewVisibility = .all
     @State private var activeAIChat: AIChat?
+    @State private var sidebarPath: [SidebarDestination] = []
 
     var body: some View {
         GeometryReader { proxy in
@@ -29,6 +30,10 @@ struct RootView: View {
         .sheet(item: $activeAIChat) { chat in
             AIChatDetailSheet(chat: chat)
         }
+        .onReceive(NotificationCenter.default.publisher(for: .clipCanvasRouteRequested)) { note in
+            guard let route = note.object as? AppRoute else { return }
+            handleRoute(route)
+        }
     }
 
     // MARK: - iPhone: canvas-first + overlay sidebar drawer
@@ -44,12 +49,16 @@ struct RootView: View {
                     .allowsHitTesting(sidebarOpen)
                     .onTapGesture { withAnimation { sidebarOpen = false } }
 
-                NavigationStack {
+                NavigationStack(path: $sidebarPath) {
                     SidebarView(
                         onClose: { withAnimation { sidebarOpen = false } },
                         isOpen: sidebarOpen,
-                        onOpenAIChat: openAIChatFromSidebar
+                        onOpenAIChat: openAIChatFromSidebar,
+                        navigationPath: $sidebarPath
                     )
+                    .navigationDestination(for: SidebarDestination.self) { destination in
+                        SidebarDestinationContent(destination: destination)
+                    }
                 }
                 .frame(width: drawerWidth)
                 .background {
@@ -67,11 +76,15 @@ struct RootView: View {
 
     private func splitLayout(prefersInspector: Bool) -> some View {
         NavigationSplitView(columnVisibility: $columnVisibility) {
-            NavigationStack {
+            NavigationStack(path: $sidebarPath) {
                 SidebarView(
                     onClose: { columnVisibility = .detailOnly },
-                    onOpenAIChat: { activeAIChat = $0 }
+                    onOpenAIChat: { activeAIChat = $0 },
+                    navigationPath: $sidebarPath
                 )
+                .navigationDestination(for: SidebarDestination.self) { destination in
+                    SidebarDestinationContent(destination: destination)
+                }
             }
         } detail: {
             CanvasHost(onToggleSidebar: {
@@ -99,5 +112,45 @@ struct RootView: View {
             sidebarOpen = false
         }
         activeAIChat = chat
+    }
+
+    private func handleRoute(_ route: AppRoute) {
+        withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+            switch route {
+            case .workspace, .object:
+                sidebarPath.removeAll()
+                sidebarOpen = false
+                columnVisibility = .detailOnly
+                activeAIChat = nil
+            case .clip:
+                sidebarPath = [.history]
+                sidebarOpen = true
+                columnVisibility = .all
+                activeAIChat = nil
+            case .chat:
+                sidebarPath.removeAll()
+                sidebarOpen = true
+                columnVisibility = .all
+            }
+        }
+    }
+}
+
+private struct SidebarDestinationContent: View {
+    let destination: SidebarDestination
+
+    var body: some View {
+        switch destination {
+        case .workspaces:
+            WorkspacesPage()
+        case .history:
+            HistoryPage()
+        case .trash:
+            TrashPage()
+        case .settings:
+            SettingsPage()
+        case .iCloudProfile:
+            ICloudProfilePage()
+        }
     }
 }

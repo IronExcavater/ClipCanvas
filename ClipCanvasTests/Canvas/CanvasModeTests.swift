@@ -14,6 +14,7 @@ import Testing
 
         #expect(configuration.items == [
             .askAI,
+            .paste,
             .newNote,
             .insertImage,
             .mode(.draw)
@@ -24,6 +25,8 @@ import Testing
         let configuration = CanvasToolbarConfiguration.make(selectedCount: 0, mode: .edit)
 
         #expect(configuration.items == [
+            .askAI,
+            .paste,
             .closeMode,
             .newNote,
             .insertImage,
@@ -35,10 +38,9 @@ import Testing
 
         #expect(configuration.items == [
             .askAI,
+            .copyToClipboard,
             .editContent,
             .details,
-            .copyToClipboard,
-            .pasteFromClipboard,
             .duplicate,
             .arrangeSelection,
             .delete
@@ -50,9 +52,8 @@ import Testing
 
         #expect(configuration.items == [
             .askAI,
-            .editContent,
             .copyToClipboard,
-            .pasteFromClipboard,
+            .editContent,
             .duplicate,
             .arrangeSelection,
             .delete
@@ -75,6 +76,8 @@ import Testing
         let configuration = CanvasToolbarConfiguration.make(selectedCount: 1, mode: .edit, isEditing: true)
 
         #expect(configuration.items == [
+            .askAI,
+            .copyToClipboard,
             .closeMode,
             .formatPanel,
             .formatList,
@@ -94,6 +97,8 @@ import Testing
         let configuration = CanvasToolbarConfiguration.make(selectedCount: 1, mode: .edit, selectionKind: .text)
 
         #expect(configuration.items == [
+            .askAI,
+            .paste,
             .closeMode,
             .newNote,
             .insertImage,
@@ -104,6 +109,8 @@ import Testing
         let configuration = CanvasToolbarConfiguration.make(selectedCount: 1, mode: .edit, selectionKind: .image)
 
         #expect(configuration.items == [
+            .askAI,
+            .paste,
             .closeMode,
             .newNote,
             .insertImage,

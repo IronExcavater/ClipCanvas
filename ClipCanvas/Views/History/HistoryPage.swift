@@ -102,6 +102,11 @@ struct HistoryPage: View {
             }
         }
         .sheet(item: $detailClip) { ClipDetailSheet(clip: $0) }
+        .onAppear(perform: consumePendingRoute)
+        .onReceive(NotificationCenter.default.publisher(for: .clipCanvasRouteRequested)) { note in
+            guard let route = note.object as? AppRoute else { return }
+            handleRoute(route)
+        }
         .sheet(isPresented: $showTagSheet) {
             NavigationStack {
                 ScrollView {
@@ -138,7 +143,14 @@ struct HistoryPage: View {
 
     private func handlePrimaryAction(_ clip: Clip) {
         if expandedClipID == clip.id { expandedClipID = nil }
-        else { ClipActionService.copy(clip); expandedClipID = clip.id; showFeedback("Copied", kind: .success) }
+        else {
+            expandedClipID = clip.id
+            guard ClipActionService.copy(clip) else {
+                showFeedback("Enable clipboard features in Settings to copy", kind: .info)
+                return
+            }
+            showFeedback("Copied", kind: .success)
+        }
     }
 
     private func clearHistory() {
@@ -154,6 +166,20 @@ struct HistoryPage: View {
 
     private func showFeedback(_ message: String, kind: FeedbackKind? = nil) {
         feedbackPresenter.show(message, kind: kind, duration: .seconds(1.5))
+    }
+
+    private func consumePendingRoute() {
+        guard let route = AppRouteService.pendingRoute else { return }
+        handleRoute(route)
+    }
+
+    private func handleRoute(_ route: AppRoute) {
+        guard case .clip(let id) = route else { return }
+        guard clips.contains(where: { $0.id == id }) else { return }
+        filter.search = ""
+        selection.end()
+        expandedClipID = id
+        _ = AppRouteService.consumePendingRoute { $0 == route }
     }
 }
 

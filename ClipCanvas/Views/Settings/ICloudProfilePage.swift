@@ -6,9 +6,7 @@ import UIKit
 struct ICloudProfilePage: View {
     @AppStorage("settings.iCloudWorkspaceSyncEnabled") private var workspaceSyncEnabled = true
     @AppStorage("settings.iCloudClipboardSyncEnabled") private var clipboardSyncEnabled = false
-    @AppStorage("settings.allowWorkspaceSharing") private var workspaceSharingEnabled = true
-    @AppStorage("settings.includeImagesInShares") private var includeImagesInShares = true
-    @AppStorage("settings.sharePrivateContent") private var sharePrivateContent = false
+    @AppStorage(ClipboardService.accessEnabledKey) private var clipboardAccessEnabled = false
 
     @State private var status: ICloudProfileStatus = .checking
 
@@ -34,34 +32,29 @@ struct ICloudProfilePage: View {
                     Button {
                         UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
                     } label: {
-                        Label("Open iCloud Settings", systemImage: "gear")
+                        Label("Open iCloud Settings", systemImage: AppSymbol.settings)
                     }
                     #endif
                 }
             }
 
-            Section("Sync") {
+            Section {
                 Toggle("Sync Workspaces", isOn: $workspaceSyncEnabled)
                     .disabled(status != .available)
                 Toggle("Sync Clipboard Between Devices", isOn: $clipboardSyncEnabled)
-                    .disabled(status != .available)
-                Text("Clipboard sync uses iCloud key-value storage for recent clipboard text and small images. Workspace sync is enabled for iCloud-backed installs and sharing exports.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
-            Section("Sharing") {
-                Toggle("Allow Workspace Sharing", isOn: $workspaceSharingEnabled)
-                Toggle("Include Images in Share Sheets", isOn: $includeImagesInShares)
-                Toggle("Include Private Content", isOn: $sharePrivateContent)
-                Text("Private content stays excluded from share payloads unless you explicitly allow it here.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                    .disabled(status != .available || !clipboardAccessEnabled)
+            } header: {
+                Text("Sync")
+            } footer: {
+                Text(syncHint)
             }
         }
         .navigationTitle("iCloud Profile")
         .appInlineNavigationTitleDisplayMode()
         .task { status = ICloudAccountService.currentStatus() }
+        .onChange(of: clipboardAccessEnabled) { _, enabled in
+            if !enabled { clipboardSyncEnabled = false }
+        }
     }
 
     private var statusText: String {
@@ -71,5 +64,12 @@ struct ICloudProfilePage: View {
         case .noAccount: return "Sign in to iCloud to sync"
         case .unavailable: return "iCloud unavailable"
         }
+    }
+
+    private var syncHint: String {
+        if !clipboardAccessEnabled {
+            return "Clipboard sync requires Clipboard Features to be enabled in Settings."
+        }
+        return "Sync settings apply only when iCloud is available for this Apple ID."
     }
 }

@@ -38,7 +38,10 @@ extension CanvasContainerView {
     }
 
     func editSelectedContent() {
-        guard selectedObjectIDs.count == 1, let id = selectedObjectIDs.first else { return }
+        guard selectedObjectIDs.count == 1,
+              let id = selectedObjectIDs.first,
+              let object = orderedCanvasObjects(matching: selectedObjectIDs).first,
+              canvasSelectionKind(for: object) == .text || canvasSelectionKind(for: object) == .clip else { return }
         editingObjectID = id
     }
 

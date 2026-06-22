@@ -73,8 +73,12 @@ final class AIChat: Identifiable {
     }
 
     var preview: String {
-        if let lastMessage {
-            return lastMessage.content.components(separatedBy: .newlines).first ?? "No messages"
+        if let event = sortedMessages.flatMap(\.sortedToolEvents).last,
+           event.status == .queued || event.status == .running || event.status == .needsConfirmation {
+            return event.summary
+        }
+        if let message = sortedMessages.last(where: { !$0.content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }) {
+            return message.content.components(separatedBy: .newlines).first ?? "No messages"
         }
         if let workspace {
             return "Ready for \(workspace.name)"

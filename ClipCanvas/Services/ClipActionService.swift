@@ -6,18 +6,23 @@ import AppKit
 #endif
 
 enum ClipActionService {
-    static func copy(_ clip: Clip) {
+    @discardableResult
+    static func copy(_ clip: Clip) -> Bool {
+        guard ClipboardService.isAccessEnabled else { return false }
         ClipboardService.write(clip: clip)
+        return true
     }
 
-    static func copy(_ clips: [Clip]) {
+    @discardableResult
+    static func copy(_ clips: [Clip]) -> Bool {
+        guard ClipboardService.isAccessEnabled else { return false }
         if let only = clips.first, clips.count == 1 {
-            copy(only)
-            return
+            return copy(only)
         }
         let text = clips.map(\.content).filter { !$0.isEmpty }.joined(separator: "\n\n")
-        guard !text.isEmpty else { return }
+        guard !text.isEmpty else { return false }
         ClipboardService.writeString(text)
+        return true
     }
 
     static func togglePin(_ clip: Clip) {

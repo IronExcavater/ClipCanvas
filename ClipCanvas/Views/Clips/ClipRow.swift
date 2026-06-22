@@ -11,6 +11,7 @@ struct ClipRow: View {
     var onDetails: (() -> Void)?
     var onPrimaryAction: (() -> Void)?
 
+    @AppStorage(ClipboardService.accessEnabledKey) private var clipboardAccessEnabled = false
     @ObservedObject private var revealStore = SensitiveTextRevealStore.shared
 
     @Query(
@@ -20,17 +21,20 @@ struct ClipRow: View {
 
     var body: some View {
         ItemRow(tint: primaryTagColor, opacity: 0.025, isSelecting: isSelecting, isSelected: isSelected, dragID: clip.id.uuidString) {
-            AppListRowHeader(
-                systemImage: clip.type.icon,
-                color: primaryTagColor,
-                title: displayTitle,
-                subtitle: compact || isExpanded ? nil : displayPreview,
-                metadata: rowMetadata,
-                lineLimit: compact ? 1 : 2,
-                pinned: clip.isPinned,
-                date: clip.updatedAt,
-                dateSuffix: " ago"
-            )
+            HStack(alignment: .top, spacing: 10) {
+                imageThumbnail
+                AppListRowHeader(
+                    systemImage: clip.type.icon,
+                    color: primaryTagColor,
+                    title: displayTitle,
+                    subtitle: compact || isExpanded ? nil : displaySubtitle,
+                    metadata: rowMetadata,
+                    lineLimit: compact ? 1 : 2,
+                    pinned: clip.isPinned,
+                    date: clip.updatedAt,
+                    dateSuffix: " ago"
+                )
+            }
             if isExpanded {
                 MarkdownPreview(
                     text: displayPreview,
@@ -43,7 +47,9 @@ struct ClipRow: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .transition(.opacity.combined(with: .move(edge: .top)))
             }
-            rowFooter
+            if !clip.tags.isEmpty {
+                rowFooter
+            }
         }
         .onTapGesture(perform: primaryAction)
         .accessibilityAddTraits(.isButton)
@@ -63,6 +69,7 @@ struct ClipRow: View {
         }
         .contextMenu {
             Button("Copy", systemImage: "doc.on.doc") { ClipActionService.copy(clip) }
+                .disabled(!clipboardAccessEnabled)
             if ClipActionService.openableURL(for: clip) != nil {
                 Button("Open Link", systemImage: "safari") { ClipActionService.openURL(for: clip) }
             }
@@ -87,36 +94,83 @@ struct ClipRow: View {
     private func primaryAction() {
         if isSelecting { onSelect?() }
         else if let onPrimaryAction { onPrimaryAction() }
-        else { ClipActionService.copy(clip) }
+        else { _ = ClipActionService.copy(clip) }
     }
 
     private var primaryTagColor: Color { clip.primaryDisplayColor }
     private var activeWorkspace: Workspace? { workspaces.first(where: \.isActive) ?? workspaces.first }
     private var displayPreview: String { clip.displayPreview(isRevealed: false) }
+    private var plainDisplayPreview: String { Self.plainRowPreview(from: displayPreview, fallback: ClipTag.builtInName(for: clip.type)) }
     private var displayTitle: String {
-        displayPreview
+        plainDisplayPreview
             .components(separatedBy: .newlines)
             .first?
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .nilIfEmpty ?? ClipTag.builtInName(for: clip.type)
     }
+    private var displaySubtitle: String? {
+        let lines = plainDisplayPreview
+            .components(separatedBy: .newlines)
+            .dropFirst()
+            .joined(separator: " ")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return lines.nilIfEmpty
+    }
     private func addToCanvas() { activeWorkspace?.place(clip: clip) }
 
     private var rowMetadata: [AppListRowMetadata] {
         var metadata = [
-            AppListRowMetadata(clip.type.icon, value: ClipTag.builtInName(for: clip.type)),
-            AppListRowMetadata("character.cursor.ibeam", value: "\(clip.content.count)", monospaced: true)
+            AppListRowMetadata(clip.type.icon, value: ClipTag.builtInName(for: clip.type))
         ]
+        if clip.type == .image, let bytes = clip.imageData?.count {
+            metadata.append(AppListRowMetadata("externaldrive", value: ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)))
+        } else {
+            metadata.append(AppListRowMetadata("character.cursor.ibeam", value: "\(clip.content.count)", monospaced: true))
+        }
         if clip.isPrivateContent {
             metadata.append(AppListRowMetadata("lock.fill", value: "Sensitive"))
         }
         return metadata
     }
 
+    @ViewBuilder
+    private var imageThumbnail: some View {
+        if clip.type == .image, let data = clip.imageData, let image = PlatformImage(data: data) {
+            #if canImport(UIKit)
+            Image(uiImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: compact ? 52 : 62, height: compact ? 52 : 62)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(Color.primary.opacity(0.08), lineWidth: 1))
+            #elseif canImport(AppKit)
+            Image(nsImage: image)
+                .resizable()
+                .scaledToFill()
+                .frame(width: compact ? 52 : 62, height: compact ? 52 : 62)
+                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous).stroke(Color.primary.opacity(0.08), lineWidth: 1))
+            #endif
+        }
+    }
+
     private var rowFooter: some View {
         VStack(alignment: .leading, spacing: 4) {
             TagPillRow(tags: Array(clip.tags), limit: 3, size: compact ? .compact : .regular)
         }
+    }
+
+    private static func plainRowPreview(from text: String, fallback: String) -> String {
+        let markerPattern = #"^\s{0,3}(?:[-*+]|\d+\.|\[\s?\]|\[x\])\s+"#
+        let lines = text
+            .components(separatedBy: .newlines)
+            .map { line in
+                line.replacingOccurrences(of: markerPattern, with: "", options: .regularExpression)
+                    .replacingOccurrences(of: #"^\s{0,3}>\s?"#, with: "", options: .regularExpression)
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+            }
+            .filter { !$0.isEmpty }
+        return lines.joined(separator: "\n").nilIfEmpty ?? fallback
     }
 }
 

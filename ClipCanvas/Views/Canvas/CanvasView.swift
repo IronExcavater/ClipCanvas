@@ -229,6 +229,11 @@ struct CanvasView: View {
                 objectContextMenu(for: object, in: geo)
             }
             .zIndex(zIndex(for: object, isSelected: isSelected, isDragging: isDragging))
+            .transaction { transaction in
+                if isDragging || activeResize?.objectID == object.id {
+                    transaction.animation = nil
+                }
+            }
     }
 
     @ViewBuilder
@@ -390,7 +395,9 @@ struct CanvasView: View {
                 guard editingObjectID == nil else { return }
                 let ids = dragObjectIDs(startingFrom: object)
                 ids.forEach(bringToFront)
-                activeDrag = CanvasDragSession(anchorID: object.id, objectIDs: ids, translation: value.translation)
+                withTransaction(Transaction(animation: nil)) {
+                    activeDrag = CanvasDragSession(anchorID: object.id, objectIDs: ids, translation: value.translation)
+                }
             }
             .onEnded { value in
                 guard activeResize?.objectID != object.id else { return }
@@ -402,7 +409,9 @@ struct CanvasView: View {
                     clampObject(movedObject, in: geo)
                     movedObject.markUpdated()
                 }
-                activeDrag = nil
+                withTransaction(Transaction(animation: nil)) {
+                    activeDrag = nil
+                }
                 updateVisibleObjectIDs(in: geo)
             }
     }
@@ -473,7 +482,9 @@ struct CanvasView: View {
         let start = activeResize?.objectID == object.id
             ? activeResize?.startSize ?? CGSize(width: object.width, height: object.height)
             : CGSize(width: object.width, height: object.height)
-        activeResize = CanvasResizeSession(objectID: object.id, startSize: start, translation: translation)
+        withTransaction(Transaction(animation: nil)) {
+            activeResize = CanvasResizeSession(objectID: object.id, startSize: start, translation: translation)
+        }
         bringToFront(object.id)
     }
 
@@ -481,10 +492,10 @@ struct CanvasView: View {
         guard editingObjectID == nil else { return }
         guard let session = activeResize, session.objectID == object.id else { return }
         let size = CanvasPlacementSizing.committedSize(for: session, scale: canvasScale, clip: object.clip)
-        withAnimation(.spring(response: 0.22, dampingFraction: 0.82)) {
-            object.width = size.width
-            object.height = size.height
-            clampObject(object, in: geo)
+        object.width = size.width
+        object.height = size.height
+        clampObject(object, in: geo)
+        withTransaction(Transaction(animation: nil)) {
             activeResize = nil
             activeDrag = nil
         }
@@ -533,9 +544,6 @@ struct CanvasView: View {
             if editingObjectID == object.id { return }
             selectedObjectIDs = [object.id]
             beginEditing(object, in: geo)
-        } else if mode == .edit, isImageObject(object) {
-            editOverlayContentHeight = 0
-            selectedObjectIDs = [object.id]
         } else {
             toggleExpandedSize(for: object, in: geo)
         }

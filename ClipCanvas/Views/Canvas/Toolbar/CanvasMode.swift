@@ -151,6 +151,25 @@ nonisolated struct CanvasToolbarConfiguration: Hashable {
         selectionKind: CanvasSelectionKind = .none,
         isEditing: Bool = false
     ) -> CanvasToolbarConfiguration {
+        if isEditing {
+            return CanvasToolbarConfiguration(items: [
+                .askAI,
+                .copyToClipboard,
+                .closeMode,
+                .formatPanel,
+                .formatList,
+                .formatQuote,
+                .formatLink,
+                .formatOutdent,
+                .formatIndent,
+                .formatBold,
+                .formatItalic,
+                .formatUnderline,
+                .formatStrikethrough,
+                .formatHighlight
+            ])
+        }
+
         switch mode {
         case .draw:
             return CanvasToolbarConfiguration(items: [
@@ -159,23 +178,9 @@ nonisolated struct CanvasToolbarConfiguration: Hashable {
             ])
 
         case .edit:
-            if isEditing {
-                return CanvasToolbarConfiguration(items: [
-                    .closeMode,
-                    .formatPanel,
-                    .formatList,
-                    .formatQuote,
-                    .formatLink,
-                    .formatOutdent,
-                    .formatIndent,
-                    .formatBold,
-                    .formatItalic,
-                    .formatUnderline,
-                    .formatStrikethrough,
-                    .formatHighlight
-                ])
-            }
             return CanvasToolbarConfiguration(items: [
+                .askAI,
+                .paste,
                 .closeMode,
                 .newNote,
                 .insertImage,
@@ -183,7 +188,7 @@ nonisolated struct CanvasToolbarConfiguration: Hashable {
 
         case .pan:
             if selectedCount > 0 {
-                var items: [CanvasToolbarItem] = [.askAI]
+                var items: [CanvasToolbarItem] = [.askAI, .copyToClipboard]
                 if selectedCount == 1 {
                     if selectionKind == .text || selectionKind == .clip {
                         items.append(.editContent)
@@ -192,15 +197,12 @@ nonisolated struct CanvasToolbarConfiguration: Hashable {
                         items.append(.details)
                     }
                 }
-                items.append(.copyToClipboard)
-                if selectedCount == 1, selectionKind == .text || selectionKind == .clip {
-                    items.append(.pasteFromClipboard)
-                }
                 items.append(contentsOf: [.duplicate, .arrangeSelection, .delete])
                 return CanvasToolbarConfiguration(items: items)
             }
             return CanvasToolbarConfiguration(items: [
                 .askAI,
+                .paste,
                 .newNote,
                 .insertImage,
                 .mode(.draw)

@@ -20,8 +20,13 @@ enum ClipboardContent {
 }
 
 enum ClipboardService {
+    static let accessEnabledKey = "settings.clipboardAccessEnabled"
     private static let duplicateReuseWindow: TimeInterval = 8 * 60
     private static var recentFingerprints: [String: Date] = [:]
+
+    static var isAccessEnabled: Bool {
+        UserDefaults.standard.bool(forKey: accessEnabledKey)
+    }
 
     static func readContent() -> ClipboardContent? {
         #if canImport(UIKit)

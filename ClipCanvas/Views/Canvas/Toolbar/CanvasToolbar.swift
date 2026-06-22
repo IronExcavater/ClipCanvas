@@ -36,15 +36,15 @@ struct CanvasToolbar: View {
     var onDrawTool: (CanvasDrawTool) -> Void = { _ in }
     var onDrawToolSettings: (CanvasDrawTool) -> Void = { _ in }
 
-    @Namespace private var glassNamespace
     @State private var showsFormatPanel = false
     @State private var showsLinkPanel = false
     @State private var linkURL = ""
     @State private var linkDisplayText = ""
     @State private var enabledInlineFormats: Set<CanvasToolbarItem> = []
 
-    private let buttonSize: CGFloat = 44
-    private let iconSize: CGFloat = 17
+    private let buttonSize: CGFloat = 50
+    private let iconSize: CGFloat = 19
+    private let visiblePagedTools: CGFloat = 6.5
 
     private var configuration: CanvasToolbarConfiguration {
         CanvasToolbarConfiguration.make(
@@ -75,43 +75,59 @@ struct CanvasToolbar: View {
 
     @ViewBuilder
     private var toolbarShell: some View {
-        AppGlassEffectContainer(spacing: 2) {
-            if configuration.items.count > 6 {
-                pagedToolbar
+        GeometryReader { proxy in
+            let maxPanelWidth = max(proxy.size.width, 280)
+            let compactWidth = min(maxPanelWidth, CGFloat(configuration.items.count) * buttonSize + CGFloat(max(configuration.items.count - 1, 0)) * 8 + 20)
+            let panelWidth = configuration.items.count > 6 ? maxPanelWidth : compactWidth
+
+            HStack {
+                Spacer(minLength: 0)
+                toolbarContent(width: panelWidth)
+                    .frame(width: panelWidth)
+                Spacer(minLength: 0)
+            }
+        }
+        .frame(height: buttonSize + 18)
+    }
+
+    @ViewBuilder
+    private func toolbarContent(width panelWidth: CGFloat) -> some View {
+        let isPaged = configuration.items.count > 6
+        let contentWidth = max(panelWidth - 20, 1)
+        let spacing = isPaged ? max((contentWidth - buttonSize * visiblePagedTools) / visiblePagedTools, 6) : 8
+
+        Group {
+            if isPaged {
+                pagedToolbar(spacing: spacing)
             } else {
-                HStack(spacing: 2) {
+                HStack(spacing: spacing) {
                     ForEach(configuration.items, id: \.self) { item in
                         toolbarItem(item)
                     }
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
+                .frame(maxWidth: .infinity, alignment: .center)
             }
         }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .glassCapsule(shadow: true, interactive: false)
         .contentShape(Capsule())
         .onTapGesture {}
     }
 
-    private var pagedToolbar: some View {
-        GeometryReader { proxy in
-            let pageWidth = max(proxy.size.width - 20, 280)
-            let visibleTools: CGFloat = 6.5
-            let spacing = max((pageWidth - buttonSize * visibleTools) / visibleTools, 2)
-            ScrollView(.horizontal) {
-                HStack(spacing: spacing) {
-                    ForEach(configuration.items, id: \.self) { item in
-                        toolbarItem(item)
-                            .frame(width: buttonSize)
-                    }
+    private func pagedToolbar(spacing: CGFloat) -> some View {
+        ScrollView(.horizontal) {
+            HStack(spacing: spacing) {
+                ForEach(configuration.items, id: \.self) { item in
+                    toolbarItem(item)
+                        .frame(width: buttonSize)
                 }
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
-                .scrollTargetLayout()
             }
-            .scrollIndicators(.hidden)
-            .scrollTargetBehavior(.paging)
+            .scrollTargetLayout()
         }
-        .frame(height: buttonSize + 12)
+        .scrollIndicators(.hidden)
+        .scrollTargetBehavior(.paging)
+        .frame(height: buttonSize)
     }
 
     @ViewBuilder
@@ -163,11 +179,7 @@ struct CanvasToolbar: View {
         .accessibilityHidden(item == .divider)
         .help(item.label)
 
-        if item == .divider {
-            content
-        } else {
-            content.glassMorphItem(id: item, in: glassNamespace)
-        }
+        content
     }
 
     private var listMenu: some View {

@@ -96,7 +96,7 @@ struct MarkdownPreview: View {
                     kind: .bullet(body, level: min(leadingWhitespace / 2, 3))
                 )
             }
-            if trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") {
+            if trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") || trimmed.hasPrefix("• ") {
                 let body = (trimmed as NSString).substring(from: 2)
                 return MarkdownPreviewBlock(
                     index: index,

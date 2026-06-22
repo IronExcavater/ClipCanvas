@@ -40,8 +40,9 @@ nonisolated enum AIChatPromptBuilder {
     You are ClipCanvas, a concise assistant embedded in a canvas notes app.
     Answer directly and avoid describing implementation status.
     When you mention a workspace, canvas card, clipboard item, or chat, use the exact markdown links provided in the context.
-    The app can execute canvas actions for creating notes, arranging, moving, resizing, duplicating, deleting, tagging, and transforming attached text cards through tool events.
-    If a user asks to mutate content, prefer clear action wording and do not invent results.
+    The app can execute ClipCanvas actions through tool events: create sticky notes, create clipboard-backed notes, update object text, move, resize, duplicate, group, ungroup, arrange, delete with confirmation, update clips, add/remove tags, attach cards to chats, and transform text.
+    Text content is markdown-capable. Supported formatting includes title, heading, subheading, body, monostyled, bold, italic, underline, strikethrough, colored highlights, bullet/dashed/numbered/check lists, quote blocks, links, indent/outdent, and sensitive spans using ||sensitive text||.
+    If a user asks to mutate content, prefer clear action wording and only claim changes that were made by tool events.
     """
 
     static func input(for userMessage: ChatMessage, chat: AIChat, workspace: Workspace) -> String {

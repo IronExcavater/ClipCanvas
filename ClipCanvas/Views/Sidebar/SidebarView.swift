@@ -4,14 +4,22 @@ import SwiftData
 import UIKit
 #endif
 
+enum SidebarDestination: Hashable {
+    case workspaces
+    case history
+    case trash
+    case settings
+    case iCloudProfile
+}
+
 struct SidebarView: View {
     @Environment(\.modelContext) private var context
 
     let onClose: (() -> Void)?
     var isOpen = true
     var onOpenAIChat: ((AIChat) -> Void)?
+    @Binding var navigationPath: [SidebarDestination]
     @State private var iCloudStatus: ICloudProfileStatus = .checking
-    @State private var navigatesToSettings = false
 
     @Query(
         filter: #Predicate<Workspace> { $0.deletedAt == nil },
@@ -136,7 +144,7 @@ struct SidebarView: View {
                 .buttonStyle(.plain)
                 .accessibilityLabel("Switch Workspace")
 
-                sidebarNavButton(destination: WorkspacesPage(), systemImage: "rectangle.3.group")
+                sidebarNavButton(destination: .workspaces, systemImage: "rectangle.3.group")
                     .accessibilityLabel("Workspaces")
             }
         }
@@ -166,25 +174,22 @@ struct SidebarView: View {
                     #if canImport(UIKit)
                     UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
                     #else
-                    navigatesToSettings = true
+                    navigationPath.append(.iCloudProfile)
                     #endif
                 } else {
-                    navigatesToSettings = true
+                    navigationPath.append(.iCloudProfile)
                 }
             } label: {
                 iCloudProfile
             }
             .buttonStyle(.plain)
             .accessibilityLabel("iCloud profile")
-            .navigationDestination(isPresented: $navigatesToSettings) {
-                ICloudProfilePage()
-            }
 
             Spacer(minLength: 10)
 
-            sidebarNavButton(destination: HistoryPage(), systemImage: "clipboard")
-            sidebarNavButton(destination: TrashPage(), systemImage: "trash")
-            sidebarNavButton(destination: SettingsPage(), systemImage: AppSymbol.settings)
+            sidebarNavButton(destination: .history, systemImage: "clipboard")
+            sidebarNavButton(destination: .trash, systemImage: "trash")
+            sidebarNavButton(destination: .settings, systemImage: AppSymbol.settings)
         }
         .padding(.horizontal, 16)
         .padding(.top, 2)
@@ -222,8 +227,8 @@ struct SidebarView: View {
         .contentShape(Capsule())
     }
 
-    private func sidebarNavButton<Destination: View>(destination: Destination, systemImage: String) -> some View {
-        NavigationLink(destination: destination) {
+    private func sidebarNavButton(destination: SidebarDestination, systemImage: String) -> some View {
+        NavigationLink(value: destination) {
             Image(systemName: systemImage)
                 .font(.system(size: 18, weight: .semibold))
                 .foregroundStyle(.primary)
@@ -285,6 +290,22 @@ struct SidebarView: View {
 
     private func refreshICloudStatus() {
         iCloudStatus = ICloudAccountService.currentStatus()
+    }
+
+    @ViewBuilder
+    func destinationView(for destination: SidebarDestination) -> some View {
+        switch destination {
+        case .workspaces:
+            WorkspacesPage()
+        case .history:
+            HistoryPage()
+        case .trash:
+            TrashPage()
+        case .settings:
+            SettingsPage()
+        case .iCloudProfile:
+            ICloudProfilePage()
+        }
     }
 }
 

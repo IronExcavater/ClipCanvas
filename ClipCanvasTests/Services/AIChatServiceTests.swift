@@ -3,6 +3,7 @@ import SwiftData
 import Testing
 @testable import ClipCanvas
 
+@MainActor
 @Suite struct AIChatServiceTests {
     @Test func createsChatForActiveWorkspace() throws {
         let context = try ModelContextFactory.makeContext()
@@ -101,5 +102,101 @@ import Testing
         #expect(workspace.canvasObjects.contains { $0.text == "Duplicate me" && $0.x == 38 && $0.y == 48 })
         #expect(assistant.toolEvents.first?.status == .completed)
         #expect(assistant.content == "Duplicated 1 card.")
+    }
+
+    @Test func chatCommandMarksSensitiveMarkdownThroughWorkspaceTools() async throws {
+        let context = try ModelContextFactory.makeContext()
+        let workspace = Workspace(name: "Board")
+        let object = CanvasObject(
+            kind: .stickyNote,
+            workspace: workspace,
+            x: 0,
+            y: 0,
+            width: 220,
+            height: 140,
+            text: "password: hunter2"
+        )
+        workspace.canvasObjects = [object]
+        context.insert(workspace)
+        context.insert(object)
+        let chat = AIChatService.createChat(in: context, workspace: workspace)
+        _ = AIChatService.attachObjects([object], to: chat, in: context)
+        let userMessage = ChatMessage(role: .user, content: "Mark the password sensitive")
+        userMessage.chat = chat
+        chat.messages.append(userMessage)
+        context.insert(userMessage)
+        let assistant = ChatMessage(role: .assistant, content: "")
+        assistant.chat = chat
+        chat.messages.append(assistant)
+        context.insert(assistant)
+
+        await AIChatCommandRouter.respond(to: userMessage, with: assistant, in: context)
+
+        #expect(object.text == "password: ||hunter2||")
+        #expect(assistant.toolEvents.first?.status == .completed)
+        #expect(assistant.content == "Marked sensitive text in 1 item.")
+    }
+
+    @Test func chatCommandFormatsAttachedTextThroughWorkspaceTools() async throws {
+        let context = try ModelContextFactory.makeContext()
+        let workspace = Workspace(name: "Board")
+        let object = CanvasObject(
+            kind: .stickyNote,
+            workspace: workspace,
+            x: 0,
+            y: 0,
+            width: 220,
+            height: 140,
+            text: "Launch plan"
+        )
+        workspace.canvasObjects = [object]
+        context.insert(workspace)
+        context.insert(object)
+        let chat = AIChatService.createChat(in: context, workspace: workspace)
+        _ = AIChatService.attachObjects([object], to: chat, in: context)
+        let userMessage = ChatMessage(role: .user, content: "Make this a heading")
+        userMessage.chat = chat
+        chat.messages.append(userMessage)
+        context.insert(userMessage)
+        let assistant = ChatMessage(role: .assistant, content: "")
+        assistant.chat = chat
+        chat.messages.append(assistant)
+        context.insert(assistant)
+
+        await AIChatCommandRouter.respond(to: userMessage, with: assistant, in: context)
+
+        #expect(object.text == "## Launch plan")
+        #expect(assistant.toolEvents.first?.status == .completed)
+        #expect(assistant.content == "Formatted 1 item.")
+    }
+
+    @Test func chatCommandCreatesNamedWorkspaceNotesAndArrangesThem() async throws {
+        let context = try ModelContextFactory.makeContext()
+        let workspace = Workspace(name: "Board", isActive: true)
+        context.insert(workspace)
+        let chat = AIChatService.createChat(in: context, workspace: workspace)
+        let userMessage = ChatMessage(
+            role: .user,
+            content: "Create a note in a new workspace, name the workspace 22 Jun, in the note show me everything you can do, then create a new note next to it and arrange the notes"
+        )
+        userMessage.chat = chat
+        chat.messages.append(userMessage)
+        context.insert(userMessage)
+        let assistant = ChatMessage(role: .assistant, content: "")
+        assistant.chat = chat
+        chat.messages.append(assistant)
+        context.insert(assistant)
+
+        await AIChatCommandRouter.respond(to: userMessage, with: assistant, in: context)
+
+        let workspaces = try context.fetch(FetchDescriptor<Workspace>())
+        let created = try #require(workspaces.first { $0.name == "22 Jun" })
+        #expect(created.isActive)
+        #expect(chat.workspace?.id == created.id)
+        #expect(created.canvasObjects.count == 2)
+        #expect(created.canvasObjects.contains { $0.text.contains("What I can do") })
+        #expect(assistant.toolEvents.count == 3)
+        #expect(assistant.toolEvents.allSatisfy { $0.status == .completed })
+        #expect(assistant.content == "Created workspace 22 Jun, added 2 notes, arranged them.")
     }
 }

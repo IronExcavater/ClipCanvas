@@ -4,6 +4,10 @@ import SwiftData
 extension CanvasContainerView {
 
     func paste() {
+        guard clipboardAccessEnabled else {
+            showFeedback("Enable clipboard features in Settings to paste", kind: .info)
+            return
+        }
         guard let content = ClipboardService.readContent() else {
             showFeedback("Clipboard is empty", kind: .info)
             return
@@ -30,29 +34,20 @@ extension CanvasContainerView {
         showFeedback("Added from share", kind: .success)
     }
 
-    // A single check on launch/foreground rather than a continuous poll - polling the
-    // pasteboard in the background triggers the system "Allow Paste" prompt on every
-    // change, which is what the clipboard-monitoring toggle exists to avoid.
+    // A single check on launch/foreground rather than a continuous poll.
+    // Pasteboard reads are gated behind the launch prompt so iOS permission UI
+    // appears at startup instead of after an unrelated clipboard action.
     //
     // Skipped under the test runner: xcodebuild test launches this app as the unit
     // test host, so .onAppear still fires - reading the real pasteboard there pops
     // the OS-level "Allow Paste" alert with no automation to dismiss it, hanging the run.
     func checkClipboardOnForeground() {
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
+        guard clipboardAccessEnabled else { return }
         importICloudClipboardIfNeeded()
         guard clipboardMonitoringEnabled else { return }
         guard let content = ClipboardService.readContent() else { return }
         defer { lastClipboardFingerprint = content.fingerprint }
-        #if canImport(UIKit)
-        // The OS "Allow Paste" alert fires as a side effect of the readContent() call
-        // above. iOS keeps re-asking unless the user flips Settings -> ClipCanvas ->
-        // Paste from Other Apps to Allow - that toggle only appears after the first ask,
-        // so nudge the user toward it right after this first successful read.
-        if !hasNudgedClipboardPermission {
-            hasNudgedClipboardPermission = true
-            showClipboardPermissionNudge = true
-        }
-        #endif
         guard content.fingerprint != lastClipboardFingerprint,
               !ClipboardService.wasRecentlyImported(content) else { return }
         captureClipboardContent(content)
@@ -72,6 +67,7 @@ extension CanvasContainerView {
     }
 
     func importICloudClipboardIfNeeded() {
+        guard clipboardAccessEnabled else { return }
         guard iCloudClipboardSyncEnabled else { return }
         let lastSeen = lastSeenICloudClipboardTimestamp > 0
             ? Date(timeIntervalSince1970: lastSeenICloudClipboardTimestamp)
@@ -83,11 +79,18 @@ extension CanvasContainerView {
     }
 
     func copySelectedToClipboard() {
+        guard clipboardAccessEnabled else {
+            showFeedback("Enable clipboard features in Settings to copy", kind: .info)
+            return
+        }
         let objects = orderedCanvasObjects(matching: selectedObjectIDs)
         guard !objects.isEmpty else { return }
         let clips = objects.compactMap(\.clip)
         if clips.count == objects.count {
-            ClipActionService.copy(clips)
+            guard ClipActionService.copy(clips) else {
+                showFeedback("Enable clipboard features in Settings to copy", kind: .info)
+                return
+            }
             if iCloudClipboardSyncEnabled, let first = clips.first {
                 if first.type == .image, let data = first.imageData {
                     ICloudClipboardService.publish(.image(data, uti: first.imageUTI ?? "public.png"))
@@ -107,6 +110,10 @@ extension CanvasContainerView {
     }
 
     func pasteClipboardIntoSelected() {
+        guard clipboardAccessEnabled else {
+            showFeedback("Enable clipboard features in Settings to paste", kind: .info)
+            return
+        }
         guard selectedObjectIDs.count == 1,
               let object = orderedCanvasObjects(matching: selectedObjectIDs).first else { return }
         guard let content = ClipboardService.readContent() else {
@@ -136,5 +143,30 @@ extension CanvasContainerView {
         }
         object.markUpdated()
         showFeedback("Pasted", kind: .success)
+    }
+
+    func prepareClipboardAccessOnLaunch() {
+        guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
+        if !clipboardPermissionPromptShown {
+            showClipboardPermissionPrompt = true
+            return
+        }
+        guard clipboardAccessEnabled else { return }
+        checkClipboardOnForeground()
+    }
+
+    func enableClipboardAccessFromLaunchPrompt() {
+        clipboardPermissionPromptShown = true
+        clipboardAccessEnabled = true
+        showClipboardPermissionPrompt = false
+        checkClipboardOnForeground()
+    }
+
+    func disableClipboardAccess() {
+        clipboardPermissionPromptShown = true
+        clipboardAccessEnabled = false
+        showClipboardPermissionPrompt = false
+        clipboardMonitoringEnabled = false
+        iCloudClipboardSyncEnabled = false
     }
 }

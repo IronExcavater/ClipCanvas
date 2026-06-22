@@ -79,30 +79,19 @@ struct AppSearchSelectionBar<Actions: View>: View {
             searchField.layoutPriority(1)
 
             if isSelecting {
-                actions.transition(.opacity.combined(with: .scale(scale: 0.94)))
-
-                Button(action: onEndSelection) {
-                    AppToolbarCircleLabel(systemImage: "checkmark", size: 40, symbolSize: 15)
-                        .overlay(alignment: .topTrailing) {
-                            if selectedCount > 0 {
-                                Text("\(selectedCount)")
-                                    .font(.system(size: 10, weight: .bold).monospacedDigit())
-                                    .foregroundStyle(.white)
-                                    .frame(minWidth: 16, minHeight: 16)
-                                    .background(Color.accentColor, in: Capsule())
-                                    .offset(x: 3, y: -3)
-                            }
-                        }
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Done")
-            } else {
-                Button(action: onBeginSelection) {
-                    AppToolbarCircleLabel(systemImage: "checklist", size: 40, symbolSize: 16)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Select")
+                actions
+                    .transition(.asymmetric(
+                        insertion: .opacity.combined(with: .scale(scale: 0.94)),
+                        removal: .opacity.combined(with: .scale(scale: 0.98))
+                    ))
             }
+
+            SelectionModeToggleButton(
+                isSelecting: isSelecting,
+                selectedCount: selectedCount,
+                onBeginSelection: onBeginSelection,
+                onEndSelection: onEndSelection
+            )
         }
         .animation(.easeInOut(duration: 0.18), value: isSelecting)
         .animation(.easeInOut(duration: 0.18), value: selectedCount)
@@ -126,6 +115,44 @@ struct AppSearchSelectionBar<Actions: View>: View {
         .padding(.horizontal, 12)
         .frame(height: 40)
         .glassCapsule(shadow: false, interactive: true)
+    }
+}
+
+private struct SelectionModeToggleButton: View {
+    let isSelecting: Bool
+    let selectedCount: Int
+    let onBeginSelection: () -> Void
+    let onEndSelection: () -> Void
+
+    var body: some View {
+        Button(action: isSelecting ? onEndSelection : onBeginSelection) {
+            Image(systemName: isSelecting ? "checkmark" : "checklist")
+                .font(.system(size: isSelecting ? 15 : 16, weight: .semibold))
+                .foregroundStyle(.primary)
+                .frame(width: 40, height: 40)
+                .background {
+                    AppGlassSurface(
+                        shape: .circle,
+                        fallback: .color(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground))
+                    )
+                }
+                .shadow(color: .black.opacity(0.10), radius: 8, y: 3)
+                .contentShape(Circle())
+                .contentTransition(.symbolEffect(.replace))
+                .overlay(alignment: .topTrailing) {
+                    if isSelecting, selectedCount > 0 {
+                        Text("\(selectedCount)")
+                            .font(.system(size: 10, weight: .bold).monospacedDigit())
+                            .foregroundStyle(.white)
+                            .frame(minWidth: 16, minHeight: 16)
+                            .background(Color.accentColor, in: Capsule())
+                            .offset(x: 3, y: -3)
+                            .transition(.scale.combined(with: .opacity))
+                    }
+                }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(isSelecting ? "Done" : "Select")
     }
 }
 

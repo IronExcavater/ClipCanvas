@@ -48,9 +48,10 @@ struct CanvasContainerView: View {
     @AppStorage("settings.clipboardMonitoringEnabled") var clipboardMonitoringEnabled = true
     @AppStorage("settings.iCloudClipboardSyncEnabled") var iCloudClipboardSyncEnabled = false
     @AppStorage("settings.includeImagesInShares") var includeImagesInShares = true
-    @AppStorage("settings.hasNudgedClipboardPermission") var hasNudgedClipboardPermission = false
+    @AppStorage("settings.clipboardPermissionPromptShown") var clipboardPermissionPromptShown = false
+    @AppStorage("settings.clipboardAccessEnabled") var clipboardAccessEnabled = false
     @AppStorage("settings.lastSeenICloudClipboardDate") var lastSeenICloudClipboardTimestamp = 0.0
-    @State var showClipboardPermissionNudge = false
+    @State var showClipboardPermissionPrompt = false
     @State var canvasSearch = ""
     @State var isCanvasSearchActive = false
     @State var isImagePickerPresented = false
@@ -238,24 +239,6 @@ struct CanvasContainerView: View {
                 .zIndex(30)
             }
 
-            if showClipboardPermissionNudge {
-                AppConfirmationOverlay(
-                    title: "Stop the clipboard prompt?",
-                    message: "iOS just asked to allow pasting from other apps. Open Settings → ClipCanvas → Paste from Other Apps and set it to Allow, and it won't ask again.",
-                    cancelTitle: "Not Now",
-                    destructiveTitle: "Open Settings",
-                    isDestructive: false,
-                    onConfirm: {
-                        showClipboardPermissionNudge = false
-                        #if canImport(UIKit)
-                        UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
-                        #endif
-                    },
-                    onCancel: { showClipboardPermissionNudge = false }
-                )
-                .zIndex(31)
-            }
-
         }
         .appFeedbackOverlay(feedbackPresenter, topPadding: 70)
         .animation(.spring(response: 0.25, dampingFraction: 0.82), value: selectedObjectIDs)
@@ -265,7 +248,8 @@ struct CanvasContainerView: View {
         .onAppear {
             context.undoManager = undoManager
             loadPersistedDrawing()
-            checkClipboardOnForeground()
+            prepareClipboardAccessOnLaunch()
+            consumePendingCanvasRoute()
         }
         .onChange(of: mode) { _, newMode in
             if newMode != .edit {
@@ -286,8 +270,13 @@ struct CanvasContainerView: View {
         .onReceive(NotificationCenter.default.publisher(for: .sharedTextReceived)) { note in
             if let text = note.object as? String { addSharedText(text) }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .clipCanvasRouteRequested)) { note in
+            guard let route = note.object as? AppRoute else { return }
+            handleCanvasRoute(route)
+        }
         .onChange(of: workspace.id) { _, _ in
             loadPersistedDrawing()
+            consumePendingCanvasRoute()
         }
         .onChange(of: activeDrawing) { _, drawing in
             persistActiveDrawing(drawing)
@@ -314,6 +303,16 @@ struct CanvasContainerView: View {
             selection: $selectedPhotoItem,
             matching: .images
         )
+        .alert("Use Clipboard Features?", isPresented: $showClipboardPermissionPrompt) {
+            Button("Disable Clipboard", role: .cancel) {
+                disableClipboardAccess()
+            }
+            Button("Enable Clipboard") {
+                enableClipboardAccessFromLaunchPrompt()
+            }
+        } message: {
+            Text("Enable clipboard features to paste into the canvas, copy cards, save clipboard history, monitor clipboard changes, and sync clipboard items with iCloud. If disabled, ClipCanvas will not read or write the system clipboard.")
+        }
         .onChange(of: selectedPhotoItem) { _, newItem in
             Task { await importSelectedImage(newItem) }
         }
@@ -367,6 +366,31 @@ struct CanvasContainerView: View {
     private func dismissDrawToolSettings() {
         withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
             drawToolSettings = nil
+        }
+    }
+
+    private func consumePendingCanvasRoute() {
+        guard let route = AppRouteService.pendingRoute else { return }
+        handleCanvasRoute(route)
+    }
+
+    private func handleCanvasRoute(_ route: AppRoute) {
+        switch route {
+        case .workspace(let id):
+            guard workspace.id == id else { return }
+            selectedObjectIDs.removeAll()
+            editingObjectID = nil
+            mode = .pan
+            _ = AppRouteService.consumePendingRoute { $0 == route }
+        case .object(let id):
+            guard workspace.canvasObjects.contains(where: { $0.id == id && $0.deletedAt == nil }) else { return }
+            selectedObjectIDs = [id]
+            editingObjectID = nil
+            mode = .pan
+            zoomCommand = .fitContent
+            _ = AppRouteService.consumePendingRoute { $0 == route }
+        case .clip, .chat:
+            break
         }
     }
 
@@ -544,7 +568,7 @@ private struct CanvasSearchPill: View {
         .padding(.trailing, 10)
         .padding(.vertical, 9)
         .frame(maxWidth: 430)
-        .glassCapsule(interactive: true)
+        .glassCapsule(interactive: false)
     }
 }
 

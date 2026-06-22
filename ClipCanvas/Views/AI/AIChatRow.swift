@@ -27,19 +27,30 @@ struct AIChatListRowHeader: View {
     let chat: AIChat
 
     var body: some View {
-        AppListRowHeader(
-            systemImage: AIChatListRowStyle.statusIcon(for: chat),
-            color: AIChatListRowStyle.statusTint(for: chat),
-            title: chat.title,
-            subtitle: AIChatListRowStyle.description(for: chat),
-            metadata: [
-                AppListRowMetadata("bubble.left.fill", value: "\(chat.sortedMessages.count)", monospaced: true),
-                AppListRowMetadata("square.on.square", value: "\(AIChatListRowStyle.attachmentCount(for: chat))", monospaced: true),
-                AppListRowMetadata(chat.mode.systemImage, value: chat.mode.displayName)
-            ],
-            date: chat.updatedAt,
-            dateSuffix: " ago"
-        )
+        ZStack(alignment: .topTrailing) {
+            AppListRowHeader(
+                systemImage: AIChatListRowStyle.statusIcon(for: chat),
+                color: AIChatListRowStyle.statusTint(for: chat),
+                title: chat.title,
+                subtitle: AIChatListRowStyle.description(for: chat),
+                metadata: [
+                    AppListRowMetadata("bubble.left.fill", value: "\(chat.sortedMessages.count)", monospaced: true),
+                    AppListRowMetadata("square.on.square", value: "\(AIChatListRowStyle.attachmentCount(for: chat))", monospaced: true),
+                    AppListRowMetadata(chat.mode.systemImage, value: chat.mode.displayName)
+                ],
+                date: chat.updatedAt,
+                dateSuffix: " ago"
+            )
+
+            if AIChatListRowStyle.isWorking(chat) {
+                ProgressView()
+                    .controlSize(.mini)
+                    .padding(6)
+                    .background(.thinMaterial, in: Circle())
+                    .transition(.opacity.combined(with: .scale(scale: 0.86)))
+            }
+        }
+        .animation(.easeInOut(duration: 0.18), value: AIChatListRowStyle.isWorking(chat))
     }
 }
 
@@ -60,6 +71,12 @@ struct AIChatModeMenu: View {
 }
 
 enum AIChatListRowStyle {
+    static func isWorking(_ chat: AIChat) -> Bool {
+        if chat.lastMessage?.status == .streaming { return true }
+        let event = latestToolEvent(for: chat)
+        return event?.status == .running || event?.status == .queued
+    }
+
     static func statusIcon(for chat: AIChat) -> String {
         let event = latestToolEvent(for: chat)
         if event?.status == .running || event?.status == .queued { return "waveform" }

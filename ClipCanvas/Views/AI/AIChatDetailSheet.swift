@@ -199,24 +199,49 @@ struct AIChatDetailView: View {
     }
 
     private var markdownInput: some View {
-        ZStack(alignment: .topLeading) {
-            AIChatGrowingTextView(text: $input, calculatedHeight: $inputHeight)
-                .frame(height: inputHeight)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 9)
-
-            if input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                Text("Message")
-                    .font(.body)
-                    .foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 0) {
+            ZStack(alignment: .topLeading) {
+                AIChatGrowingTextView(text: $input, calculatedHeight: $inputHeight)
+                    .frame(height: inputHeight)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 9)
-                    .padding(.top, 1)
-                    .allowsHitTesting(false)
+
+                if input.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    Text("Message")
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 9)
+                        .padding(.top, 1)
+                        .allowsHitTesting(false)
+                }
+            }
+
+            if showsInputPreview {
+                Divider()
+                    .padding(.horizontal, 12)
+                MarkdownPreview(text: input)
+                    .font(.callout)
+                    .foregroundStyle(.primary.opacity(0.76))
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
         .frame(maxWidth: .infinity)
         .glassPanel(cornerRadius: 16, shadow: false, interactive: true)
+    }
+
+    private var showsInputPreview: Bool {
+        let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return false }
+        return trimmed.contains("\n- ")
+            || trimmed.contains("\n* ")
+            || trimmed.contains("\n• ")
+            || trimmed.contains("\n1. ")
+            || trimmed.contains("**")
+            || trimmed.contains("==")
+            || trimmed.contains("[")
     }
 
     private func beginRename() {
@@ -267,8 +292,8 @@ struct AIChatDetailView: View {
             input = ""
             inputHeight = 38
         }
-        if chat.messages.isEmpty {
-            chat.title = String(text.prefix(42))
+        if shouldUpdateTitle(from: chat) {
+            chat.title = Self.title(for: text)
         }
 
         let user = ChatMessage(role: .user, content: text)
@@ -290,38 +315,54 @@ struct AIChatDetailView: View {
         }
     }
 
+    private func shouldUpdateTitle(from chat: AIChat) -> Bool {
+        if chat.title == "New Chat" { return true }
+        guard let workspace = chat.workspace else { return chat.sortedMessages.count <= 1 }
+        return chat.title == "\(workspace.name) AI" || chat.sortedMessages.count <= 1
+    }
+
+    private static func title(for text: String) -> String {
+        let line = text
+            .components(separatedBy: .newlines)
+            .first?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? text
+        let title = String(line.prefix(56)).trimmingCharacters(in: .whitespacesAndNewlines)
+        return title.isEmpty ? "New Chat" : title
+    }
+
     private func handleOpenURL(_ url: URL) -> OpenURLAction.Result {
-        guard url.scheme == "clipcanvas", let host = url.host() else {
+        guard url.scheme == "clipcanvas" else {
             return .systemAction
         }
-        let idText = url.pathComponents.dropFirst().first
-        guard let idText, let id = UUID(uuidString: idText) else {
+        guard let route = AppRouteService.route(from: url) else {
             return .discarded
         }
 
-        switch host {
-        case "object":
-            if let clip = canvasObjects.first(where: { $0.id == id })?.clip {
-                linkedClip = clip
+        switch route {
+        case .object(let id):
+            if canvasObjects.contains(where: { $0.id == id }) {
+                AppRouteService.open(route)
+                close()
                 return .handled
             }
-        case "clip":
-            if let clip = clips.first(where: { $0.id == id }) {
-                linkedClip = clip
+        case .clip(let id):
+            if clips.contains(where: { $0.id == id }) {
+                AppRouteService.open(route)
+                close()
                 return .handled
             }
-        case "chat":
+        case .chat(let id):
             if let linked = chats.first(where: { $0.id == id }), linked.id != chat.id {
                 linkedChat = linked
                 return .handled
             }
-        case "workspace":
+        case .workspace(let id):
             if let workspace = workspaces.first(where: { $0.id == id }) {
                 WorkspaceActionService.activate(workspace, among: workspaces)
+                AppRouteService.open(route)
+                close()
                 return .handled
             }
-        default:
-            break
         }
         return .discarded
     }

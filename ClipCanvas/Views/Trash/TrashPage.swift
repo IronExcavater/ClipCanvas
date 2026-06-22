@@ -10,6 +10,7 @@ struct TrashPage: View {
     @Environment(\.modelContext) private var context
     @State private var search = ""
     @State private var selection = SelectionState<String>()
+    @State private var expandedItemKey: String?
     @State private var confirmingDeleteAll = false
     @State private var confirmingDeleteSelected = false
 
@@ -70,10 +71,15 @@ struct TrashPage: View {
             if !filteredWorkspaces.isEmpty {
                 Section("Workspaces") {
                     ForEach(filteredWorkspaces) { ws in
-                        TrashItemRow(title: ws.name, systemImage: "folder", deletedAt: ws.deletedAt,
-                                     tint: .secondary, isSelecting: selection.isActive,
-                                     isSelected: selection.contains(key(for: ws)),
-                                     onTap: { selection.toggle(key(for: ws)) },
+                        let itemKey = key(for: ws)
+                        TrashItemRow(title: ws.name,
+                                     preview: workspacePreview(ws),
+                                     systemImage: "folder", deletedAt: ws.deletedAt,
+                                     tint: .secondary,
+                                     isExpanded: expandedItemKey == itemKey,
+                                     isSelecting: selection.isActive,
+                                     isSelected: selection.contains(itemKey),
+                                     onTap: { handleRowTap(itemKey) },
                                      onRestore: { ws.restore() },
                                      onDeleteForever: { TrashRetentionService.deleteForever(ws, in: context) })
                         .appListItemRowInsets(vertical: 3)
@@ -84,14 +90,17 @@ struct TrashPage: View {
             if !filteredChats.isEmpty {
                 Section("AI Chats") {
                     ForEach(filteredChats) { chat in
+                        let itemKey = key(for: chat)
                         TrashItemRow(
                             title: chat.title,
+                            preview: chat.preview,
                             systemImage: "sparkles",
                             deletedAt: chat.deletedAt,
                             tint: .accentColor,
+                            isExpanded: expandedItemKey == itemKey,
                             isSelecting: selection.isActive,
-                            isSelected: selection.contains(key(for: chat)),
-                            onTap: { selection.toggle(key(for: chat)) },
+                            isSelected: selection.contains(itemKey),
+                            onTap: { handleRowTap(itemKey) },
                             onRestore: { chat.restore() },
                             onDeleteForever: { context.delete(chat) }
                         )
@@ -103,13 +112,18 @@ struct TrashPage: View {
             if !filteredClips.isEmpty {
                 Section("Clips") {
                     ForEach(filteredClips) { clip in
-                        TrashItemRow(title: clip.preview, systemImage: clip.type.icon,
+                        let itemKey = key(for: clip)
+                        TrashItemRow(title: clipTitle(clip),
+                                     preview: clip.preview,
+                                     systemImage: clip.type.icon,
                                      deletedAt: clip.deletedAt, tint: clip.primaryDisplayColor,
                                      tags: Array(clip.tags.sorted { $0.sortIndex < $1.sortIndex }.prefix(2)),
+                                     imageData: clip.imageData,
+                                     isExpanded: expandedItemKey == itemKey,
                                      dragID: clip.id.uuidString,
                                      isSelecting: selection.isActive,
-                                     isSelected: selection.contains(key(for: clip)),
-                                     onTap: { selection.toggle(key(for: clip)) },
+                                     isSelected: selection.contains(itemKey),
+                                     onTap: { handleRowTap(itemKey) },
                                      onRestore: { clip.restore() },
                                      onDeleteForever: { context.delete(clip) },
                                      onAddToCanvas: { addToCanvas(clip) })
@@ -194,7 +208,37 @@ struct TrashPage: View {
         activeWorkspace.place(clip: clip)
     }
 
+    private func handleRowTap(_ itemKey: String) {
+        if selection.isActive {
+            selection.toggle(itemKey)
+        } else {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                expandedItemKey = expandedItemKey == itemKey ? nil : itemKey
+            }
+        }
+    }
+
+    private func clipTitle(_ clip: Clip) -> String {
+        clip.preview
+            .components(separatedBy: .newlines)
+            .first?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .nilIfEmpty ?? ClipTag.builtInName(for: clip.type)
+    }
+
+    private func workspacePreview(_ workspace: Workspace) -> String {
+        let cardCount = workspace.canvasObjects.filter(\.isCanvasContent).count
+        let chatCount = workspace.chats.count
+        return "\(cardCount) cards · \(chatCount) AI chats"
+    }
+
     private func key(for clip: Clip) -> String      { "clip:\(clip.id.uuidString)" }
     private func key(for ws: Workspace) -> String   { "ws:\(ws.id.uuidString)" }
     private func key(for chat: AIChat) -> String    { "chat:\(chat.id.uuidString)" }
+}
+
+private extension String {
+    var nilIfEmpty: String? {
+        isEmpty ? nil : self
+    }
 }
