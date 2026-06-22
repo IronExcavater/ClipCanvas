@@ -213,7 +213,7 @@ struct CanvasToolbar: View {
                     }
                 }
             } label: {
-                toolLabel("sparkles", selected: true, selectedTint: .purple)
+                toolLabel("sparkles", selected: true, selectedTint: .secondary)
             }
             .buttonStyle(.plain)
         } else {

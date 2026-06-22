@@ -36,6 +36,7 @@ extension CanvasContainerView {
             sensitivity: classification.sensitivity,
             sensitivityReason: classification.reason
         )
+        clip.isCanvasOnly = true
         context.insert(clip)
         workspace.place(clip: clip, at: workspace.nextPosition(around: visibleViewportCenter))
         showFeedback("Added from share", kind: .success)

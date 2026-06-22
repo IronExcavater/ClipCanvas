@@ -225,7 +225,7 @@ struct CanvasView: View {
             ))
             .opacity(isOverlaid ? 0 : searchOpacity(for: object))
             .allowsHitTesting(!isOverlaid)
-            .gesture(objectDragGesture(for: object, in: geo))
+            .simultaneousGesture(objectDragGesture(for: object, in: geo))
             .modifier(CanvasContextMenuPreviewShapeModifier())
             .contextMenu {
                 objectContextMenu(for: object, in: geo)
@@ -457,7 +457,9 @@ struct CanvasView: View {
                 guard activeResize?.objectID != object.id else { return }
                 guard editingObjectID == nil else { return }
                 let ids = dragObjectIDs(startingFrom: object)
-                ids.forEach(bringToFront)
+                if activeDrag?.objectIDs != ids {
+                    ids.forEach(bringToFront)
+                }
                 withTransaction(Transaction(animation: nil)) {
                     activeDrag = CanvasDragSession(anchorID: object.id, objectIDs: ids, translation: value.translation)
                 }
@@ -1082,8 +1084,5 @@ private struct CanvasObjectPositionModifier: ViewModifier {
                 y: (object.y - viewportOrigin.y) * canvasScale + dragOffset.height
             )
             .shadow(color: .black.opacity(isDragging ? 0.22 : 0), radius: isDragging ? 16 : 0, y: isDragging ? 8 : 0)
-            .animation(.spring(response: 0.28, dampingFraction: 0.86), value: canvasScale)
-            .animation(.spring(response: 0.28, dampingFraction: 0.86), value: viewportOrigin)
-            .animation(.spring(response: 0.28, dampingFraction: 0.86), value: size)
     }
 }

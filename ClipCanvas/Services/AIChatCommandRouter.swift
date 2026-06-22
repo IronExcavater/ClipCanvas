@@ -158,6 +158,15 @@ enum AIChatCommandRouter {
                 in: context
             )
             finish(assistantMessage, content: result.success ? "Added \(count(names, singular: "tag", plural: "tags"))." : result.message)
+        case .transform(let skill):
+            let result = runTransform(
+                skillID: skill.id,
+                chat: chat,
+                workspace: workspace,
+                message: assistantMessage,
+                in: context
+            )
+            finish(assistantMessage, content: result.success ? skill.completion(for: result) : result.message)
         case .format(let kind):
             let result = runFormat(kind, chat: chat, workspace: workspace, message: assistantMessage, in: context)
             finish(assistantMessage, content: result.success ? "Formatted \(count(result.changedObjectIDs + result.changedClipIDs, singular: "item", plural: "items"))." : result.message)
@@ -188,7 +197,7 @@ enum AIChatCommandRouter {
     }
 }
 
-private extension AIChatCommandRouter {
+extension AIChatCommandRouter {
     struct CommandPlan {
         var workspaceName: String?
         var noteTexts: [String]
@@ -264,6 +273,7 @@ private extension AIChatCommandRouter {
         case group
         case ungroup
         case addTags([String])
+        case transform(AITransformSkill)
         case format(NoteTextCommandKind)
         case markSensitive
         case unmarkSensitive
@@ -290,6 +300,8 @@ private extension AIChatCommandRouter {
                 self = .unmarkSensitive
             } else if lower.contains("mark") && (lower.contains("sensitive") || lower.contains("private") || lower.contains("password")) {
                 self = .markSensitive
+            } else if let skill = AITransformSkill.matching(message: message) {
+                self = .transform(skill)
             } else if let format = Self.formatCommand(from: lower) {
                 self = .format(format)
             } else if lower.contains("suggest tags") || lower.contains("add tag") || lower.contains("tag ") || lower.contains("tags") {
@@ -309,9 +321,34 @@ private extension AIChatCommandRouter {
                     || message.range(of: "add", options: .caseInsensitive) != nil else { return nil }
             guard let range = message.range(of: "note", options: .caseInsensitive)
                     ?? message.range(of: "card", options: .caseInsensitive) else { return nil }
-            let suffix = message[range.upperBound...]
+            let suffix = String(message[range.upperBound...])
                 .trimmingCharacters(in: CharacterSet(charactersIn: " :.-\n\t"))
-            return suffix.isEmpty ? "New note" : suffix
+            guard !suffix.isEmpty else { return "New note" }
+
+            let lowerSuffix = suffix.lowercased()
+            if lowerSuffix.hasPrefix("answering ")
+                || lowerSuffix.hasPrefix("answer ")
+                || lowerSuffix.hasPrefix("explaining ")
+                || lowerSuffix.hasPrefix("about ")
+                || lowerSuffix.hasPrefix("for ") {
+                return nil
+            }
+
+            let explicitPatterns = [
+                #"(?i)^(?:that\s+says|saying|with\s+text|containing|called|titled)\s+(.+)$"#,
+                #"(?i)^["“](.+?)["”]$"#
+            ]
+            for pattern in explicitPatterns {
+                guard let regex = try? NSRegularExpression(pattern: pattern) else { continue }
+                let nsRange = NSRange(suffix.startIndex..., in: suffix)
+                guard let match = regex.firstMatch(in: suffix, range: nsRange),
+                      match.numberOfRanges > 1,
+                      let textRange = Range(match.range(at: 1), in: suffix) else { continue }
+                let text = String(suffix[textRange]).trimmingCharacters(in: .whitespacesAndNewlines)
+                if !text.isEmpty { return text }
+            }
+
+            return nil
         }
 
         private static func horizontalDelta(from lower: String) -> Double {

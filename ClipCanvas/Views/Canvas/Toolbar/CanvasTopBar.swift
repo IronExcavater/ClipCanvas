@@ -116,8 +116,15 @@ struct CanvasTopBar: View {
         }
         .padding(.horizontal, 5)
         .padding(.vertical, 5)
-        .background { Capsule().fill(.regularMaterial) }
-        .overlay { Capsule().stroke(Color.white.opacity(0.35), lineWidth: 1) }
+        .background {
+            AppGlassSurface(
+                shape: .capsule,
+                fallback: .color(Color.adaptive(light: .white, dark: PlatformColor.secondarySystemBackground)),
+                interactive: true,
+                stroke: Color.primary.opacity(0.06)
+            )
+        }
+        .shadow(color: .black.opacity(0.14), radius: 10, y: 5)
     }
 
     private var shareMenu: some View {

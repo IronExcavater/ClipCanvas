@@ -193,7 +193,7 @@ nonisolated enum NoteTextFormattingEngine {
 
     private static func marker(for style: NoteTextListStyle, index: Int) -> String {
         switch style {
-        case .bullet: return "* "
+        case .bullet: return "- "
         case .dashed: return "- "
         case .numbered: return "\(index + 1). "
         case .checklist: return "- [ ] "

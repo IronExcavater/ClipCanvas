@@ -42,11 +42,11 @@ nonisolated enum AITransformSkill: String, CaseIterable, Identifiable {
 
     var matchingPhrases: [String] {
         switch self {
-        case .cleanUp: ["clean up", "cleanup", "tidy"]
-        case .distill: ["distill", "summarize", "summary"]
-        case .actionItems: ["action item", "todo", "to-do"]
-        case .rewrite: ["rewrite"]
-        case .title: ["title"]
+        case .cleanUp: ["clean up", "cleanup", "tidy", "fix spacing"]
+        case .distill: ["distill", "summarize", "summary", "make concise", "shorten", "condense"]
+        case .actionItems: ["action item", "action items", "todo", "to-do", "to do", "checklist", "task list"]
+        case .rewrite: ["rewrite", "reword", "improve wording", "make clearer"]
+        case .title: ["title", "headline", "name this"]
         }
     }
 

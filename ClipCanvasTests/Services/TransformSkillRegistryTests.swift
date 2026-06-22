@@ -57,6 +57,15 @@ import Testing
         #expect(tags.suggestedTagNames.contains("Swift"))
     }
 
+    @Test func shortTextFallbackTransformsStillProduceVisibleChanges() async throws {
+        let registry = TransformSkillRegistry(provider: FoundationTransformProvider(isAvailable: false))
+        let rewrite = try await registry.run("clip.rewrite", input: TransformSkillInput(text: "buy milk"))
+        let actionItems = try await registry.run("clip.actionItems", input: TransformSkillInput(text: "buy milk"))
+
+        #expect(rewrite.text == "Buy milk.")
+        #expect(actionItems.text == "- [ ] buy milk")
+    }
+
     @Test func arrangeGridSkillReturnsWorkspaceAction() async throws {
         let workspaceID = UUID()
         let objectIDs = [UUID(), UUID(), UUID()]

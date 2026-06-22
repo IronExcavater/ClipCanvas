@@ -10,7 +10,7 @@ nonisolated enum TextTransformFallbacks {
         case "clip.actionItems":
             return actionItems(input)
         case "clip.rewrite":
-            return collapseWhitespace(input)
+            return rewritten(input)
         case "clip.title":
             return title(input)
         default:
@@ -55,7 +55,24 @@ nonisolated enum TextTransformFallbacks {
             .components(separatedBy: CharacterSet(charactersIn: ".\n"))
             .map { collapseWhitespace($0) }
             .filter { !$0.isEmpty }
-        return clauses.prefix(5).map { "- \($0)" }.joined(separator: "\n")
+        return clauses.prefix(5).map { "- [ ] \($0)" }.joined(separator: "\n")
+    }
+
+    private static func rewritten(_ text: String) -> String {
+        let cleaned = collapseWhitespace(text)
+        guard !cleaned.isEmpty else { return cleaned }
+        return cleaned
+            .components(separatedBy: .newlines)
+            .map { line in
+                let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !trimmed.isEmpty else { return trimmed }
+                let capitalized = String(trimmed.prefix(1)).uppercased() + String(trimmed.dropFirst())
+                if let last = capitalized.last, ".!?".contains(last) {
+                    return String(capitalized)
+                }
+                return "\(capitalized)."
+            }
+            .joined(separator: "\n")
     }
 
     private static func title(_ text: String) -> String {

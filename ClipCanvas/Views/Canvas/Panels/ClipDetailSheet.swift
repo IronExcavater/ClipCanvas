@@ -72,6 +72,12 @@ struct ClipDetailView: View {
                         ClipInfoPanel(clip: clip)
                     }
 
+                    if !canvasObjects.isEmpty {
+                        ClipDetailSection("Note Color") {
+                            CanvasColorPanel(objects: canvasObjects, onDismiss: {})
+                        }
+                    }
+
                     ClipDetailSection("Tags") {
                         ClipTagEditor(clips: [clip], composerShowsShadow: true)
                     }
@@ -105,6 +111,15 @@ struct ClipDetailView: View {
 
     private var activeWorkspace: Workspace? {
         workspaces.first(where: \.isActive) ?? workspaces.first
+    }
+
+    private var canvasObjects: [CanvasObject] {
+        clip.canvasObjects
+            .filter(\.isCanvasContent)
+            .sorted { lhs, rhs in
+                if lhs.updatedAt == rhs.updatedAt { return lhs.createdAt < rhs.createdAt }
+                return lhs.updatedAt > rhs.updatedAt
+            }
     }
 
     private var shareText: String {

@@ -163,7 +163,7 @@ import SwiftUI
         let numbered = NoteTextFormattingEngine.apply(.list(.numbered), to: "", selectedRange: NSRange(location: 0, length: 0))
         let checklist = NoteTextFormattingEngine.apply(.list(.checklist), to: "", selectedRange: NSRange(location: 0, length: 0))
 
-        #expect(bullet.text == "* ")
+        #expect(bullet.text == "- ")
         #expect(numbered.text == "1. ")
         #expect(checklist.text == "- [ ] ")
     }

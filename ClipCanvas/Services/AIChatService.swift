@@ -51,6 +51,32 @@ enum AIChatService {
         chat.updatedAt = Date()
         return message
     }
+
+    @discardableResult
+    static func attachUniqueObjects(
+        _ objects: [CanvasObject],
+        to message: ChatMessage,
+        in context: ModelContext
+    ) -> [CanvasObject] {
+        guard let chat = message.chat else { return [] }
+        let existingIDs = Set(
+            chat.sortedMessages
+                .flatMap(\.sortedAttachments)
+                .compactMap(\.canvasObject?.id)
+        )
+        let uniqueObjects = uniqueLiveObjects(objects).filter { !existingIDs.contains($0.id) }
+        guard !uniqueObjects.isEmpty else { return [] }
+
+        for object in uniqueObjects {
+            let attachment = ChatAttachment(object: object)
+            attachment.message = message
+            message.attachments.append(attachment)
+            context.insert(attachment)
+        }
+
+        chat.updatedAt = Date()
+        return uniqueObjects
+    }
 }
 
 private extension AIChatService {

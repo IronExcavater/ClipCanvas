@@ -175,7 +175,6 @@ private enum MarkdownInlineRenderer {
         var attributed = AttributedString(visibleText)
         let encodedID = id.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed) ?? id
         attributed.link = URL(string: "clipcanvas-sensitive://\(encodedID)")
-        attributed.backgroundColor = Color.red.opacity(0.18)
         attributed.foregroundColor = .primary
         attributed.underlineStyle = .single
         return attributed

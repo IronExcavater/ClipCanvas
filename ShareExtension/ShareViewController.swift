@@ -82,9 +82,11 @@ final class ShareViewController: PlatformViewController {
             self?.extensionContext?.completeRequest(returningItems: [])
         }
 
-        extensionContext?.open(url) { _ in
+        extensionContext?.open(url) { _ in }
+        if Thread.isMainThread {
+            completeOnce()
+        } else {
             DispatchQueue.main.async(execute: completeOnce)
         }
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: completeOnce)
     }
 }

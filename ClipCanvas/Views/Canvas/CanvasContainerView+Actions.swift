@@ -239,7 +239,6 @@ extension CanvasContainerView {
     func openAIChat(attaching objects: [CanvasObject]) {
         guard !objects.isEmpty else { showFeedback("No cards to attach", kind: .info); return }
         let chat = AIChatService.createChat(in: context, workspace: workspace)
-        AIChatService.attachObjects(objects, to: chat, in: context)
         activeAIChat = chat
     }
 

@@ -142,11 +142,11 @@ struct AIChatDetailView: View {
                 }
                 .padding(16)
                 .padding(.bottom, 8)
-                .animation(.easeInOut(duration: 0.18), value: chat.sortedMessages.count)
+                .animation(.easeInOut(duration: 0.34), value: chat.sortedMessages.count)
             }
             .onChange(of: chat.sortedMessages.count) { _, _ in
                 if let id = chat.sortedMessages.last?.id {
-                    withAnimation(.easeInOut(duration: 0.18)) {
+                    withAnimation(.easeInOut(duration: 0.34)) {
                         proxy.scrollTo(id, anchor: .bottom)
                     }
                 }
@@ -302,6 +302,8 @@ struct AIChatDetailView: View {
 
         isSending = true
         Task {
+            let delay: Duration = chat.mode == .thinking ? .milliseconds(900) : .milliseconds(450)
+            try? await Task.sleep(for: delay)
             await AIChatCommandRouter.respond(to: user, with: assistant, in: context)
             isSending = false
         }
@@ -316,12 +318,7 @@ struct AIChatDetailView: View {
             }
         guard !selected.isEmpty else { return }
 
-        for object in selected {
-            let attachment = ChatAttachment(object: object)
-            attachment.message = message
-            message.attachments.append(attachment)
-            context.insert(attachment)
-        }
+        AIChatService.attachUniqueObjects(selected, to: message, in: context)
     }
 
     private func shouldUpdateTitle(from chat: AIChat) -> Bool {
@@ -514,8 +511,9 @@ private struct AIChatMessageBubble: View {
                 }
             }
         }
-        .animation(.easeInOut(duration: 0.18), value: message.sortedToolEvents.count)
-        .animation(.easeInOut(duration: 0.18), value: message.statusRaw)
+        .animation(.easeInOut(duration: 0.34), value: message.sortedAttachments.count)
+        .animation(.easeInOut(duration: 0.34), value: message.sortedToolEvents.count)
+        .animation(.easeInOut(duration: 0.34), value: message.statusRaw)
     }
 
     private var bubbleShape: UnevenRoundedRectangle {
@@ -567,10 +565,30 @@ private struct AIChatAttachmentRow: View {
     let attachment: ChatAttachment
 
     var body: some View {
+        Group {
+            if let url = attachment.linkURL {
+                Link(destination: url) {
+                    content
+                }
+                .buttonStyle(.plain)
+            } else {
+                content
+            }
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 8)
+        .background(Color.secondary.opacity(0.10), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .overlay {
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .stroke(Color.primary.opacity(0.08), lineWidth: 1)
+        }
+    }
+
+    private var content: some View {
         HStack(spacing: 8) {
             Image(systemName: attachment.state == .live ? "paperclip" : "exclamationmark.triangle.fill")
                 .font(.system(size: 13, weight: .semibold))
-                .foregroundStyle(attachment.state == .live ? Color.accentColor : .orange)
+                .foregroundStyle(attachment.state == .live ? Color.secondary : .orange)
                 .frame(width: 18, height: 18)
 
             VStack(alignment: .leading, spacing: 2) {
@@ -584,9 +602,6 @@ private struct AIChatAttachmentRow: View {
                     .lineLimit(1)
             }
         }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 8)
-        .background(Color.accentColor.opacity(0.11), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 
@@ -645,6 +660,17 @@ private extension ChatAttachment {
         case .hardDeleted:
             return "Attachment is no longer available"
         }
+    }
+
+    var linkURL: URL? {
+        guard state == .live else { return nil }
+        if let canvasObject {
+            return URL(string: "clipcanvas://object/\(canvasObject.id.uuidString)")
+        }
+        if let clip {
+            return URL(string: "clipcanvas://clip/\(clip.id.uuidString)")
+        }
+        return nil
     }
 }
 

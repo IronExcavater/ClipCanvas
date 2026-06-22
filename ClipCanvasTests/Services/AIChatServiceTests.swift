@@ -43,6 +43,28 @@ import Testing
         #expect(chat.messages.count == 1)
     }
 
+    @Test func attachesOnlyObjectsNotAlreadyInChatContextToMessage() throws {
+        let context = try ModelContextFactory.makeContext()
+        let workspace = Workspace(name: "Board")
+        let first = CanvasObject(kind: .stickyNote, workspace: workspace, x: 0, y: 0, width: 220, height: 140, text: "First")
+        let second = CanvasObject(kind: .stickyNote, workspace: workspace, x: 260, y: 0, width: 220, height: 140, text: "Second")
+        workspace.canvasObjects = [first, second]
+        context.insert(workspace)
+        context.insert(first)
+        context.insert(second)
+        let chat = AIChatService.createChat(in: context, workspace: workspace)
+        _ = AIChatService.attachObjects([first], to: chat, in: context)
+        let message = ChatMessage(role: .user, content: "Use selected cards")
+        message.chat = chat
+        chat.messages.append(message)
+        context.insert(message)
+
+        let attached = AIChatService.attachUniqueObjects([first, second, second], to: message, in: context)
+
+        #expect(attached.map(\.id) == [second.id])
+        #expect(message.sortedAttachments.compactMap(\.canvasObject?.id) == [second.id])
+    }
+
     @Test func chatCommandCleansUpAttachedClipThroughWorkspaceTools() async throws {
         let context = try ModelContextFactory.makeContext()
         let workspace = Workspace(name: "Board")
@@ -68,6 +90,39 @@ import Testing
         #expect(clip.content == "Clean this\nnote")
         #expect(assistant.toolEvents.first?.status == .completed)
         #expect(assistant.content == "Cleaned up 1 note.")
+    }
+
+    @Test func chatCommandSummarizesAttachedStickyThroughWorkspaceTools() async throws {
+        let context = try ModelContextFactory.makeContext()
+        let workspace = Workspace(name: "Board")
+        let object = CanvasObject(
+            kind: .stickyNote,
+            workspace: workspace,
+            x: 0,
+            y: 0,
+            width: 220,
+            height: 140,
+            text: "Launch checklist needs design, copy, build, and QA before Friday. Risks need owner review."
+        )
+        workspace.canvasObjects = [object]
+        context.insert(workspace)
+        context.insert(object)
+        let chat = AIChatService.createChat(in: context, workspace: workspace)
+        _ = AIChatService.attachObjects([object], to: chat, in: context)
+        let userMessage = ChatMessage(role: .user, content: "Summarize this card")
+        userMessage.chat = chat
+        chat.messages.append(userMessage)
+        context.insert(userMessage)
+        let assistant = ChatMessage(role: .assistant, content: "")
+        assistant.chat = chat
+        chat.messages.append(assistant)
+        context.insert(assistant)
+
+        await AIChatCommandRouter.respond(to: userMessage, with: assistant, in: context)
+
+        #expect(object.text == "Launch checklist needs design, copy, build, and QA before Friday.")
+        #expect(assistant.toolEvents.first?.status == .completed)
+        #expect(assistant.content == "Distilled 1 note.")
     }
 
     @Test func chatCommandDuplicatesAttachedCanvasObjectThroughWorkspaceTools() async throws {
