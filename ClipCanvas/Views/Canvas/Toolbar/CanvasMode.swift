@@ -197,7 +197,13 @@ nonisolated struct CanvasToolbarConfiguration: Hashable {
     }
 
     var preferredWidth: CGFloat {
-        CGFloat(items.count * 44 + max(items.count - 1, 0) * 2 + 20)
+        let itemCount = items.count
+        let itemWidth = itemCount * 44
+        let spacingCount = Swift.max(itemCount - 1, 0)
+        let spacingWidth = spacingCount * 2
+        let horizontalPadding = 20
+        let totalWidth = itemWidth + spacingWidth + horizontalPadding
+        return CGFloat(totalWidth)
     }
 
     private static var emptyPanItems: [CanvasToolbarItem] {
