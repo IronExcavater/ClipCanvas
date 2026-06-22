@@ -8,6 +8,10 @@ final class Workspace: SoftDeletable, Identifiable {
     var name: String
     var isActive: Bool = false
     var sortIndex: Int = 0
+    var isCollaborative: Bool = false
+    var ownerName: String?
+    var sharedByName: String?
+    var sharedAt: Date?
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
     var deletedAt: Date? = nil
@@ -22,6 +26,9 @@ final class Workspace: SoftDeletable, Identifiable {
         self.name = name
         self.sortIndex = sortIndex
         self.isActive = isActive
+        self.ownerName = nil
+        self.sharedByName = nil
+        self.sharedAt = nil
     }
 
     func softDelete() {

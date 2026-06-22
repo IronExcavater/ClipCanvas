@@ -12,6 +12,7 @@ struct CanvasTopBar: View {
     let shareSelectionText: String
     let shareVisibleText: String
     let shareWorkspaceText: String
+    let shareWorkspaceURL: URL?
     let shareImageURLs: [URL]
     let onAskAI: () -> Void
     let onClearAll: () -> Void
@@ -106,8 +107,13 @@ struct CanvasTopBar: View {
 
     private var shareMenu: some View {
         Menu {
+            if let shareWorkspaceURL {
+                ShareLink(item: shareWorkspaceURL) {
+                    Label("Share ClipCanvas Workspace", systemImage: "person.2.wave.2")
+                }
+            }
             ShareLink(item: shareWorkspaceText) {
-                Label("Share Workspace", systemImage: "rectangle.3.group")
+                Label("Share Workspace Text", systemImage: "rectangle.3.group")
             }
             ShareLink(item: shareVisibleText) {
                 Label("Share Visible Cards", systemImage: "rectangle.stack")

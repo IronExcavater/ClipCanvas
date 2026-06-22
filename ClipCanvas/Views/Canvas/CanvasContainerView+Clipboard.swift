@@ -22,6 +22,11 @@ extension CanvasContainerView {
     func addSharedText(_ text: String) {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
+        if let sharedWorkspace = ClipCanvasWorkspaceShare.importWorkspace(from: trimmed, in: context, existing: workspaces) {
+            WorkspaceActionService.activate(sharedWorkspace, among: workspaces)
+            showFeedback("Shared workspace added", kind: .success)
+            return
+        }
         let classification = ClipClassificationService.classifySensitivity(trimmed)
         let clip = Clip(
             content: trimmed,

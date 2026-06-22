@@ -187,29 +187,36 @@ nonisolated struct CanvasToolbarConfiguration: Hashable {
 
         case .pan:
             if selectedCount > 0 {
-                var items: [CanvasToolbarItem] = [.askAI, .copyToClipboard]
-                if selectedCount == 1 {
-                    if selectionKind == .text || selectionKind == .clip {
-                        items.append(.editContent)
-                    }
-                    if selectionKind == .clip || selectionKind == .image {
-                        items.append(.details)
-                    }
-                }
-                items.append(contentsOf: [.duplicate, .arrangeSelection, .delete])
-                return CanvasToolbarConfiguration(items: items)
+                return CanvasToolbarConfiguration(items: panSelectionItems(
+                    selectedCount: selectedCount,
+                    selectionKind: selectionKind
+                ))
             }
-            return CanvasToolbarConfiguration(items: [
-                .askAI,
-                .paste,
-                .newNote,
-                .insertImage,
-                .mode(.draw)
-            ])
+            return CanvasToolbarConfiguration(items: emptyPanItems)
         }
     }
 
     var preferredWidth: CGFloat {
         CGFloat(items.count * 44 + max(items.count - 1, 0) * 2 + 20)
+    }
+
+    private static var emptyPanItems: [CanvasToolbarItem] {
+        [.askAI, .paste, .newNote, .insertImage, .mode(.draw)]
+    }
+
+    private static func panSelectionItems(
+        selectedCount: Int,
+        selectionKind: CanvasSelectionKind
+    ) -> [CanvasToolbarItem] {
+        var items: [CanvasToolbarItem] = [.askAI, .copyToClipboard]
+        guard selectedCount == 1 else {
+            items.append(contentsOf: [.arrangeSelection, .delete])
+            return items
+        }
+        if selectionKind == .text || selectionKind == .clip {
+            items.append(.editContent)
+        }
+        items.append(contentsOf: [.details, .arrangeSelection, .delete])
+        return items
     }
 }

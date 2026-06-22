@@ -19,6 +19,7 @@ struct CanvasView: View {
     @Binding var noteTextCommand: NoteTextCommand?
     var drawingTool: PKTool
     var canvasSearch: String = ""
+    var onDismissSearch: () -> Void = {}
     var onShowDetails: (CanvasObject) -> Void = { _ in }
     var onManageTags: ([CanvasObject]) -> Void = { _ in }
     var onAskAI: ([CanvasObject]) -> Void = { _ in }
@@ -224,9 +225,10 @@ struct CanvasView: View {
             .opacity(isOverlaid ? 0 : searchOpacity(for: object))
             .allowsHitTesting(!isOverlaid)
             .gesture(objectDragGesture(for: object, in: geo))
-            .simultaneousGesture(objectLongPressSelectionGesture(for: object))
             .contextMenu {
                 objectContextMenu(for: object, in: geo)
+            } preview: {
+                objectContextPreview(for: object)
             }
             .zIndex(zIndex(for: object, isSelected: isSelected, isDragging: isDragging))
             .transaction { transaction in
@@ -274,15 +276,30 @@ struct CanvasView: View {
             }
         }
 
-        Button("Duplicate", systemImage: "plus.square.on.square") {
-            selectObjectForMenu(object)
-            duplicate(object, in: geo)
-        }
-
         Button("Delete", systemImage: "trash", role: .destructive) {
             selectObjectForMenu(object)
             delete(object)
         }
+    }
+
+    @ViewBuilder
+    private func objectContextPreview(for object: CanvasObject) -> some View {
+        Text(contextPreviewTitle(for: object))
+            .font(.headline)
+            .lineLimit(3)
+            .padding()
+            .frame(width: 220)
+            .frame(minHeight: 96)
+            .onAppear {
+                selectObjectForMenu(object)
+            }
+    }
+
+    private func contextPreviewTitle(for object: CanvasObject) -> String {
+        let title = object.displayText.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !title.isEmpty { return title }
+        if isImageObject(object) { return "Image" }
+        return "Canvas Card"
     }
 
     private func renderedCanvasObjects(in geo: GeometryProxy) -> [CanvasObject] {
@@ -326,6 +343,7 @@ struct CanvasView: View {
                     guard mode == .edit else { return }
                     createNote(at: viewportCenter(in: geo), in: geo, beginEditing: true)
                 case .second:
+                    onDismissSearch()
                     editingObjectID = nil
                     selectedObjectIDs.removeAll()
                 }
@@ -413,14 +431,6 @@ struct CanvasView: View {
                     activeDrag = nil
                 }
                 updateVisibleObjectIDs(in: geo)
-            }
-    }
-
-    private func objectLongPressSelectionGesture(for object: CanvasObject) -> some Gesture {
-        LongPressGesture(minimumDuration: 0.35, maximumDistance: 12)
-            .onEnded { _ in
-                guard editingObjectID == nil else { return }
-                selectObjectForMenu(object)
             }
     }
 
@@ -677,7 +687,8 @@ struct CanvasView: View {
             .animation(.spring(response: 0.28, dampingFraction: 0.86), value: available)
             .animation(.spring(response: 0.28, dampingFraction: 0.86), value: topBarContentHeight)
         } else if isImageObject(object), let clip = object.clip {
-            let aspect = imageAspectRatio(for: object) ?? max(object.width / max(object.height, 1), 1)
+            let fallbackAspect = CGFloat(max(object.width / max(object.height, 1), 1))
+            let aspect: CGFloat = imageAspectRatio(for: object) ?? fallbackAspect
             let rawImgHeight = available.width / max(aspect, 0.001)
             let imgHeight = min(rawImgHeight, available.height)
             let imgWidth: CGFloat = imgHeight < rawImgHeight ? imgHeight * aspect : available.width
@@ -790,6 +801,7 @@ struct CanvasView: View {
     }
 
     private func handleTap(for object: CanvasObject, in geo: GeometryProxy) {
+        onDismissSearch()
         bringToFront(object.id)
         if selectedObjectIDs.contains(object.id) {
             selectedObjectIDs.remove(object.id)

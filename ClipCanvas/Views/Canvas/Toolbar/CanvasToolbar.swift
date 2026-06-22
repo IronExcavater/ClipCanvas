@@ -13,7 +13,6 @@ struct CanvasToolbar: View {
     let onEditContent: () -> Void
     let onManageTags: () -> Void
     let onArrangeSelection: () -> Void
-    let onDuplicate: () -> Void
     let onColor: () -> Void
     let onCopyToClipboard: () -> Void
     let onPasteFromClipboard: () -> Void
@@ -158,7 +157,7 @@ struct CanvasToolbar: View {
             case .editContent: toolButton("character.cursor.ibeam", action: onEditContent)
             case .manageTags: toolButton("tag", action: onManageTags)
             case .arrangeSelection: toolButton("square.grid.2x2", action: onArrangeSelection)
-            case .duplicate: toolButton("plus.square.on.square", action: onDuplicate)
+            case .duplicate: EmptyView()
             case .color: toolButton("paintpalette", action: onColor)
             case .copyToClipboard: toolButton("doc.on.doc", action: onCopyToClipboard)
             case .pasteFromClipboard: toolButton("doc.on.clipboard", action: onPasteFromClipboard)

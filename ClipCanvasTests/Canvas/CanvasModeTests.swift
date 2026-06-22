@@ -41,20 +41,19 @@ import Testing
             .copyToClipboard,
             .editContent,
             .details,
-            .duplicate,
             .arrangeSelection,
             .delete
         ])
     }
 
-    @Test func panStandaloneTextSelectionOmitsUnavailableDetails() {
+    @Test func panStandaloneTextSelectionShowsDetails() {
         let configuration = CanvasToolbarConfiguration.make(selectedCount: 1, mode: .pan, selectionKind: .text)
 
         #expect(configuration.items == [
             .askAI,
             .copyToClipboard,
             .editContent,
-            .duplicate,
+            .details,
             .arrangeSelection,
             .delete
         ])
@@ -66,7 +65,6 @@ import Testing
         #expect(configuration.items == [
             .askAI,
             .copyToClipboard,
-            .duplicate,
             .arrangeSelection,
             .delete
         ])

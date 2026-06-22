@@ -14,7 +14,6 @@ struct CanvasCommandActions {
     let fitContent: () -> Void
     let arrangeSelection: () -> Void
     let editSelection: () -> Void
-    let duplicateSelection: () -> Void
     let deleteSelection: () -> Void
     let bold: () -> Void
     let italic: () -> Void
@@ -77,10 +76,6 @@ struct ClipCanvasCommands: Commands {
             Button("Edit Selection") { canvasActions?.editSelection() }
                 .keyboardShortcut(.return, modifiers: [.command])
                 .disabled(canvasActions?.canEditSelection != true)
-
-            Button("Duplicate Selection") { canvasActions?.duplicateSelection() }
-                .keyboardShortcut("d", modifiers: [.command])
-                .disabled(canvasActions?.canDeleteSelection != true)
 
             Button("Arrange Selection") { canvasActions?.arrangeSelection() }
                 .keyboardShortcut("r", modifiers: [.command, .shift])

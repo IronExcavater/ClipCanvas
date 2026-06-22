@@ -20,9 +20,7 @@ struct ICloudProfilePage: View {
 
     var body: some View {
         List {
-            Section {
-                profileSummary
-            }
+            Section { profileSummary }
             .listRowInsets(EdgeInsets(top: 8, leading: 16, bottom: 8, trailing: 16))
 
             Section {
@@ -37,12 +35,11 @@ struct ICloudProfilePage: View {
             }
 
             Section {
-                Toggle("Workspace Sharing", isOn: $workspaceSharingEnabled)
                 Toggle("Include Images", isOn: $includeImagesInShares)
             } header: {
                 Text("Sharing")
             } footer: {
-                Text("Controls what ClipCanvas includes when sharing workspaces, cards, and images.")
+                Text("Controls whether ClipCanvas includes image files when sharing cards and workspaces.")
             }
         }
         .navigationTitle("iCloud Profile")
@@ -73,7 +70,7 @@ struct ICloudProfilePage: View {
         VStack(alignment: .leading, spacing: 16) {
             HStack(spacing: 14) {
                 ZStack(alignment: .bottomTrailing) {
-                    Image(systemName: "person.crop.circle.fill")
+                    Image(systemName: status == .available ? "person.crop.circle.fill.badge.checkmark" : "person.crop.circle.fill")
                         .font(.system(size: 54, weight: .semibold))
                         .foregroundStyle(Color.accentColor)
                     Circle()
@@ -96,23 +93,15 @@ struct ICloudProfilePage: View {
                 Spacer(minLength: 0)
             }
 
-            HStack(spacing: 8) {
-                ICloudProfileMetric(title: "Saved", value: estimatedICloudData)
-                ICloudProfileMetric(title: "Workspaces", value: "\(workspaces.count)")
-                ICloudProfileMetric(title: "Cards", value: "\(clips.count)")
+            #if canImport(UIKit)
+            Button {
+                openAppleIDSettings()
+            } label: {
+                Label(status == .available ? "Manage Apple ID and iCloud" : "Open iCloud Settings", systemImage: AppSymbol.settings)
+                    .frame(maxWidth: .infinity)
             }
-
-            if status == .noAccount {
-                #if canImport(UIKit)
-                Button {
-                    UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
-                } label: {
-                    Label("Open iCloud Settings", systemImage: AppSymbol.settings)
-                        .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.borderedProminent)
-                #endif
-            }
+            .buttonStyle(.borderedProminent)
+            #endif
         }
         .padding(.vertical, 8)
     }
@@ -138,42 +127,14 @@ struct ICloudProfilePage: View {
         }
     }
 
-    private var estimatedICloudData: String {
-        let clipBytes = clips.reduce(0) { total, clip in
-            total
-                + clip.content.lengthOfBytes(using: .utf8)
-                + (clip.imageData?.count ?? 0)
-                + (clip.imageUTI?.lengthOfBytes(using: .utf8) ?? 0)
-        }
-        let workspaceBytes = workspaces.reduce(0) { total, workspace in
-            total
-                + workspace.name.lengthOfBytes(using: .utf8)
-                + workspace.canvasObjects.reduce(0) { objectTotal, object in
-                    objectTotal
-                        + object.text.lengthOfBytes(using: .utf8)
-                        + (object.drawingData?.count ?? 0)
-                }
-        }
-        return ByteCountFormatter.string(fromByteCount: Int64(max(clipBytes + workspaceBytes, 0)), countStyle: .file)
+    #if canImport(UIKit)
+    private func openAppleIDSettings() {
+        let urls = [
+            URL(string: "App-prefs:APPLE_ACCOUNT"),
+            URL(string: UIApplication.openSettingsURLString)
+        ].compactMap { $0 }
+        guard let url = urls.first else { return }
+        UIApplication.shared.open(url)
     }
-}
-
-private struct ICloudProfileMetric: View {
-    let title: String
-    let value: String
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 2) {
-            Text(value)
-                .font(.subheadline.weight(.semibold))
-                .foregroundStyle(.primary)
-            Text(title)
-                .font(.caption2.weight(.medium))
-                .foregroundStyle(.secondary)
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 12)
-        .padding(.vertical, 10)
-        .background(Color.secondary.opacity(0.08), in: RoundedRectangle(cornerRadius: 14, style: .continuous))
-    }
+    #endif
 }

@@ -17,7 +17,19 @@ extension CanvasContainerView {
     }
 
     func showSelectedDetails() {
-        detailClip = selectedClips.first
+        if let clip = selectedClips.first {
+            detailClip = clip
+            return
+        }
+        guard let object = orderedCanvasObjects(matching: selectedObjectIDs).first,
+              object.kind == .stickyNote || object.kind == .text else { return }
+        let clip = Clip(content: object.text, origin: .typed)
+        context.insert(clip)
+        object.clip = clip
+        object.kind = .clipNote
+        object.text = ""
+        object.markUpdated()
+        detailClip = clip
     }
 
     func showSelectedTags() {

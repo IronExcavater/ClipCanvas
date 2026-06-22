@@ -10,7 +10,6 @@ struct CanvasInspectorPanel: View {
     let onDetails: () -> Void
     let onTags: () -> Void
     let onColor: () -> Void
-    let onDuplicate: () -> Void
     let onArrange: () -> Void
     let onAskAI: () -> Void
     let onDelete: () -> Void
@@ -68,10 +67,9 @@ struct CanvasInspectorPanel: View {
     private var actionGrid: some View {
         LazyVGrid(columns: [GridItem(.adaptive(minimum: 74), spacing: 10)], spacing: 10) {
             inspectorAction("Edit", systemImage: "character.cursor.ibeam", isEnabled: selectedObjects.count == 1 && selectedObjects.contains(where: \.canEditTextInInspector), action: onEdit)
-            inspectorAction("Details", systemImage: "info.circle", isEnabled: selectedObjects.contains { $0.clip != nil }, action: onDetails)
+            inspectorAction("Details", systemImage: "info.circle", isEnabled: selectedObjects.count == 1, action: onDetails)
             inspectorAction("Tags", systemImage: "tag", isEnabled: selectedObjects.contains { $0.clip != nil }, action: onTags)
             inspectorAction("Color", systemImage: "paintpalette", action: onColor)
-            inspectorAction("Duplicate", systemImage: "square.on.square", action: onDuplicate)
             inspectorAction("Arrange", systemImage: "rectangle.3.group", action: onArrange)
             inspectorAction("Ask AI", systemImage: "sparkles", action: onAskAI)
             inspectorAction("Delete", systemImage: "trash", role: .destructive, action: onDelete)

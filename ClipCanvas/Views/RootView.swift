@@ -143,6 +143,8 @@ private struct SidebarDestinationContent: View {
         switch destination {
         case .workspaces:
             WorkspacesPage()
+        case .sharedWithMe:
+            SharedWithMePage()
         case .history:
             HistoryPage()
         case .trash:

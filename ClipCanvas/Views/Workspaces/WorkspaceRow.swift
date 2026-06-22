@@ -21,7 +21,7 @@ struct WorkspaceRow: View {
                 renameField
             } else {
                 AppListRowHeader(
-                    systemImage: "folder.fill",
+                    systemImage: workspace.isCollaborative ? "person.2.fill" : "folder.fill",
                     color: tint,
                     title: workspace.name,
                     subtitle: workspaceSummary,
@@ -43,20 +43,31 @@ struct WorkspaceRow: View {
 
     @ViewBuilder
     private var renameField: some View {
-        TextField("Workspace name", text: $editingName)
-            .font(.subheadline.weight(.semibold))
-            .lineLimit(1)
-            .submitLabel(.done)
-            .focused($focused)
-            .onChange(of: editingName) { _, newValue in
-                let limited = WorkspaceNamePolicy.limitedEditingText(newValue)
-                if limited != newValue { editingName = limited }
+        HStack(spacing: 12) {
+            AppIconBadge(systemImage: workspace.name.isEmpty ? "plus" : "folder.fill", size: 34, iconSize: 16, color: tint)
+            VStack(alignment: .leading, spacing: 4) {
+                TextField("Workspace name", text: $editingName)
+                    .font(.subheadline.weight(.semibold))
+                    .lineLimit(1)
+                    .submitLabel(.done)
+                    .focused($focused)
+                    .onChange(of: editingName) { _, newValue in
+                        let limited = WorkspaceNamePolicy.limitedEditingText(newValue)
+                        if limited != newValue { editingName = limited }
+                    }
+                    .onSubmit(onCommitRename)
+                    .onDisappear(perform: onCommitRename)
+                Text(workspace.name.isEmpty ? "New workspace" : workspaceSummary)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
-            .onSubmit(onCommitRename)
-            .onDisappear(perform: onCommitRename)
+        }
     }
 
     private var workspaceSummary: String {
+        if workspace.isCollaborative {
+            return "Owner: \(workspace.ownerName ?? workspace.sharedByName ?? "Unknown")"
+        }
         let chats = workspace.chats.count
         return "\(chats) \(chats == 1 ? "chat" : "chats")"
     }

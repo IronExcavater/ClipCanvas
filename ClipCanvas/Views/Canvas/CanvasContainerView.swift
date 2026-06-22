@@ -17,7 +17,7 @@ struct CanvasContainerView: View {
     @Query(
         filter: #Predicate<Workspace> { $0.deletedAt == nil },
         sort: \Workspace.sortIndex
-    ) private var workspaces: [Workspace]
+    ) var workspaces: [Workspace]
 
     @State var mode: CanvasMode = .pan
     @State var feedbackPresenter = FeedbackPresenter()
@@ -80,7 +80,6 @@ struct CanvasContainerView: View {
                         onDetails: showSelectedDetails,
                         onTags: showSelectedTags,
                         onColor: showSelectedColors,
-                        onDuplicate: duplicateSelected,
                         onArrange: { zoomCommand = .arrangeSelection },
                         onAskAI: askAIAboutSelection,
                         onDelete: deleteSelected
@@ -110,6 +109,7 @@ struct CanvasContainerView: View {
                 noteTextCommand: $noteTextCommand,
                 drawingTool: pencilTool,
                 canvasSearch: canvasSearch,
+                onDismissSearch: closeCanvasSearch,
                 onShowDetails: { object in
                     if let clip = object.clip {
                         detailClip = clip
@@ -128,7 +128,7 @@ struct CanvasContainerView: View {
                     runAIAction(skill, on: objects)
                 }
             )
-            .ignoresSafeArea()
+            .ignoresSafeArea(.container)
 
             VStack(spacing: 0) {
                 topChrome
@@ -167,7 +167,6 @@ struct CanvasContainerView: View {
                     onEditContent: editSelectedContent,
                     onManageTags: showSelectedTags,
                     onArrangeSelection: { zoomCommand = .arrangeSelection },
-                    onDuplicate: duplicateSelected,
                     onColor: showSelectedColors,
                     onCopyToClipboard: copySelectedToClipboard,
                     onPasteFromClipboard: pasteClipboardIntoSelected,
@@ -190,9 +189,8 @@ struct CanvasContainerView: View {
                     onDrawTool: selectDrawTool,
                     onDrawToolSettings: toggleDrawToolSettings
                 )
-                .padding(.bottom, keyboardHeight > 0 && editingObjectID != nil ? keyboardHeight - 32 : 0)
             }
-            .ignoresSafeArea(.container, edges: .bottom)
+            .ignoresSafeArea(.container, edges: [.top, .horizontal])
 
             if let tool = drawToolSettings {
                 CanvasBottomOverlay(bottomPadding: 82, onDismiss: dismissDrawToolSettings) {
@@ -409,7 +407,6 @@ struct CanvasContainerView: View {
             fitContent: { zoomCommand = .fitContent },
             arrangeSelection: { zoomCommand = .arrangeSelection },
             editSelection: editSelectedContent,
-            duplicateSelection: duplicateSelected,
             deleteSelection: deleteSelected,
             bold: { noteTextCommand = NoteTextCommand(kind: .bold) },
             italic: { noteTextCommand = NoteTextCommand(kind: .italic) },
@@ -440,6 +437,7 @@ struct CanvasContainerView: View {
                 shareSelectionText: shareSelectionText,
                 shareVisibleText: shareVisibleText,
                 shareWorkspaceText: shareWorkspaceText,
+                shareWorkspaceURL: shareWorkspaceURL,
                 shareImageURLs: shareImageURLs,
                 onAskAI: askAIAboutCurrentContext,
                 onClearAll: { confirmingClearCanvas = true },
@@ -485,6 +483,10 @@ struct CanvasContainerView: View {
 
     var shareWorkspaceText: String {
         CanvasShareExporter.workspaceText(workspace)
+    }
+
+    var shareWorkspaceURL: URL? {
+        ClipCanvasWorkspaceShare.temporaryShareURL(for: workspace, includeImages: includeImagesInShares)
     }
 
     var shareImageURLs: [URL] {

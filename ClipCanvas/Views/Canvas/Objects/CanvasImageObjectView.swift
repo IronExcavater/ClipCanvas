@@ -11,7 +11,11 @@ struct CanvasImageObjectView: View {
     let onResizeEnded: () -> Void
     let onToggleExpandedSize: () -> Void
 
+    @State private var decodedImage: PlatformImage?
+    @State private var sampledLuminance: CGFloat?
+
     private let cornerRadius: CGFloat = 12
+    private var imageDataVersion: Int { clip.imageData?.count ?? 0 }
 
     var body: some View {
         ZStack(alignment: .bottomTrailing) {
@@ -35,13 +39,16 @@ struct CanvasImageObjectView: View {
         .contentShape(RoundedRectangle(cornerRadius: cornerRadius, style: .continuous))
         .gesture(tapGesture)
         .animation(.spring(response: 0.18, dampingFraction: 0.8), value: isSelected)
+        .task(id: imageDataVersion) {
+            refreshDecodedImage()
+        }
     }
 
     @ViewBuilder
     private var content: some View {
         if !showsContent {
             Color.clear
-        } else if let data = clip.imageData, let image = PlatformImage(data: data) {
+        } else if let image = decodedImage {
             platformImage(image)
         } else {
             Label("Image", systemImage: "photo")
@@ -82,12 +89,21 @@ struct CanvasImageObjectView: View {
     }
 
     private var resizeHandleTint: Color {
-        guard let data = clip.imageData,
-              let image = PlatformImage(data: data),
-              let luminance = bottomTrailingLuminance(of: image) else {
+        guard let luminance = sampledLuminance else {
             return .white
         }
         return luminance < 0.48 ? .white : .black
+    }
+
+    private func refreshDecodedImage() {
+        guard let data = clip.imageData,
+              let image = PlatformImage(data: data) else {
+            decodedImage = nil
+            sampledLuminance = nil
+            return
+        }
+        decodedImage = image
+        sampledLuminance = bottomTrailingLuminance(of: image)
     }
 
     private func bottomTrailingLuminance(of image: PlatformImage) -> CGFloat? {

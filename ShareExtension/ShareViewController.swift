@@ -36,7 +36,20 @@ final class ShareViewController: PlatformViewController {
             return
         }
 
-        if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
+        if provider.hasItemConformingToTypeIdentifier(UTType.data.identifier) {
+            provider.loadItem(forTypeIdentifier: UTType.data.identifier) { [weak self] result, _ in
+                if let url = result as? URL,
+                   let data = try? Data(contentsOf: url),
+                   let text = String(data: data, encoding: .utf8) {
+                    self?.saveAndComplete(text: text)
+                } else if let data = result as? Data,
+                          let text = String(data: data, encoding: .utf8) {
+                    self?.saveAndComplete(text: text)
+                } else {
+                    self?.saveAndComplete(text: nil)
+                }
+            }
+        } else if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
             provider.loadItem(forTypeIdentifier: UTType.url.identifier) { [weak self] result, _ in
                 let urlString = (result as? URL)?.absoluteString
                 self?.saveAndComplete(text: urlString)

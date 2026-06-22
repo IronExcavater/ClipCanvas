@@ -6,6 +6,7 @@ import UIKit
 
 enum SidebarDestination: Hashable {
     case workspaces
+    case sharedWithMe
     case history
     case trash
     case settings
@@ -187,7 +188,8 @@ struct SidebarView: View {
 
             Spacer(minLength: 10)
 
-            sidebarNavButton(destination: .history, systemImage: "clipboard")
+                sidebarNavButton(destination: .history, systemImage: "clipboard")
+            sidebarNavButton(destination: .sharedWithMe, systemImage: "person.2")
             sidebarNavButton(destination: .trash, systemImage: "trash")
             sidebarNavButton(destination: .settings, systemImage: AppSymbol.settings)
         }
@@ -297,6 +299,8 @@ struct SidebarView: View {
         switch destination {
         case .workspaces:
             WorkspacesPage()
+        case .sharedWithMe:
+            SharedWithMePage()
         case .history:
             HistoryPage()
         case .trash:
