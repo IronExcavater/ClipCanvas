@@ -186,43 +186,19 @@ nonisolated struct CanvasToolbarConfiguration: Hashable {
             ])
 
         case .pan:
-            if selectedCount > 0 {
-                return CanvasToolbarConfiguration(items: panSelectionItems(
-                    selectedCount: selectedCount,
-                    selectionKind: selectionKind
-                ))
-            }
-            return CanvasToolbarConfiguration(items: emptyPanItems)
+            return CanvasToolbarConfiguration(items: selectedCount > 0 ? [
+                .askAI,
+                .copyToClipboard
+            ] + (selectedCount == 1
+                ? (selectionKind == .text || selectionKind == .clip
+                    ? [.editContent, .details, .arrangeSelection, .delete]
+                    : [.details, .arrangeSelection, .delete])
+                : [.arrangeSelection, .delete])
+                : [.askAI, .paste, .newNote, .insertImage, .mode(.draw)])
         }
     }
 
     var preferredWidth: CGFloat {
-        let itemCount = items.count
-        let itemWidth = itemCount * 44
-        let spacingCount = Swift.max(itemCount - 1, 0)
-        let spacingWidth = spacingCount * 2
-        let horizontalPadding = 20
-        let totalWidth = itemWidth + spacingWidth + horizontalPadding
-        return CGFloat(totalWidth)
-    }
-
-    private static var emptyPanItems: [CanvasToolbarItem] {
-        [.askAI, .paste, .newNote, .insertImage, .mode(.draw)]
-    }
-
-    private static func panSelectionItems(
-        selectedCount: Int,
-        selectionKind: CanvasSelectionKind
-    ) -> [CanvasToolbarItem] {
-        var items: [CanvasToolbarItem] = [.askAI, .copyToClipboard]
-        guard selectedCount == 1 else {
-            items.append(contentsOf: [.arrangeSelection, .delete])
-            return items
-        }
-        if selectionKind == .text || selectionKind == .clip {
-            items.append(.editContent)
-        }
-        items.append(contentsOf: [.details, .arrangeSelection, .delete])
-        return items
+        CGFloat(items.count * 44 + max(items.count - 1, 0) * 2 + 20)
     }
 }

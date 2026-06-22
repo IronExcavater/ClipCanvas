@@ -687,8 +687,7 @@ struct CanvasView: View {
             .animation(.spring(response: 0.28, dampingFraction: 0.86), value: available)
             .animation(.spring(response: 0.28, dampingFraction: 0.86), value: topBarContentHeight)
         } else if isImageObject(object), let clip = object.clip {
-            let fallbackAspect = CGFloat(max(object.width / max(object.height, 1), 1))
-            let aspect: CGFloat = imageAspectRatio(for: object) ?? fallbackAspect
+            let aspect = imageAspectRatio(for: object) ?? max(object.width / max(object.height, 1), 1)
             let rawImgHeight = available.width / max(aspect, 0.001)
             let imgHeight = min(rawImgHeight, available.height)
             let imgWidth: CGFloat = imgHeight < rawImgHeight ? imgHeight * aspect : available.width
