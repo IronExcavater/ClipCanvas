@@ -15,14 +15,16 @@ struct CanvasTopBar: View {
     let shareWorkspaceURL: URL?
     let shareImageURLs: [URL]
     let onAskAI: () -> Void
+    let workspaceName: String
     let onClearAll: () -> Void
     let onArrangeAll: () -> Void
     let onFitContent: () -> Void
     var onSearch: (() -> Void)? = nil
+    var showsSidebarButton = true
 
     private func titleMaxWidth(in totalWidth: CGFloat) -> CGFloat {
         let horizontalPadding: CGFloat = 32
-        let sideControls: CGFloat = 46 + 100
+        let sideControls: CGFloat = (showsSidebarButton ? 46 : 0) + 100
         let hStackSpacing: CGFloat = 12 * 2
         let minimumSpacerRoom: CGFloat = 16
         let available = totalWidth - horizontalPadding - sideControls - hStackSpacing - minimumSpacerRoom
@@ -33,20 +35,23 @@ struct CanvasTopBar: View {
         GeometryReader { proxy in
             ZStack {
                 HStack(spacing: 12) {
-                    Button(action: onToggleSidebar) {
-                        Image(systemName: AppSymbol.sidebar)
-                            .font(.system(size: 18, weight: .semibold))
-                            .foregroundStyle(.primary)
+                    if showsSidebarButton {
+                        Button(action: onToggleSidebar) {
+                            Image(systemName: AppSymbol.sidebar)
+                                .font(.system(size: 18, weight: .semibold))
+                                .foregroundStyle(.primary)
+                        }
+                        .buttonStyle(BlendedIconButtonStyle())
+                        .frame(width: 46)
                     }
-                    .buttonStyle(BlendedIconButtonStyle())
-                    .frame(width: 46)
 
                     if isRenaming {
                         titleEditor(maxWidth: titleMaxWidth(in: proxy.size.width))
                             .layoutPriority(1)
                             .animation(.spring(response: 0.24, dampingFraction: 0.86), value: isRenaming)
                     } else {
-                        Spacer(minLength: 8)
+                        titleButton(maxWidth: titleMaxWidth(in: proxy.size.width))
+                            .layoutPriority(1)
                     }
 
                     actionCapsule
@@ -67,6 +72,23 @@ struct CanvasTopBar: View {
 
     private var askAITitle: String {
         selectedCount > 0 ? "Ask About Selection" : "Ask About View"
+    }
+
+    @ViewBuilder
+    private func titleButton(maxWidth: CGFloat) -> some View {
+        Button(action: onBeginRename) {
+            Text(workspaceName)
+                .font(.title3.weight(.semibold))
+                .lineLimit(1)
+                .truncationMode(.middle)
+                .foregroundStyle(.primary)
+                .frame(width: maxWidth)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background { WorkspaceTitleBackdrop() }
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Rename workspace")
     }
 
     @ViewBuilder

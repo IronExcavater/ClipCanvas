@@ -6,6 +6,7 @@ import SwiftData
 struct CanvasHost: View {
     let onToggleSidebar: () -> Void
     var prefersInspector = false
+    var showsSidebarButton = true
 
     @Query(filter: #Predicate<Workspace> { $0.deletedAt == nil }, sort: \Workspace.sortIndex)
     private var workspaces: [Workspace]
@@ -22,7 +23,8 @@ struct CanvasHost: View {
                 CanvasContainerView(
                     workspace: workspace,
                     onToggleSidebar: onToggleSidebar,
-                    prefersInspector: prefersInspector
+                    prefersInspector: prefersInspector,
+                    showsSidebarButton: showsSidebarButton
                 )
             } else {
                 AppLoadingScreen()

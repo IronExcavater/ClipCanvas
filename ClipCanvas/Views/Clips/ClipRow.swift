@@ -11,6 +11,7 @@ struct ClipRow: View {
     var onDetails: (() -> Void)?
     var onPrimaryAction: (() -> Void)?
 
+    @Environment(\.modelContext) private var context
     @AppStorage(ClipboardService.accessEnabledKey) private var clipboardAccessEnabled = false
     @ObservedObject private var revealStore = SensitiveTextRevealStore.shared
 
@@ -21,34 +22,38 @@ struct ClipRow: View {
 
     var body: some View {
         ItemRow(tint: primaryTagColor, opacity: 0.025, isSelecting: isSelecting, isSelected: isSelected, dragID: clip.id.uuidString) {
-            HStack(alignment: .top, spacing: 10) {
-                imageThumbnail
-                AppListRowHeader(
-                    systemImage: clip.type.icon,
-                    color: primaryTagColor,
-                    title: displayTitle,
-                    subtitle: compact || isExpanded ? nil : displaySubtitle,
-                    metadata: rowMetadata,
-                    lineLimit: compact ? 1 : 2,
-                    pinned: clip.isPinned,
-                    date: clip.updatedAt,
-                    dateSuffix: " ago"
-                )
-            }
-            if isExpanded {
-                MarkdownPreview(
-                    text: displayPreview,
-                    revealedSensitiveParts: revealStore.revealedPartIDs,
-                    onSensitivePartTapped: revealStore.toggle
-                )
-                    .font(.callout)
-                    .foregroundStyle(.primary.opacity(0.78))
-                    .lineLimit(6)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            }
-            if !clip.tags.isEmpty {
-                rowFooter
+            VStack(alignment: .leading, spacing: 9) {
+                HStack(alignment: .top, spacing: 10) {
+                    imageThumbnail
+                    AppListRowHeader(
+                        systemImage: clip.type.icon,
+                        color: primaryTagColor,
+                        title: displayTitle,
+                        subtitle: compact || isExpanded ? nil : displaySubtitle,
+                        metadata: rowMetadata,
+                        lineLimit: compact ? 1 : 2,
+                        pinned: clip.isPinned,
+                        date: clip.updatedAt,
+                        dateSuffix: " ago"
+                    )
+                }
+
+                if isExpanded {
+                    MarkdownPreview(
+                        text: displayPreview,
+                        revealedSensitiveParts: revealStore.revealedPartIDs,
+                        onSensitivePartTapped: revealStore.toggle
+                    )
+                        .font(.callout)
+                        .foregroundStyle(.primary.opacity(0.78))
+                        .lineLimit(6)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
+                if !clip.tags.isEmpty {
+                    rowFooter
+                }
             }
         }
         .onTapGesture(perform: primaryAction)
@@ -73,9 +78,11 @@ struct ClipRow: View {
             if ClipActionService.openableURL(for: clip) != nil {
                 Button("Open Link", systemImage: "safari") { ClipActionService.openURL(for: clip) }
             }
-            Button(clip.isPrivateContent ? "Unmark Sensitive" : "Mark Sensitive",
-                   systemImage: clip.isPrivateContent ? "lock.open" : "lock") {
-                ClipActionService.toggleSensitive(clip)
+            if clip.isPrivateContent || ClipClassificationService.canMarkSensitiveMarkdown(in: clip.content) {
+                Button(clip.isPrivateContent ? "Unmark Sensitive" : "Mark Sensitive",
+                       systemImage: clip.isPrivateContent ? "lock.open" : "lock") {
+                    ClipActionService.toggleSensitive(clip)
+                }
             }
             Button("Add to Canvas", systemImage: "square.and.arrow.down") { addToCanvas() }
                 .disabled(activeWorkspace == nil)
@@ -116,12 +123,10 @@ struct ClipRow: View {
             .trimmingCharacters(in: .whitespacesAndNewlines)
         return lines.nilIfEmpty
     }
-    private func addToCanvas() { activeWorkspace?.place(clip: clip) }
+    private func addToCanvas() { activeWorkspace?.placeDuplicate(of: clip, in: context) }
 
     private var rowMetadata: [AppListRowMetadata] {
-        var metadata = [
-            AppListRowMetadata(clip.type.icon, value: ClipTag.builtInName(for: clip.type))
-        ]
+        var metadata: [AppListRowMetadata] = []
         if clip.type == .image, let bytes = clip.imageData?.count {
             metadata.append(AppListRowMetadata("externaldrive", value: ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)))
         } else {

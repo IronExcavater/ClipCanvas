@@ -1,6 +1,8 @@
 import Foundation
 
 @MainActor enum CanvasShareExporter {
+    private static var temporaryImageURLs: [String: URL] = [:]
+
     static func workspaceText(_ workspace: Workspace) -> String {
         let objects = orderedContentObjects(workspace.canvasObjects)
         let body = objects.map(cardText).filter { !$0.isEmpty }.joined(separator: "\n\n")
@@ -18,11 +20,22 @@ import Foundation
                   clip.type == .image,
                   let data = clip.imageData else { return nil }
             let ext = fileExtension(for: clip.imageUTI)
-            let url = FileManager.default.temporaryDirectory
-                .appendingPathComponent("ClipCanvas-\(object.id.uuidString)")
+            let cacheKey = "\(object.id.uuidString)-\(clip.imageUTI ?? "public.png")-\(data.count)-\(data.hashValue)"
+            if let cached = temporaryImageURLs[cacheKey],
+               FileManager.default.fileExists(atPath: cached.path) {
+                return cached
+            }
+            let keySuffix = String(abs(data.hashValue), radix: 16)
+            let directory = FileManager.default.temporaryDirectory
+                .appendingPathComponent("ClipCanvasShares", isDirectory: true)
+                .appendingPathComponent("Images", isDirectory: true)
+            let url = directory
+                .appendingPathComponent("ClipCanvas-\(object.id.uuidString)-\(keySuffix)")
                 .appendingPathExtension(ext)
             do {
+                try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
                 try data.write(to: url, options: .atomic)
+                temporaryImageURLs[cacheKey] = url
                 return url
             } catch {
                 return nil

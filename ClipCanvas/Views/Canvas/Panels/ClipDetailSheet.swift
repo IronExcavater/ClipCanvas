@@ -14,6 +14,7 @@ struct ClipDetailSheet: View {
 struct ClipDetailView: View {
     let clip: Clip
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.modelContext) private var context
     @Query(filter: #Predicate<Workspace> { $0.deletedAt == nil }, sort: \Workspace.sortIndex)
     private var workspaces: [Workspace]
     @State private var isTransforming = false
@@ -35,6 +36,7 @@ struct ClipDetailView: View {
                         canTransform: clip.type != .image,
                         isTransforming: isTransforming,
                         isPrivate: clip.isPrivateContent,
+                        canChangeSensitivity: clip.isPrivateContent || ClipClassificationService.canMarkSensitiveMarkdown(in: clip.content),
                         canCopy: clipboardAccessEnabled,
                         shareText: shareText,
                         canAddToCanvas: activeWorkspace != nil,
@@ -137,7 +139,7 @@ private struct ClipInfoPanel: View {
 
     var body: some View {
         VStack(spacing: 7) {
-            ClipInfoRow("Type", value: ClipTag.builtInName(for: clip.type), icon: clip.type.icon)
+            ClipTypePickerRow(clip: clip)
             ClipInfoRow("Privacy", value: privacyLabel, icon: privacyIcon)
             if let expiresAt = clip.expiresAt, clip.isPrivateContent {
                 ClipInfoRow("Expires", value: expiresAt.formatted(date: .omitted, time: .shortened), icon: "timer")
@@ -164,6 +166,48 @@ private struct ClipInfoPanel: View {
     }
 }
 
+private struct ClipTypePickerRow: View {
+    let clip: Clip
+
+    var body: some View {
+        HStack(spacing: 12) {
+            Label("Type", systemImage: clip.type.icon)
+                .foregroundStyle(.primary.opacity(0.68))
+
+            Spacer(minLength: 12)
+
+            Picker("Type", selection: typeBinding) {
+                ForEach(availableTypes, id: \.self) { type in
+                    Label(ClipTag.builtInName(for: type), systemImage: type.icon)
+                        .tag(type)
+                }
+            }
+            .labelsHidden()
+            .pickerStyle(.menu)
+
+            if clip.isTypeManuallySet {
+                Button("Auto") {
+                    clip.resetTypeDetection()
+                }
+                .font(.caption.weight(.semibold))
+                .buttonStyle(.borderless)
+            }
+        }
+        .font(.footnote)
+    }
+
+    private var typeBinding: Binding<ClipType> {
+        Binding(
+            get: { clip.type },
+            set: { clip.setManualType($0) }
+        )
+    }
+
+    private var availableTypes: [ClipType] {
+        clip.imageData == nil ? [.text, .url, .code] : ClipType.allCases
+    }
+}
+
 private struct ClipContentPanel: View {
     let clip: Clip
     let revealedSensitiveParts: Set<String>
@@ -175,6 +219,7 @@ private struct ClipContentPanel: View {
     let onExitEditing: () -> Void
     let onCommand: (NoteTextCommandKind) -> Void
     let onSensitivePartTapped: (String) -> Void
+    @State private var activeHighlight: NoteHighlightColor?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -282,10 +327,13 @@ private struct ClipContentPanel: View {
     private var highlightMenu: some View {
         Menu {
             ForEach(NoteHighlightColor.allCases, id: \.self) { color in
-                Button(color.rawValue.capitalized) { onCommand(.highlight(color)) }
+                Button(color.rawValue.capitalized) {
+                    activeHighlight = color
+                    onCommand(.highlight(color))
+                }
             }
         } label: {
-            formatLabel("highlighter")
+            formatLabel("highlighter", isActive: activeHighlight != nil, activeTint: .orange)
         }
         .buttonStyle(.plain)
     }
@@ -298,11 +346,12 @@ private struct ClipContentPanel: View {
         .accessibilityLabel(kind.accessibilityName)
     }
 
-    private func formatLabel(_ icon: String) -> some View {
+    private func formatLabel(_ icon: String, isActive: Bool = false, activeTint: Color = .accentColor) -> some View {
         Image(systemName: icon)
             .font(.system(size: 14, weight: .semibold))
+            .foregroundStyle(isActive ? .white : .primary)
             .frame(width: 34, height: 34)
-            .background(Color.secondary.opacity(0.10), in: Circle())
+            .background(isActive ? activeTint : Color.secondary.opacity(0.10), in: Circle())
             .contentShape(Circle())
     }
 }
@@ -390,6 +439,7 @@ private struct ClipDetailActionToolbar: View {
     let canTransform: Bool
     let isTransforming: Bool
     let isPrivate: Bool
+    let canChangeSensitivity: Bool
     let canCopy: Bool
     let shareText: String
     let canAddToCanvas: Bool
@@ -420,9 +470,11 @@ private struct ClipDetailActionToolbar: View {
                 .disabled(!canAddToCanvas)
             transformMenu
             action(isPinned ? "Unpin" : "Pin", icon: isPinned ? "pin.slash" : "pin", action: onPin)
-            action(isPrivate ? "Unmark" : "Sensitive",
-                   icon: isPrivate ? "lock.open" : "lock",
-                   action: onSensitive)
+            if canChangeSensitivity {
+                action(isPrivate ? "Unmark" : "Sensitive",
+                       icon: isPrivate ? "lock.open" : "lock",
+                       action: onSensitive)
+            }
             action("Delete", icon: "trash", destructive: true, action: onDelete)
         }
     }
@@ -485,14 +537,14 @@ private struct ClipDetailActionToolbar: View {
 
 private extension ClipDetailView {
     func addToCanvas() {
-        activeWorkspace?.place(clip: clip)
+        activeWorkspace?.placeDuplicate(of: clip, in: context)
     }
 
     func updateClipContent(_ text: String) {
         guard clip.content != text else { return }
         let classification = ClipClassificationService.classifySensitivity(text)
         clip.content = text
-        clip.type = Clip.detect(content: text, imageData: clip.imageData)
+        clip.updateDetectedType()
         clip.updateSensitivity(classification.sensitivity, reason: classification.reason)
         clip.updatedAt = Date()
     }
@@ -512,7 +564,7 @@ private extension ClipDetailView {
                       !text.isEmpty else { return }
                 let classification = ClipClassificationService.classifySensitivity(text)
                 clip.content = text
-                clip.type = Clip.detect(content: text, imageData: clip.imageData)
+                clip.updateDetectedType()
                 clip.updateSensitivity(classification.sensitivity, reason: classification.reason)
                 clip.updatedAt = Date()
             } catch {

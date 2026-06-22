@@ -36,6 +36,26 @@ struct MarkdownPreview: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .padding(.leading, CGFloat(level) * 16)
+                    case .ordered(let content, let number, let level):
+                        HStack(alignment: .firstTextBaseline, spacing: 7) {
+                            Text("\(number).")
+                                .fontWeight(.semibold)
+                                .monospacedDigit()
+                                .frame(width: 22, alignment: .trailing)
+                            Text(Self.attributedString(for: content, emptyText: emptyText, revealedSensitiveParts: revealedSensitiveParts))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .padding(.leading, CGFloat(level) * 16)
+                    case .checklist(let content, let isChecked, let level):
+                        HStack(alignment: .firstTextBaseline, spacing: 7) {
+                            Image(systemName: isChecked ? "checkmark.square.fill" : "square")
+                                .font(.caption.weight(.semibold))
+                                .frame(width: 14, alignment: .center)
+                                .foregroundStyle(isChecked ? Color.accentColor : Color.secondary)
+                            Text(Self.attributedString(for: content, emptyText: emptyText, revealedSensitiveParts: revealedSensitiveParts))
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .padding(.leading, CGFloat(level) * 16)
                     case .quote(let content):
                         Text(Self.attributedString(for: content, emptyText: emptyText, revealedSensitiveParts: revealedSensitiveParts))
                             .padding(.leading, 10)
@@ -93,7 +113,7 @@ struct MarkdownPreview: View {
                 let body = (trimmed as NSString).substring(from: 6)
                 return MarkdownPreviewBlock(
                     index: index,
-                    kind: .bullet(body, level: min(leadingWhitespace / 2, 3))
+                    kind: .checklist(body, isChecked: trimmed.hasPrefix("- [x] "), level: min(leadingWhitespace / 2, 3))
                 )
             }
             if trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") || trimmed.hasPrefix("• ") {
@@ -108,9 +128,11 @@ struct MarkdownPreview: View {
                 range: NSRange(location: 0, length: trimmedNS.length)
             ), match.range.location == 0 {
                 let body = trimmedNS.substring(from: match.range.length)
+                let marker = trimmedNS.substring(with: match.range)
+                let number = Int(marker.prefix { $0.isNumber }) ?? index + 1
                 return MarkdownPreviewBlock(
                     index: index,
-                    kind: .bullet(body, level: min(leadingWhitespace / 2, 3))
+                    kind: .ordered(body, number: number, level: min(leadingWhitespace / 2, 3))
                 )
             }
             return MarkdownPreviewBlock(index: index, kind: .paragraph(line))
@@ -455,6 +477,8 @@ struct MarkdownPreviewBlock: Identifiable {
         case paragraph(String)
         case monostyled(String)
         case bullet(String, level: Int)
+        case ordered(String, number: Int, level: Int)
+        case checklist(String, isChecked: Bool, level: Int)
         case quote(String)
         case empty
     }

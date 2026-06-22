@@ -8,7 +8,8 @@ nonisolated enum CanvasEditOverlayLayout {
         safeAreaBottom: CGFloat
     ) -> CGRect {
         let topInset = topBarContentHeight + 12
-        let bottomInset = max(keyboardHeight - 32, 0) + 58 + safeAreaBottom
+        let keyboardInset = keyboardHeight > 0 ? max(keyboardHeight - 12, 0) : safeAreaBottom
+        let bottomInset = keyboardInset + 54
         let sideInset: CGFloat = 16
         let width = viewportSize.width - sideInset * 2
         let availableHeight = max(80, viewportSize.height - topInset - bottomInset)

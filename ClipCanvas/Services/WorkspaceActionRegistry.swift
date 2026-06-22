@@ -460,7 +460,7 @@ private extension WorkspaceActionRegistry {
     static func update(_ clip: Clip, content: String, at date: Date = Date()) {
         let classification = ClipClassificationService.classifySensitivity(content)
         clip.content = content
-        clip.type = Clip.detect(content: content, imageData: clip.imageData)
+        clip.updateDetectedType()
         clip.updateSensitivity(classification.sensitivity, reason: classification.reason, at: date)
         clip.updatedAt = date
     }

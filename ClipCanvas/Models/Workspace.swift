@@ -96,7 +96,7 @@ final class Workspace: SoftDeletable, Identifiable {
         let pos = position ?? nextPosition()
         let isImage = clip.type == .image
         let size = isImage
-            ? CGSize(width: 260, height: 190)
+            ? CanvasPlacementSizing.expandedSize(for: clip, availableScreenWidth: 360)
             : CanvasPlacementSizing.defaultSize
         let object = CanvasObject(
             kind: isImage ? .image : .clipNote,
@@ -110,6 +110,14 @@ final class Workspace: SoftDeletable, Identifiable {
         object.zIndex = Double(canvasObjects.count)
         canvasObjects.append(object)
         updatedAt = Date()
+        return object
+    }
+
+    @discardableResult
+    func placeDuplicate(of clip: Clip, at position: CGPoint? = nil, in context: ModelContext? = nil) -> CanvasObject {
+        let copy = clip.duplicateForCanvas()
+        context?.insert(copy)
+        let object = place(clip: copy, at: position)
         return object
     }
 }

@@ -102,7 +102,7 @@ struct NoteTextEditor: UIViewRepresentable {
             options: .dotMatchesLineSeparators
         )
         private static let bulletPattern = try? NSRegularExpression(
-            pattern: #"(?m)^(\s*)(?:[-*]|\d+\.)\s+"#,
+            pattern: #"(?m)^(\s*)(- \[[ xX]\]|[-*]|\d+\.)\s+"#,
             options: []
         )
 
@@ -231,6 +231,7 @@ struct NoteTextEditor: UIViewRepresentable {
                 ],
                 markerLength: 1
             )
+            applyBlockMarkdownAttributes(to: attr, in: plain)
             applyBulletAttributes(to: attr, in: plain, range: nsRange)
             let saved = textView.selectedRange
             textView.attributedText = attr
@@ -238,6 +239,47 @@ struct NoteTextEditor: UIViewRepresentable {
             if saved.location + saved.length <= length {
                 textView.selectedRange = saved
             }
+        }
+
+        private func applyBlockMarkdownAttributes(to attr: NSMutableAttributedString, in plain: String) {
+            let ns = plain as NSString
+            ns.enumerateSubstrings(in: NSRange(location: 0, length: ns.length), options: [.byLines, .substringNotRequired]) { [self] _, lineRange, _, _ in
+                let line = ns.substring(with: lineRange)
+                let leadingLength = line.prefix { $0 == " " || $0 == "\t" }.count
+                let body = String(line.dropFirst(leadingLength))
+                let bodyStart = lineRange.location + leadingLength
+
+                if body.hasPrefix("# ") {
+                    styleHeading(in: attr, markerRange: NSRange(location: bodyStart, length: 2), lineRange: lineRange, size: fontSize + 7)
+                } else if body.hasPrefix("## ") {
+                    styleHeading(in: attr, markerRange: NSRange(location: bodyStart, length: 3), lineRange: lineRange, size: fontSize + 5)
+                } else if body.hasPrefix("### ") {
+                    styleHeading(in: attr, markerRange: NSRange(location: bodyStart, length: 4), lineRange: lineRange, size: fontSize + 3)
+                } else if body.hasPrefix("> ") {
+                    attr.addAttributes(hiddenMarkerAttributes, range: NSRange(location: bodyStart, length: 2))
+                    let paragraph = NSMutableParagraphStyle()
+                    paragraph.headIndent = 12
+                    paragraph.firstLineHeadIndent = 12
+                    paragraph.paragraphSpacing = 3
+                    attr.addAttributes([
+                        .paragraphStyle: paragraph,
+                        .foregroundColor: UIColor.secondaryLabel
+                    ], range: lineRange)
+                } else if body.hasPrefix("    ") {
+                    attr.addAttributes(hiddenMarkerAttributes, range: NSRange(location: bodyStart, length: min(4, lineRange.length)))
+                    attr.addAttributes([
+                        .font: UIFont.monospacedSystemFont(ofSize: max(fontSize - 1, 11), weight: .regular),
+                        .backgroundColor: UIColor.secondarySystemFill
+                    ], range: lineRange)
+                }
+            }
+        }
+
+        private func styleHeading(in attr: NSMutableAttributedString, markerRange: NSRange, lineRange: NSRange, size: CGFloat) {
+            attr.addAttributes(hiddenMarkerAttributes, range: markerRange)
+            attr.addAttributes([
+                .font: UIFont.boldSystemFont(ofSize: size)
+            ], range: lineRange)
         }
 
         private func applyInlineMarkdown(
@@ -307,11 +349,20 @@ struct NoteTextEditor: UIViewRepresentable {
                 paragraph.firstLineHeadIndent = indent
                 paragraph.paragraphSpacing = 2
                 if #available(iOS 15.0, *) {
-                    paragraph.textLists = [NSTextList(markerFormat: .disc, options: 0)]
+                    paragraph.textLists = [NSTextList(markerFormat: textListMarkerFormat(for: plain, markerRange: markerRange), options: 0)]
                 }
                 let lineRange = (plain as NSString).lineRange(for: match.range)
                 attr.addAttribute(.paragraphStyle, value: paragraph, range: lineRange)
             }
+        }
+
+        @available(iOS 15.0, *)
+        private func textListMarkerFormat(for plain: String, markerRange: NSRange) -> NSTextList.MarkerFormat {
+            let marker = (plain as NSString).substring(with: markerRange)
+            if marker.trimmingCharacters(in: .whitespaces).last == "." { return .decimal }
+            if marker.contains("[") { return .square }
+            if marker.trimmingCharacters(in: .whitespaces).hasPrefix("-") { return .disc }
+            return .disc
         }
 
         private var hiddenMarkerAttributes: [NSAttributedString.Key: Any] {

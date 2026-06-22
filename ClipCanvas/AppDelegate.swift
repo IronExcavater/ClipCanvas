@@ -39,7 +39,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDockMenu(_ sender: NSApplication) -> NSMenu? {
         let menu = NSMenu()
         let item = NSMenuItem(
-            title: "Copy to Canvas",
+            title: "Paste into ClipCanvas",
             action: #selector(copyToCanvas),
             keyEquivalent: ""
         )

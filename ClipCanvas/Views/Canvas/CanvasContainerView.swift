@@ -10,6 +10,7 @@ struct CanvasContainerView: View {
     let workspace: Workspace
     let onToggleSidebar: () -> Void
     var prefersInspector = false
+    var showsSidebarButton = true
 
     @Environment(\.modelContext) var context
     @Environment(\.undoManager) private var undoManager
@@ -32,6 +33,7 @@ struct CanvasContainerView: View {
     @State var activeAIChat: AIChat?
     @State var tagClips: [Clip]?
     @State var colorObjects: [CanvasObject]?
+    @State var aiSkillPreview: AISelectionSkillPreview?
     @State var isRenaming = false
     @State var renameText = ""
     @State var activeDrawing: PKDrawing = PKDrawing()
@@ -90,6 +92,7 @@ struct CanvasContainerView: View {
             }
             .animation(.spring(response: 0.28, dampingFraction: 0.86), value: usesInspector)
         }
+        .navigationTitle(workspace.name)
     }
 
     private func canvasContent(usesInspector: Bool) -> some View {
@@ -161,7 +164,8 @@ struct CanvasContainerView: View {
                     isEditing: editingObjectID != nil,
                     onPaste: paste,
                     onCreateNote: createNoteAtViewCenter,
-                    onAskAI: openRecentOrNewAIChat,
+                    onAskAI: askAIAboutCurrentContext,
+                    onRunAIAction: runAIActionOnSelection,
                     onInsertImage: insertImageFromLibrary,
                     onDetails: showSelectedDetails,
                     onEditContent: editSelectedContent,
@@ -185,15 +189,16 @@ struct CanvasContainerView: View {
                     activeDrawTool: activeDrawTool,
                     penColor: penColor,
                     highlighterColor: highlighterColor,
+                    isKeyboardShown: keyboardHeight > 0,
                     onCloseMode: closeToolbarMode,
                     onDrawTool: selectDrawTool,
                     onDrawToolSettings: toggleDrawToolSettings
                 )
             }
-            .ignoresSafeArea(.container, edges: [.top, .horizontal])
+            .ignoresSafeArea(.container, edges: [.bottom, .horizontal])
 
             if let tool = drawToolSettings {
-                CanvasBottomOverlay(bottomPadding: 82, onDismiss: dismissDrawToolSettings) {
+                CanvasBottomOverlay(bottomPadding: drawingSettingsBottomPadding, onDismiss: dismissDrawToolSettings) {
                     CanvasDrawToolSettingsPanel(
                         tool: tool,
                         color: drawColor(for: tool),
@@ -221,6 +226,20 @@ struct CanvasContainerView: View {
                 }
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                     .zIndex(9)
+            }
+
+            if let preview = aiSkillPreview {
+                AppConfirmationOverlay(
+                    title: preview.skill.title,
+                    message: preview.message,
+                    destructiveTitle: "Apply",
+                    onConfirm: {
+                        runAIAction(preview.skill, on: preview.objects)
+                        aiSkillPreview = nil
+                    },
+                    onCancel: { aiSkillPreview = nil }
+                )
+                .zIndex(24)
             }
 
             if confirmingClearCanvas {
@@ -266,11 +285,10 @@ struct CanvasContainerView: View {
             paste()
         }
         .onReceive(NotificationCenter.default.publisher(for: .sharedTextReceived)) { note in
-            if let text = note.object as? String { addSharedText(text) }
+            handleSharedTextNotification(note)
         }
         .onReceive(NotificationCenter.default.publisher(for: .clipCanvasRouteRequested)) { note in
-            guard let route = note.object as? AppRoute else { return }
-            handleCanvasRoute(route)
+            handleCanvasRouteNotification(note)
         }
         .onChange(of: workspace.id) { _, _ in
             loadPersistedDrawing()
@@ -301,36 +319,25 @@ struct CanvasContainerView: View {
             selection: $selectedPhotoItem,
             matching: .images
         )
-        .alert("Use Clipboard Features?", isPresented: $showClipboardPermissionPrompt) {
-            Button("Enable Clipboard") {
-                enableClipboardAccessFromLaunchPrompt()
-            }
-            .keyboardShortcut(.defaultAction)
-            Button("Not Now", role: .cancel) {
-                disableClipboardAccess()
-            }
-        } message: {
-            Text("Paste, copy, history, and clipboard sync need clipboard access. You can turn this on later in Settings.")
-        }
+        .modifier(
+            ClipboardPermissionAlertPresenter(
+                isPresented: $showClipboardPermissionPrompt,
+                onEnable: enableClipboardAccessFromLaunchPrompt,
+                onCancel: disableClipboardAccess
+            )
+        )
         .onChange(of: selectedPhotoItem) { _, newItem in
             Task { await importSelectedImage(newItem) }
         }
         .onPreferenceChange(CanvasTopChromeHeightPreferenceKey.self) { height in
-            let newHeight = CanvasTopChromeLayout.resolvedHeight(
-                measuredHeight: height,
-                expectedHeight: topBarContentHeight
+            updateTopChromeHeight(height)
+        }
+        .modifier(
+            CanvasContainerSheetPresenter(
+                detailClip: detailSheetBinding(usesInspector: usesInspector),
+                activeAIChat: chatSheetBinding(usesInspector: usesInspector)
             )
-            guard abs(newHeight - measuredTopChromeHeight) > 0.5 else { return }
-            withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
-                measuredTopChromeHeight = newHeight
-            }
-        }
-        .sheet(item: detailSheetBinding(usesInspector: usesInspector)) { clip in
-            ClipDetailSheet(clip: clip)
-        }
-        .sheet(item: chatSheetBinding(usesInspector: usesInspector)) { chat in
-            AIChatDetailSheet(chat: chat)
-        }
+        )
     }
 
     private var selectedInspectorObjects: [CanvasObject] {
@@ -339,9 +346,13 @@ struct CanvasContainerView: View {
     }
 
     private func shouldUseInspector(width: CGFloat) -> Bool {
+        #if os(macOS)
+        return false
+        #else
         prefersInspector
             && width >= 760
             && (activeAIChat != nil || detailClip != nil || !selectedInspectorObjects.isEmpty)
+        #endif
     }
 
     private func inspectorWidth(for width: CGFloat) -> CGFloat {
@@ -365,6 +376,33 @@ struct CanvasContainerView: View {
     private func dismissDrawToolSettings() {
         withAnimation(.spring(response: 0.22, dampingFraction: 0.86)) {
             drawToolSettings = nil
+        }
+    }
+
+    private var drawingSettingsBottomPadding: CGFloat {
+        keyboardHeight > 0 ? 128 : 152
+    }
+
+    private func handleSharedTextNotification(_ note: Notification) {
+        guard let text = note.object as? String else { return }
+        addSharedText(text)
+    }
+
+    private func handleCanvasRouteNotification(_ note: Notification) {
+        guard let route = note.object as? AppRoute else { return }
+        handleCanvasRoute(route)
+    }
+
+    private func updateTopChromeHeight(_ measuredHeight: CGFloat) {
+        let expectedHeight = topBarContentHeight
+        let newHeight = CanvasTopChromeLayout.resolvedHeight(
+            measuredHeight: measuredHeight,
+            expectedHeight: expectedHeight
+        )
+        guard abs(newHeight - measuredTopChromeHeight) > 0.5 else { return }
+        let animation = Animation.spring(response: 0.28, dampingFraction: 0.86)
+        withAnimation(animation) {
+            measuredTopChromeHeight = newHeight
         }
     }
 
@@ -400,7 +438,7 @@ struct CanvasContainerView: View {
             canFormatText: editingObjectID != nil,
             createNote: createNoteAtViewCenter,
             paste: paste,
-            askAI: openRecentOrNewAIChat,
+            askAI: askAIAboutCurrentContext,
             search: toggleCanvasSearch,
             zoomIn: { zoomCommand = .zoomIn },
             zoomOut: { zoomCommand = .zoomOut },
@@ -440,10 +478,12 @@ struct CanvasContainerView: View {
                 shareWorkspaceURL: shareWorkspaceURL,
                 shareImageURLs: shareImageURLs,
                 onAskAI: askAIAboutCurrentContext,
+                workspaceName: workspace.name,
                 onClearAll: { confirmingClearCanvas = true },
                 onArrangeAll: { zoomCommand = .arrangeAll },
                 onFitContent: { zoomCommand = .fitContent },
-                onSearch: toggleCanvasSearch
+                onSearch: toggleCanvasSearch,
+                showsSidebarButton: showsSidebarButton
             )
 
             if isCanvasSearchActive {
@@ -583,6 +623,49 @@ private struct CanvasTopChromeHeightPreferenceKey: PreferenceKey {
     }
 }
 
+private struct CanvasContainerSheetPresenter: ViewModifier {
+    @Binding var detailClip: Clip?
+    @Binding var activeAIChat: AIChat?
+
+    func body(content: Content) -> some View {
+        content
+            .sheet(item: $detailClip) { clip in
+                ClipDetailSheet(clip: clip)
+            }
+            .sheet(item: $activeAIChat) { chat in
+                AIChatDetailSheet(chat: chat)
+            }
+    }
+}
+
+private struct ClipboardPermissionAlertPresenter: ViewModifier {
+    @Binding var isPresented: Bool
+    let onEnable: () -> Void
+    let onCancel: () -> Void
+
+    func body(content: Content) -> some View {
+        content
+            .alert("Use Clipboard Features?", isPresented: $isPresented) {
+                Button("Enable Clipboard") {
+                    onEnable()
+                }
+                .keyboardShortcut(.defaultAction)
+                #if canImport(UIKit)
+                Button("Open Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) {
+                        UIApplication.shared.open(url)
+                    }
+                }
+                #endif
+                Button("Not Now", role: .cancel) {
+                    onCancel()
+                }
+            } message: {
+                Text("Paste, copy, history, and clipboard sync need clipboard access. If iOS keeps asking, set Paste from Other Apps to Allow in ClipCanvas settings.")
+            }
+    }
+}
+
 private struct CanvasKeyboardHeightModifier: ViewModifier {
     let isEditing: Bool
     @Binding var keyboardHeight: CGFloat
@@ -596,13 +679,13 @@ private struct CanvasKeyboardHeightModifier: ViewModifier {
                     let screenHeight = UIApplication.shared.connectedScenes
                         .compactMap { ($0 as? UIWindowScene)?.screen.bounds.height }
                         .first ?? frame.maxY
-                    withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+                    withAnimation(keyboardAnimation(from: notification)) {
                         keyboardHeight = max(0, screenHeight - frame.minY)
                     }
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { _ in
-                withAnimation(.spring(response: 0.28, dampingFraction: 0.86)) {
+            .onReceive(NotificationCenter.default.publisher(for: UIResponder.keyboardWillHideNotification)) { notification in
+                withAnimation(keyboardAnimation(from: notification)) {
                     keyboardHeight = 0
                 }
             }
@@ -610,4 +693,11 @@ private struct CanvasKeyboardHeightModifier: ViewModifier {
         content
         #endif
     }
+
+    #if canImport(UIKit)
+    private func keyboardAnimation(from notification: Notification) -> Animation {
+        let duration = notification.userInfo?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double ?? 0.28
+        return .easeOut(duration: duration)
+    }
+    #endif
 }

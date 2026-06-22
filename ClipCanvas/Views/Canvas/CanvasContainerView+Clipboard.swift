@@ -14,7 +14,7 @@ extension CanvasContainerView {
         }
         let (clip, isNew) = Clip.findOrMake(from: content, origin: .clipboard, in: context)
         if isNew { context.insert(clip) }
-        workspace.place(clip: clip, at: workspace.nextPosition(around: visibleViewportCenter))
+        workspace.placeDuplicate(of: clip, at: workspace.nextPosition(around: visibleViewportCenter), in: context)
         showFeedback("Pasted", kind: .success)
     }
 
@@ -98,7 +98,7 @@ extension CanvasContainerView {
             }
             if iCloudClipboardSyncEnabled, let first = clips.first {
                 if first.type == .image, let data = first.imageData {
-                    ICloudClipboardService.publish(.image(data, uti: first.imageUTI ?? "public.png"))
+                    ICloudClipboardService.publish(.image(data, uti: first.imageUTI ?? "public.png", name: first.imageName))
                 } else {
                     ICloudClipboardService.publish(.text(clips.map(\.content).joined(separator: "\n\n")))
                 }
@@ -130,19 +130,24 @@ extension CanvasContainerView {
             if let clip = object.clip {
                 let classification = ClipClassificationService.classifySensitivity(text)
                 clip.content = text
-                clip.type = Clip.detect(content: text, imageData: clip.imageData)
+                clip.updateDetectedType()
                 clip.updateSensitivity(classification.sensitivity, reason: classification.reason)
                 clip.updatedAt = Date()
             } else {
                 object.text = text
             }
-        case .image(let data, let uti):
+        case .image(let data, let uti, let name):
             guard let clip = object.clip else {
                 showFeedback("Select a clip to paste an image into", kind: .info)
                 return
             }
             clip.imageData = data
             clip.imageUTI = uti
+            clip.imageName = name
+            clip.isTypeManuallySet = false
+            if let name, !name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                clip.content = name
+            }
             clip.type = .image
             clip.updatedAt = Date()
         }

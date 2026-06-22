@@ -75,6 +75,9 @@ struct RootView: View {
     // MARK: - iPad / Mac: NavigationSplitView
 
     private func splitLayout(prefersInspector: Bool) -> some View {
+        #if os(macOS)
+        macSplitLayout(prefersInspector: prefersInspector)
+        #else
         NavigationSplitView(columnVisibility: $columnVisibility) {
             NavigationStack(path: $sidebarPath) {
                 SidebarView(
@@ -93,7 +96,36 @@ struct RootView: View {
                 }
             }, prefersInspector: prefersInspector)
         }
+        #endif
     }
+
+    #if os(macOS)
+    private func macSplitLayout(prefersInspector: Bool) -> some View {
+        HStack(spacing: 0) {
+            NavigationStack(path: $sidebarPath) {
+                SidebarView(
+                    onClose: nil,
+                    onOpenAIChat: { activeAIChat = $0 },
+                    navigationPath: $sidebarPath
+                )
+                .navigationDestination(for: SidebarDestination.self) { destination in
+                    SidebarDestinationContent(destination: destination)
+                }
+            }
+            .frame(width: 300)
+            .frame(minWidth: 260, maxWidth: 340)
+
+            Divider()
+
+            CanvasHost(
+                onToggleSidebar: {},
+                prefersInspector: false,
+                showsSidebarButton: false
+            )
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        }
+    }
+    #endif
 
     private var prefersDesktopLayout: Bool {
         #if os(macOS)

@@ -26,17 +26,28 @@ struct ClipCanvasWorkspaceSharePayload: Codable {
 
 @MainActor enum ClipCanvasWorkspaceShare {
     static let fileExtension = "clipcanvas"
+    private static var temporaryShareURLs: [String: URL] = [:]
 
     static func temporaryShareURL(for workspace: Workspace, includeImages: Bool) -> URL? {
         let payload = payload(for: workspace, includeImages: includeImages)
         guard let data = try? JSONEncoder.clipCanvasShare.encode(payload) else { return nil }
+        let cacheKey = "\(workspace.id.uuidString)-\(includeImages)-\(data.count)-\(data.hashValue)"
+        if let cached = temporaryShareURLs[cacheKey],
+           FileManager.default.fileExists(atPath: cached.path) {
+            return cached
+        }
         let safeName = workspace.name
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "/", with: "-")
-        let fileName = (safeName.isEmpty ? "ClipCanvas Workspace" : safeName) + "." + fileExtension
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+        let keySuffix = String(abs(data.hashValue), radix: 16)
+        let fileName = (safeName.isEmpty ? "ClipCanvas Workspace" : safeName) + "-\(keySuffix)." + fileExtension
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("ClipCanvasShares", isDirectory: true)
+        let url = directory.appendingPathComponent(fileName)
         do {
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
             try data.write(to: url, options: .atomic)
+            temporaryShareURLs[cacheKey] = url
             return url
         } catch {
             return nil

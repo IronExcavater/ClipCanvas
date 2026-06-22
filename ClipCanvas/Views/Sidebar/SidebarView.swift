@@ -80,6 +80,7 @@ struct SidebarView: View {
             .appListSectionSpacingCompact()
             .listSectionSeparator(.hidden)
             .mask(VerticalEdgeFadeMask(top: 10, bottom: 24))
+            .frame(maxHeight: .infinity)
 
             bottomNav
         }
@@ -99,9 +100,9 @@ struct SidebarView: View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 12) {
                 Text("ClipCanvas")
-                    .font(.title3.weight(.bold))
+                    .font(.largeTitle.weight(.bold))
                     .foregroundStyle(Color.accentColor)
-                    .padding(.top, 9)
+                    .padding(.top, 2)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 Button(action: createChat) {
@@ -159,9 +160,9 @@ struct SidebarView: View {
 
     private func sidebarSectionTitle(_ title: String) -> some View {
         Text(title)
-            .font(.caption.weight(.bold))
+            .font(.footnote.weight(.heavy))
             .textCase(.uppercase)
-            .foregroundStyle(.secondary)
+            .foregroundStyle(.primary.opacity(0.82))
             .padding(.leading, 4)
             .padding(.top, 8)
     }
@@ -169,7 +170,7 @@ struct SidebarView: View {
     // MARK: - Bottom nav
 
     private var bottomNav: some View {
-        HStack(spacing: 12) {
+        VStack(alignment: .leading, spacing: 10) {
             Button {
                 if iCloudStatus == .noAccount {
                     #if canImport(UIKit)
@@ -186,16 +187,18 @@ struct SidebarView: View {
             .buttonStyle(.plain)
             .accessibilityLabel("iCloud profile")
 
-            Spacer(minLength: 10)
-
+            HStack(spacing: 12) {
+                Spacer(minLength: 0)
                 sidebarNavButton(destination: .history, systemImage: "clipboard")
-            sidebarNavButton(destination: .sharedWithMe, systemImage: "person.2")
-            sidebarNavButton(destination: .trash, systemImage: "trash")
-            sidebarNavButton(destination: .settings, systemImage: AppSymbol.settings)
+                sidebarNavButton(destination: .sharedWithMe, systemImage: "person.2")
+                sidebarNavButton(destination: .trash, systemImage: "trash")
+                sidebarNavButton(destination: .settings, systemImage: AppSymbol.settings)
+            }
         }
         .padding(.horizontal, 16)
-        .padding(.top, 2)
+        .padding(.top, 10)
         .padding(.bottom, 24)
+        .background(.regularMaterial)
         .ignoresSafeArea(.container, edges: .bottom)
         .ignoresSafeArea(.keyboard, edges: .bottom)
     }

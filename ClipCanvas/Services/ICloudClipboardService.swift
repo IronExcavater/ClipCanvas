@@ -16,7 +16,7 @@ enum ICloudClipboardService {
             store.set(text, forKey: textKey)
             store.removeObject(forKey: imageDataKey)
             store.removeObject(forKey: imageUTIKey)
-        case .image(let data, let uti):
+        case .image(let data, let uti, _):
             guard data.count <= maxImageBytes else { return }
             store.set(data, forKey: imageDataKey)
             store.set(uti, forKey: imageUTIKey)

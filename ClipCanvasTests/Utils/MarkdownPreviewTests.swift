@@ -22,15 +22,35 @@ import SwiftUI
         }
     }
 
-    @Test func parsesOrderedListMarkersAsBulletPreviewBlocks() {
+    @Test func parsesOrderedListMarkersAsOrderedPreviewBlocks() {
         let blocks = MarkdownPreview.blocks(for: "1. First item\n2. Second item")
 
         #expect(blocks.count == 2)
-        if case .bullet(let first, let level) = blocks[0].kind {
+        if case .ordered(let first, let number, let level) = blocks[0].kind {
             #expect(first == "First item")
+            #expect(number == 1)
             #expect(level == 0)
         } else {
-            Issue.record("Expected ordered list item to render as a bullet preview")
+            Issue.record("Expected ordered list item to render as an ordered preview")
+        }
+    }
+
+    @Test func parsesChecklistMarkersAsChecklistPreviewBlocks() {
+        let blocks = MarkdownPreview.blocks(for: "- [ ] Todo\n- [x] Done")
+
+        #expect(blocks.count == 2)
+        if case .checklist(let first, let checked, let level) = blocks[0].kind {
+            #expect(first == "Todo")
+            #expect(checked == false)
+            #expect(level == 0)
+        } else {
+            Issue.record("Expected unchecked checklist item")
+        }
+        if case .checklist(let second, let checked, _) = blocks[1].kind {
+            #expect(second == "Done")
+            #expect(checked == true)
+        } else {
+            Issue.record("Expected checked checklist item")
         }
     }
 
@@ -136,6 +156,16 @@ import SwiftUI
         let result = NoteTextFormattingEngine.apply(.list(.numbered), to: "one\ntwo", selectedRange: NSRange(location: 0, length: 7))
 
         #expect(result.text == "1. one\n2. two")
+    }
+
+    @Test func listCommandCreatesMarkerInEmptyNote() {
+        let bullet = NoteTextFormattingEngine.apply(.list(.bullet), to: "", selectedRange: NSRange(location: 0, length: 0))
+        let numbered = NoteTextFormattingEngine.apply(.list(.numbered), to: "", selectedRange: NSRange(location: 0, length: 0))
+        let checklist = NoteTextFormattingEngine.apply(.list(.checklist), to: "", selectedRange: NSRange(location: 0, length: 0))
+
+        #expect(bullet.text == "* ")
+        #expect(numbered.text == "1. ")
+        #expect(checklist.text == "- [ ] ")
     }
 
     @Test func indentAndOutdentListItems() {

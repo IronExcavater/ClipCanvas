@@ -67,17 +67,9 @@ struct ICloudProfilePage: View {
     }
 
     private var profileSummary: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 14) {
-                ZStack(alignment: .bottomTrailing) {
-                    Image(systemName: status == .available ? "person.crop.circle.fill.badge.checkmark" : "person.crop.circle.fill")
-                        .font(.system(size: 54, weight: .semibold))
-                        .foregroundStyle(Color.accentColor)
-                    Circle()
-                        .fill(statusBadgeColor)
-                        .frame(width: 13, height: 13)
-                        .overlay(Circle().stroke(Color.platformSystemBackground, lineWidth: 2))
-                }
+                iCloudAvatar
 
                 VStack(alignment: .leading, spacing: 4) {
                     Text("iCloud")
@@ -85,7 +77,7 @@ struct ICloudProfilePage: View {
                     Text(statusText)
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
-                    Text(syncSummary)
+                    Text("\(syncSummary) - \(savedDataText) saved")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
@@ -104,6 +96,34 @@ struct ICloudProfilePage: View {
             #endif
         }
         .padding(.vertical, 8)
+    }
+
+    private var iCloudAvatar: some View {
+        ZStack(alignment: .bottomTrailing) {
+            Image(systemName: "person.crop.circle.fill")
+                .font(.system(size: 54, weight: .semibold))
+                .foregroundStyle(Color.accentColor)
+
+            Circle()
+                .fill(statusBadgeColor)
+                .frame(width: 13, height: 13)
+                .overlay(Circle().stroke(Color.platformSystemBackground, lineWidth: 2))
+        }
+    }
+
+    private var savedDataText: String {
+        let clipBytes = clips.reduce(0) { total, clip in
+            total
+                + clip.content.lengthOfBytes(using: .utf8)
+                + (clip.imageData?.count ?? 0)
+                + (clip.imageName?.lengthOfBytes(using: .utf8) ?? 0)
+        }
+        let workspaceBytes = workspaces.reduce(0) { total, workspace in
+            total
+                + workspace.name.lengthOfBytes(using: .utf8)
+                + workspace.canvasObjects.reduce(0) { $0 + $1.text.lengthOfBytes(using: .utf8) }
+        }
+        return ByteCountFormatter.string(fromByteCount: Int64(clipBytes + workspaceBytes), countStyle: .file)
     }
 
     private var syncSummary: String {

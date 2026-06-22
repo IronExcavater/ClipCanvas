@@ -210,6 +210,19 @@ extension CanvasContainerView {
         }
     }
 
+    func runAIActionOnSelection(_ skill: AITransformSkill) {
+        let objects = orderedCanvasObjects(matching: selectedObjectIDs)
+        guard !objects.isEmpty else {
+            showFeedback("Select cards first", kind: .info)
+            return
+        }
+        guard let preview = AISelectionSkillPreview(skill: skill, objects: objects) else {
+            showFeedback("Select a text card first", kind: .info)
+            return
+        }
+        aiSkillPreview = preview
+    }
+
     func openAIChat(attaching objects: [CanvasObject]) {
         guard !objects.isEmpty else { showFeedback("No cards to attach", kind: .info); return }
         let chat = AIChatService.createChat(in: context, workspace: workspace)
@@ -251,5 +264,41 @@ extension CanvasContainerView {
 
     func showFeedback(_ msg: String, kind: FeedbackKind? = nil) {
         feedbackPresenter.show(msg, kind: kind)
+    }
+}
+
+struct AISelectionSkillPreview: Identifiable {
+    let id = UUID()
+    let skill: AITransformSkill
+    let objects: [CanvasObject]
+    let message: String
+
+    init?(skill: AITransformSkill, objects: [CanvasObject]) {
+        let rows = objects.compactMap { object -> String? in
+            guard object.clip?.type != .image else { return nil }
+            let source = object.clip?.content ?? object.text
+            let trimmed = source.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !trimmed.isEmpty,
+                  let transformed = TextTransformFallbacks.text(for: skill.id, input: source),
+                  transformed != source else {
+                return nil
+            }
+            return """
+            Before: \(Self.previewLine(trimmed))
+            After: \(Self.previewLine(transformed))
+            """
+        }
+        guard !rows.isEmpty else { return nil }
+        self.skill = skill
+        self.objects = objects
+        self.message = rows.prefix(3).joined(separator: "\n\n")
+    }
+
+    private static func previewLine(_ text: String) -> String {
+        let line = text
+            .components(separatedBy: .newlines)
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .first(where: { !$0.isEmpty }) ?? text
+        return String(line.prefix(120))
     }
 }

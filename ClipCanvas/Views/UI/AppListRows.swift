@@ -22,10 +22,16 @@ struct AppSectionHeader: View {
     let title: String
 
     var body: some View {
-        Text(title)
-            .font(.title3.weight(.semibold))
-            .foregroundStyle(.primary)
-            .textCase(nil)
+        HStack(spacing: 8) {
+            RoundedRectangle(cornerRadius: 2, style: .continuous)
+                .fill(Color.accentColor)
+                .frame(width: 4, height: 16)
+            Text(title)
+                .font(.headline.weight(.heavy))
+                .foregroundStyle(.primary)
+                .textCase(nil)
+        }
+        .padding(.top, 4)
     }
 }
 

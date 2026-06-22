@@ -118,7 +118,7 @@ nonisolated enum CanvasDrawTool: Equatable {
 
     var systemImage: String {
         switch self {
-        case .pen: "pencil"
+        case .pen: "pencil.tip"
         case .highlighter: "highlighter"
         case .eraser: "eraser.fill"
         case .lasso: "lasso"
@@ -191,9 +191,9 @@ nonisolated struct CanvasToolbarConfiguration: Hashable {
                 .copyToClipboard
             ] + (selectedCount == 1
                 ? (selectionKind == .text || selectionKind == .clip
-                    ? [.editContent, .details, .arrangeSelection, .delete]
-                    : [.details, .arrangeSelection, .delete])
-                : [.arrangeSelection, .delete])
+                    ? [.editContent, .details, .manageTags, .delete]
+                    : [.details, .manageTags, .delete])
+                : [.manageTags, .delete])
                 : [.askAI, .paste, .newNote, .insertImage, .mode(.draw)])
         }
     }

@@ -69,7 +69,9 @@ final class Clip: SoftDeletable, Identifiable {
     var content: String
     var imageData: Data?
     var imageUTI: String?
+    var imageName: String?
     var type: ClipType
+    var isTypeManuallySet: Bool = false
     var origin: ClipOrigin
     var sensitivity: Sensitivity
     var sensitivityReasonRaw: String?
@@ -90,6 +92,7 @@ final class Clip: SoftDeletable, Identifiable {
         content: String,
         imageData: Data? = nil,
         imageUTI: String? = nil,
+        imageName: String? = nil,
         origin: ClipOrigin,
         sensitivity: Sensitivity = .normal,
         sensitivityReason: SensitivityReason? = nil,
@@ -99,6 +102,7 @@ final class Clip: SoftDeletable, Identifiable {
         self.content = content
         self.imageData = imageData
         self.imageUTI = imageUTI
+        self.imageName = imageName
         self.origin = origin
         self.sensitivity = sensitivity
         self.sensitivityReasonRaw = sensitivityReason?.rawValue
@@ -173,6 +177,7 @@ final class Clip: SoftDeletable, Identifiable {
             content: content,
             imageData: imageData,
             imageUTI: imageUTI,
+            imageName: imageName,
             origin: origin ?? self.origin,
             sensitivity: sensitivity,
             sensitivityReason: sensitivityReason,
@@ -181,7 +186,31 @@ final class Clip: SoftDeletable, Identifiable {
         copy.expiresAt = expiresAt
         copy.isPinned = false
         copy.tags = tags
+        copy.isTypeManuallySet = isTypeManuallySet
         return copy
+    }
+
+    func updateDetectedType() {
+        guard !isTypeManuallySet else { return }
+        type = Self.detect(content: content, imageData: imageData)
+    }
+
+    func setManualType(_ newType: ClipType, at date: Date = Date()) {
+        guard newType != .image || imageData != nil else { return }
+        if newType != .image {
+            imageData = nil
+            imageUTI = nil
+            imageName = nil
+        }
+        type = newType
+        isTypeManuallySet = true
+        updatedAt = date
+    }
+
+    func resetTypeDetection(at date: Date = Date()) {
+        isTypeManuallySet = false
+        type = Self.detect(content: content, imageData: imageData)
+        updatedAt = date
     }
 
     // MARK: - Type detection

@@ -8,10 +8,10 @@ struct ClipCanvasShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: CopyClipboardToCanvasIntent(),
             phrases: [
-                "Copy clipboard to \(.applicationName)",
-                "Copy to canvas in \(.applicationName)"
+                "Paste clipboard into \(.applicationName)",
+                "Paste into canvas in \(.applicationName)"
             ],
-            shortTitle: "Copy to Canvas",
+            shortTitle: "Paste",
             systemImageName: "doc.on.clipboard"
         )
         AppShortcut(

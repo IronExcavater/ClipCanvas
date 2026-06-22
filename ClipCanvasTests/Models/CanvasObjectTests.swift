@@ -152,4 +152,19 @@ import Testing
         #expect(object.frame.origin == CGPoint(x: 120, y: 180))
         #expect(object.frame.size == CanvasPlacementSizing.defaultSize)
     }
+
+    @Test func placeDuplicateClonesClipForCanvasObject() {
+        let workspace = Workspace(name: "Board")
+        let clip = Clip(content: "Saved history item", origin: .clipboard)
+
+        let object = workspace.placeDuplicate(of: clip, at: CGPoint(x: 120, y: 180))
+
+        #expect(object.clip?.id != clip.id)
+        #expect(object.clip?.content == clip.content)
+
+        object.clip?.content = "Edited on canvas"
+
+        #expect(clip.content == "Saved history item")
+        #expect(object.clip?.content == "Edited on canvas")
+    }
 }

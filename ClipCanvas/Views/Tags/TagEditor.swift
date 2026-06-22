@@ -92,7 +92,7 @@ struct ClipTagEditor: View {
         }
 
         if userTags.isEmpty && !showsClipTypes {
-            Text("Create a tag to organize clips.")
+            Text(appliesToClips ? "Add your first tag, then tap it to apply it here." : "Add your first reusable tag.")
                 .font(.subheadline)
                 .foregroundStyle(.primary.opacity(0.72))
                 .frame(maxWidth: .infinity, alignment: .leading)

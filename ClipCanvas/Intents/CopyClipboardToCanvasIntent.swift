@@ -4,7 +4,7 @@ import AppIntents
 // paste via PendingCanvasActionStore and brings the app forward to perform it, same as the
 // Home Screen quick action / Dock menu entry points.
 struct CopyClipboardToCanvasIntent: AppIntent {
-    static let title: LocalizedStringResource = "Copy Clipboard to Canvas"
+    static let title: LocalizedStringResource = "Paste into ClipCanvas"
     static let description = IntentDescription("Pastes the current clipboard contents into the active ClipCanvas workspace.")
     static let openAppWhenRun = true
 

@@ -54,6 +54,10 @@ enum ClipClassificationService {
         return marked
     }
 
+    static func canMarkSensitiveMarkdown(in text: String) -> Bool {
+        markSensitiveMarkdown(in: text) != text
+    }
+
     static func sensitiveSpans(in text: String) -> [SensitiveSpan] {
         let range = NSRange(text.startIndex..., in: text)
         var spans: [SensitiveSpan] = explicitSensitiveSpans(in: text)
@@ -62,6 +66,12 @@ enum ClipClassificationService {
             let valueRange = match.range(at: 1)
             if valueRange.location != NSNotFound {
                 spans.append(SensitiveSpan(range: valueRange, sensitivity: .privateContent, reason: .secretKeyword))
+            }
+        }
+
+        for pattern in providerSecretRegexes {
+            for match in pattern.matches(in: text, range: range) {
+                spans.append(SensitiveSpan(range: match.range, sensitivity: .privateContent, reason: .secretKeyword))
             }
         }
 
@@ -85,11 +95,36 @@ enum ClipClassificationService {
     )
 
     private static let codeKeywordRegex = try! NSRegularExpression(
-        pattern: #"\b(?:func|class|struct|enum|import|def|async|function|const|interface|extends|implements|public|private|protected|static|return|override|void|#include|#import|SELECT|FROM|WHERE|INSERT|UPDATE|DELETE|CREATE|ALTER)\b"#
+        pattern: #"\b(?:func|let|var|class|struct|enum|import|def|async|await|function|const|interface|extends|implements|public|private|protected|static|return|override|throws?|guard|if|else|switch|case|for|while|try|catch|void|nil|null|true|false|#include|#import|SELECT|FROM|WHERE|INSERT|UPDATE|DELETE|CREATE|ALTER|JOIN|ORDER\s+BY|GROUP\s+BY)\b"#
     )
 
     private static let codeOperatorRegex = try! NSRegularExpression(
-        pattern: #"(?:->|=>|::|===|!==|\?\?|&&|\|\||\+=|-=|\*=|/=)"#
+        pattern: #"(?:->|=>|::|===|!==|\?\?|&&|\|\||\+=|-=|\*=|/=|==|!=|<=|>=)"#
+    )
+
+    private static let codeFenceRegex = try! NSRegularExpression(
+        pattern: #"^\s*```[\s\S]*```\s*$"#
+    )
+
+    private static let markupRegex = try! NSRegularExpression(
+        pattern: #"^\s*</?[A-Za-z][^>]*>(?:[\s\S]*</[A-Za-z][^>]*>)?\s*$"#
+    )
+
+    private static let cssRuleRegex = try! NSRegularExpression(
+        pattern: #"(?m)^\s*[.#]?[A-Za-z][\w-]*(?:\s+[.#]?[A-Za-z][\w-]*)*\s*\{[\s\S]*:\s*[^;{}]+;?[\s\S]*\}\s*$"#
+    )
+
+    private static let shellCommandRegex = try! NSRegularExpression(
+        pattern: #"^\s*(?:\$|>|%)?\s*(?:git|npm|pnpm|yarn|swift|xcodebuild|curl|docker|kubectl|python3?|node|cd|mkdir|rm|cp|mv|grep|rg|sed|awk)\b(?:\s+[-./:\w=@{}"'\\]+)+\s*$"#,
+        options: .caseInsensitive
+    )
+
+    private static let functionCallRegex = try! NSRegularExpression(
+        pattern: #"^\s*[A-Za-z_$][\w$]*(?:\.[A-Za-z_$][\w$]*)*\s*\([^)]*\)\s*;?\s*$"#
+    )
+
+    private static let assignmentRegex = try! NSRegularExpression(
+        pattern: #"^\s*(?:let|var|const|final|static|private|public|protected)?\s*[A-Za-z_$][\w$]*(?:\s*:\s*[\w<>\[\].?]+)?\s*=\s*.+;?\s*$"#
     )
 
     private static let secretRegex = try! NSRegularExpression(
@@ -105,6 +140,17 @@ enum ClipClassificationService {
         pattern: #"\b(?:password|passwd|secret|api[-_]?key|api[-_]?token|access[-_]?key|auth[-_]?key|bearer(?:\s+token)?|private[-_]?key|client[-_]?secret)\b(?:\s+for\s+\S+\s+is\s+|\s*[:=]\s*|\s+)([^\s,;]+)"#,
         options: .caseInsensitive
     )
+
+    private static let providerSecretRegexes: [NSRegularExpression] = [
+        try! NSRegularExpression(pattern: #"\bsk-(?:proj|live|test)-[A-Za-z0-9_-]{20,}\b"#),
+        try! NSRegularExpression(pattern: #"\bsk-[A-Za-z0-9]{32,}\b"#),
+        try! NSRegularExpression(pattern: #"\bpk_(?:live|test)_[A-Za-z0-9]{20,}\b"#),
+        try! NSRegularExpression(pattern: #"\bgh[opsu]_[A-Za-z0-9_]{30,}\b"#),
+        try! NSRegularExpression(pattern: #"\bgithub_pat_[A-Za-z0-9_]{40,}\b"#),
+        try! NSRegularExpression(pattern: #"\bAKIA[0-9A-Z]{16}\b"#),
+        try! NSRegularExpression(pattern: #"\bAIza[0-9A-Za-z_-]{35}\b"#),
+        try! NSRegularExpression(pattern: #"\bxox[baprs]-[0-9A-Za-z-]{20,}\b"#)
+    ]
 
     private static let piiPatterns: [(SensitivityReason, NSRegularExpression)] = [
         (.ssn, try! NSRegularExpression(pattern: #"\b\d{3}-\d{2}-\d{4}\b"#)),
@@ -123,14 +169,25 @@ enum ClipClassificationService {
     }
 
     private static func looksLikeCode(_ text: String) -> Bool {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.count >= 2 else { return false }
+        let trimmedRange = NSRange(trimmed.startIndex..., in: trimmed)
+
+        if codeFenceRegex.firstMatch(in: trimmed, range: trimmedRange) != nil { return true }
+        if markupRegex.firstMatch(in: trimmed, range: trimmedRange) != nil { return true }
+        if cssRuleRegex.firstMatch(in: trimmed, range: trimmedRange) != nil { return true }
+        if shellCommandRegex.firstMatch(in: trimmed, range: trimmedRange) != nil { return true }
+        if looksLikeJSON(trimmed) { return true }
+
         let lines = text.components(separatedBy: .newlines)
-        guard lines.count >= 2 else { return false }
         let range = NSRange(text.startIndex..., in: text)
         let keywords = codeKeywordRegex.numberOfMatches(in: text, range: range)
         let operators = codeOperatorRegex.numberOfMatches(in: text, range: range)
         let braces = text.filter { "{}[]".contains($0) }.count
         let hasIndent = lines.dropFirst().contains { $0.hasPrefix("    ") || $0.hasPrefix("\t") }
         let semicolons = text.filter { $0 == ";" }.count
+        let hasFunctionCall = functionCallRegex.firstMatch(in: trimmed, range: trimmedRange) != nil
+        let hasAssignment = assignmentRegex.firstMatch(in: trimmed, range: trimmedRange) != nil
 
         var score = 0
         score += min(keywords, 3)
@@ -138,12 +195,28 @@ enum ClipClassificationService {
         score += braces >= 4 ? 2 : braces >= 2 ? 1 : 0
         if hasIndent { score += 1 }
         if semicolons >= 2 { score += 1 }
-        return score >= 3
+        if hasFunctionCall { score += 2 }
+        if hasAssignment { score += 2 }
+        if lines.count >= 2, lines.contains(where: { $0.trimmingCharacters(in: .whitespaces).hasSuffix("{") }) { score += 1 }
+        return lines.count >= 2 ? score >= 3 : score >= 4
+    }
+
+    private static func looksLikeJSON(_ text: String) -> Bool {
+        guard let first = text.first,
+              let last = text.last,
+              (first == "{" && last == "}") || (first == "[" && last == "]"),
+              let data = text.data(using: .utf8) else {
+            return false
+        }
+        return (try? JSONSerialization.jsonObject(with: data)) != nil
     }
 
     private static func looksLikePassword(_ text: String) -> Bool {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.contains(where: \.isWhitespace), (10...128).contains(trimmed.count) else {
+        guard !trimmed.contains(where: \.isWhitespace), (10...256).contains(trimmed.count) else {
+            return false
+        }
+        if looksLikeURL(trimmed) {
             return false
         }
 

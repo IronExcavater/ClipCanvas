@@ -102,7 +102,7 @@ import Testing
         #expect(object.frame == CGRect(x: 15, y: -5, width: 320, height: 200))
     }
 
-    @Test func duplicatesObjectsWithoutCopyingClipContent() throws {
+    @Test func duplicatesObjectsWithIndependentClipContent() throws {
         let (context, workspace) = try makeWorkspace()
         let clip = Clip(content: "Clip source", origin: .clipboard)
         context.insert(clip)
@@ -122,9 +122,15 @@ import Testing
         let objects = try context.fetch(FetchDescriptor<CanvasObject>())
         #expect(objects.count == 2)
         let copy = try #require(objects.first { $0.id != object.id })
-        #expect(copy.clip?.id == clip.id)
+        let copiedClip = try #require(copy.clip)
+        #expect(copiedClip.id != clip.id)
+        #expect(copiedClip.content == clip.content)
         #expect(copy.text.isEmpty)
         #expect(copy.frame.origin == CGPoint(x: 34, y: 44))
+
+        copiedClip.content = "Changed duplicate"
+        #expect(clip.content == "Clip source")
+        #expect(copiedClip.content == "Changed duplicate")
     }
 
     @Test func arrangesObjectsByTopLeftGridAndReturnsFitViewResult() throws {

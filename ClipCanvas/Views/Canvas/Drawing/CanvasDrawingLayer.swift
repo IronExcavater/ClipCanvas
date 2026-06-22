@@ -33,7 +33,7 @@ struct CanvasDrawingLayer: UIViewRepresentable {
         uiView.contentSize = worldSize
         uiView.minimumZoomScale = canvasScale
         uiView.maximumZoomScale = canvasScale
-        applyViewport(to: uiView, animated: context.transaction.animation != nil)
+        applyViewport(to: uiView, animated: false)
         if uiView.drawing != drawing {
             context.coordinator.isApplyingSwiftUIUpdate = true
             uiView.drawing = drawing

@@ -16,9 +16,6 @@ enum AIChatCommandRouter {
         case .plan(let plan):
             let result = run(plan: plan, chat: chat, fallbackWorkspace: workspace, message: assistantMessage, in: context)
             finish(assistantMessage, content: result)
-        case .transform(let skill):
-            let result = runTransform(skillID: skill.id, chat: chat, workspace: workspace, message: assistantMessage, in: context)
-            finish(assistantMessage, content: skill.completion(for: result))
         case .arrangeGrid:
             let objects = targetObjects(chat: chat, workspace: workspace)
             guard !objects.isEmpty else {
@@ -259,7 +256,6 @@ private extension AIChatCommandRouter {
 
     enum Command {
         case plan(CommandPlan)
-        case transform(AITransformSkill)
         case arrangeGrid
         case createNote(String)
         case duplicate
@@ -278,8 +274,6 @@ private extension AIChatCommandRouter {
             let lower = message.lowercased()
             if let plan = CommandPlan(message: message), plan.hasWork {
                 self = .plan(plan)
-            } else if let skill = AITransformSkill.matching(message: message) {
-                self = .transform(skill)
             } else if lower.contains("arrange") || lower.contains("grid") {
                 self = .arrangeGrid
             } else if lower.contains("duplicate") || lower.contains("copy this card") || lower.contains("copy these cards") {

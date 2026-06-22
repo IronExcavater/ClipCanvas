@@ -8,6 +8,7 @@ struct CanvasToolbar: View {
     let onPaste: () -> Void
     let onCreateNote: () -> Void
     let onAskAI: () -> Void
+    var onRunAIAction: (AITransformSkill) -> Void = { _ in }
     var onInsertImage: () -> Void = {}
     let onDetails: () -> Void
     let onEditContent: () -> Void
@@ -31,6 +32,7 @@ struct CanvasToolbar: View {
     var activeDrawTool: CanvasDrawTool = .pen
     var penColor: PlatformColor = .label
     var highlighterColor: PlatformColor = .systemYellow
+    var isKeyboardShown = false
     var onCloseMode: () -> Void = {}
     var onDrawTool: (CanvasDrawTool) -> Void = { _ in }
     var onDrawToolSettings: (CanvasDrawTool) -> Void = { _ in }
@@ -70,14 +72,18 @@ struct CanvasToolbar: View {
         VStack(spacing: 10) {
             if showsFormatPanel {
                 textFormatPanel
+                    .frame(maxWidth: 430)
+                    .frame(maxWidth: .infinity, alignment: .center)
             } else if showsLinkPanel {
                 linkPanel
+                    .frame(maxWidth: 430)
+                    .frame(maxWidth: .infinity, alignment: .center)
             } else {
                 toolbarShell
             }
         }
         .padding(.horizontal, 20)
-        .padding(.bottom, 24)
+        .padding(.bottom, isKeyboardShown ? 6 : 8)
         .ignoresSafeArea(.container, edges: .bottom)
         .animation(.spring(response: 0.24, dampingFraction: 0.82), value: configuration)
         .animation(.spring(response: 0.24, dampingFraction: 0.82), value: showsFormatPanel)
@@ -149,7 +155,7 @@ struct CanvasToolbar: View {
             case .paste: toolButton("clipboard", action: onPaste)
             case .newNote: toolButton("note.text.badge.plus", action: onCreateNote)
             case .insertImage: toolButton("photo.badge.plus", action: onInsertImage)
-            case .askAI: toolButton("sparkles", action: onAskAI)
+            case .askAI: aiTool
             case .details:
                 toolButton("info.circle", action: onDetails)
                     .disabled(selectedCount != 1)
@@ -194,6 +200,27 @@ struct CanvasToolbar: View {
         content
     }
 
+    @ViewBuilder
+    private var aiTool: some View {
+        if selectedCount > 0 {
+            Menu {
+                Button("Chat", systemImage: "bubble.left.and.sparkles", action: onAskAI)
+                Menu("Skills", systemImage: "wand.and.sparkles") {
+                    ForEach(AITransformSkill.allCases) { skill in
+                        Button(skill.title, systemImage: skill.systemImage) {
+                            onRunAIAction(skill)
+                        }
+                    }
+                }
+            } label: {
+                toolLabel("sparkles", selected: true, selectedTint: .purple)
+            }
+            .buttonStyle(.plain)
+        } else {
+            toolButton("sparkles", action: onAskAI)
+        }
+    }
+
     private var listMenu: some View {
         Menu {
             Button("Bulleted", systemImage: "list.bullet") { onFormatList(.bullet) }
@@ -215,7 +242,11 @@ struct CanvasToolbar: View {
                 }
             }
         } label: {
-            toolLabel("highlighter", selected: enabledInlineFormats.contains(.formatHighlight))
+            toolLabel(
+                "highlighter",
+                selected: enabledInlineFormats.contains(.formatHighlight),
+                selectedTint: .orange
+            )
         }
         .buttonStyle(.plain)
     }
@@ -236,12 +267,14 @@ struct CanvasToolbar: View {
         Button(action: action) {
             ZStack {
                 Circle()
-                    .fill(Color.accentColor.opacity(0.14))
+                    .fill(.regularMaterial)
+                Circle()
+                    .stroke(Color.primary.opacity(0.12), lineWidth: 1)
                 Image(systemName: "chevron.backward")
-                    .font(.system(size: iconSize, weight: .semibold))
-                    .foregroundStyle(Color.accentColor)
+                    .font(.system(size: 15, weight: .semibold))
+                    .foregroundStyle(.primary)
             }
-            .frame(width: buttonSize, height: buttonSize)
+            .frame(width: 38, height: 38)
             .contentShape(Circle())
         }
         .buttonStyle(.plain)
@@ -261,9 +294,9 @@ struct CanvasToolbar: View {
         .buttonStyle(.plain)
     }
 
-    private func toolLabel(_ icon: String, selected: Bool = false) -> some View {
+    private func toolLabel(_ icon: String, selected: Bool = false, selectedTint: Color = .accentColor) -> some View {
         ZStack {
-            Circle().fill(selected ? Color.accentColor : Color.clear)
+            Circle().fill(selected ? selectedTint : Color.clear)
             Image(systemName: icon)
                 .font(.system(size: iconSize, weight: selected ? .semibold : .medium))
                 .foregroundStyle(selected ? .white : .primary)
@@ -281,13 +314,17 @@ struct CanvasToolbar: View {
             }
         } label: {
             ZStack {
-                toolLabel(tool.systemImage, selected: activeDrawTool == tool)
+                toolLabel(
+                    tool.systemImage,
+                    selected: activeDrawTool == tool,
+                    selectedTint: drawToolActiveTint(for: tool)
+                )
                 if let color = toolSwatchColor(for: tool) {
                     Circle()
                         .fill(Color(platformColor: color))
-                        .frame(width: 7, height: 7)
-                        .overlay(Circle().stroke(Color.platformSystemBackground, lineWidth: 1))
-                        .offset(x: 11, y: 11)
+                        .frame(width: activeDrawTool == tool ? 10 : 7, height: activeDrawTool == tool ? 10 : 7)
+                        .overlay(Circle().stroke(Color.platformSystemBackground, lineWidth: 1.5))
+                        .offset(x: 12, y: 12)
                 }
             }
         }
@@ -299,6 +336,19 @@ struct CanvasToolbar: View {
         case .pen: return penColor
         case .highlighter: return highlighterColor.withAlphaComponent(1.0)
         default: return nil
+        }
+    }
+
+    private func drawToolActiveTint(for tool: CanvasDrawTool) -> Color {
+        switch tool {
+        case .pen:
+            return .blue
+        case .highlighter:
+            return .orange
+        case .eraser:
+            return .red
+        case .lasso:
+            return .purple
         }
     }
 
@@ -318,7 +368,7 @@ struct CanvasToolbar: View {
     }
 
     private var textFormatPanel: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 14) {
             HStack {
                 Text("Format")
                     .font(.headline.weight(.semibold))
@@ -355,8 +405,8 @@ struct CanvasToolbar: View {
                     .buttonStyle(.plain)
             }
         }
-        .padding(18)
-        .glassPanel(cornerRadius: 28, shadow: true, interactive: true)
+        .padding(16)
+        .glassPanel(cornerRadius: 22, shadow: true, interactive: true)
     }
 
     private func formatStyleButton(_ title: String, style: NoteTextBlockStyle, font: Font) -> some View {
@@ -439,8 +489,8 @@ struct CanvasToolbar: View {
             .buttonStyle(.borderedProminent)
             .disabled(linkURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         }
-        .padding(18)
-        .glassPanel(cornerRadius: 28, shadow: true, interactive: true)
+        .padding(16)
+        .glassPanel(cornerRadius: 22, shadow: true, interactive: true)
     }
 
     private func dismissKeyboard() {

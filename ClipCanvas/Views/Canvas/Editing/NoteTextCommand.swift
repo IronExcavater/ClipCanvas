@@ -133,7 +133,6 @@ nonisolated enum NoteTextFormattingEngine {
 
     private static func applyList(_ style: NoteTextListStyle, to source: String, selectedRange: NSRange) -> Result {
         transformLines(in: source, selectedRange: selectedRange) { line, index in
-            guard !line.trimmingCharacters(in: .whitespaces).isEmpty else { return line }
             let leading = line.prefix { $0 == " " || $0 == "\t" }
             let body = removeListPrefix(from: String(line.dropFirst(leading.count)))
             return "\(leading)\(marker(for: style, index: index))\(body)"
@@ -154,8 +153,9 @@ nonisolated enum NoteTextFormattingEngine {
     private static func transformLines(in source: String, selectedRange: NSRange, transform: (String, Int) -> String) -> Result {
         let ns = source as NSString
         let range = ns.lineRange(for: selectedRange)
-        var lines = ns.substring(with: range).components(separatedBy: .newlines)
-        let keepsTrailingNewline = lines.last == ""
+        let selectedLines = ns.substring(with: range)
+        var lines = selectedLines.components(separatedBy: .newlines)
+        let keepsTrailingNewline = !selectedLines.isEmpty && lines.last == ""
         if keepsTrailingNewline { lines.removeLast() }
         let replacement = lines.enumerated().map { transform($0.element, $0.offset) }.joined(separator: "\n") + (keepsTrailingNewline ? "\n" : "")
         let text = ns.replacingCharacters(in: range, with: replacement)

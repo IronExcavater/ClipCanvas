@@ -205,7 +205,7 @@ struct TrashPage: View {
     private func addToCanvas(_ clip: Clip) {
         guard let activeWorkspace else { return }
         clip.restore()
-        activeWorkspace.place(clip: clip)
+        activeWorkspace.placeDuplicate(of: clip, in: context)
     }
 
     private func handleRowTap(_ itemKey: String) {

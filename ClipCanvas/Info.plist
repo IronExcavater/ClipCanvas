@@ -12,9 +12,9 @@
 			<key>UIApplicationShortcutItemIconSymbolName</key>
 			<string>doc.on.clipboard</string>
 			<key>UIApplicationShortcutItemSubtitle</key>
-			<string>Paste into active workspace</string>
+			<string>Paste clipboard into active workspace</string>
 			<key>UIApplicationShortcutItemTitle</key>
-			<string>Copy to Canvas</string>
+			<string>Paste into ClipCanvas</string>
 			<key>UIApplicationShortcutItemType</key>
 			<string>au.com.ironbyte.clipcanvas.app.copyToCanvas</string>
 		</dict>

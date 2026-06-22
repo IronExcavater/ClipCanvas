@@ -225,6 +225,7 @@ struct CanvasView: View {
             .opacity(isOverlaid ? 0 : searchOpacity(for: object))
             .allowsHitTesting(!isOverlaid)
             .gesture(objectDragGesture(for: object, in: geo))
+            .modifier(CanvasContextMenuPreviewShapeModifier())
             .contextMenu {
                 objectContextMenu(for: object, in: geo)
             } preview: {
@@ -265,17 +266,6 @@ struct CanvasView: View {
             onAskAI([object])
         }
 
-        if canRunAIActions(on: object) {
-            Menu("AI Transforms", systemImage: "wand.and.sparkles") {
-                ForEach(AITransformSkill.allCases) { skill in
-                    Button(skill.title, systemImage: skill.systemImage) {
-                        selectObjectForMenu(object)
-                        onRunAIAction(skill, [object])
-                    }
-                }
-            }
-        }
-
         Button("Delete", systemImage: "trash", role: .destructive) {
             selectObjectForMenu(object)
             delete(object)
@@ -284,22 +274,76 @@ struct CanvasView: View {
 
     @ViewBuilder
     private func objectContextPreview(for object: CanvasObject) -> some View {
-        Text(contextPreviewTitle(for: object))
-            .font(.headline)
-            .lineLimit(3)
-            .padding()
-            .frame(width: 220)
-            .frame(minHeight: 96)
-            .onAppear {
-                selectObjectForMenu(object)
-            }
+        let size = contextPreviewSize(for: object)
+        if object.kind == .image || object.clip?.type == .image, let clip = object.clip {
+            CanvasImageObjectView(
+                clip: clip,
+                isSelected: true,
+                showsContent: true,
+                onTap: {},
+                onDoubleTap: {},
+                onResize: { _ in },
+                onResizeEnded: {},
+                onToggleExpandedSize: {}
+            )
+            .frame(width: size.width, height: size.height)
+            .modifier(CanvasObjectContextPreviewChrome())
+            .allowsHitTesting(false)
+        } else if object.kind == .clipNote, let clip = object.clip {
+            ClipCard(
+                clip: clip,
+                fillColor: Color(hex: object.style.fillHex),
+                isTransparentSurface: false,
+                isSelected: true,
+                showsContent: true,
+                onTap: {},
+                onDoubleTap: {},
+                isEditing: false,
+                editingText: clip.content,
+                fontSize: CanvasPlacementSizing.fontSizeForContent(clip.content, width: object.width),
+                textCommand: nil,
+                onCommitEditing: { _ in },
+                onExitEditing: {},
+                onEditorSizeChange: { _ in },
+                onResize: { _ in },
+                onResizeEnded: {},
+                onToggleExpandedSize: {}
+            )
+            .frame(width: size.width, height: size.height)
+            .modifier(CanvasObjectContextPreviewChrome())
+            .allowsHitTesting(false)
+        } else {
+            CanvasObjectView(
+                object: object,
+                isSelected: true,
+                showsContent: true,
+                onTap: {},
+                onDoubleTap: {},
+                isEditing: false,
+                editingText: object.text,
+                textCommand: nil,
+                onCommitEditing: { _ in },
+                onExitEditing: {},
+                onEditorSizeChange: { _ in },
+                onResize: { _ in },
+                onResizeEnded: {},
+                onToggleExpandedSize: {}
+            )
+            .frame(width: size.width, height: size.height)
+            .modifier(CanvasObjectContextPreviewChrome())
+            .allowsHitTesting(false)
+        }
     }
 
-    private func contextPreviewTitle(for object: CanvasObject) -> String {
-        let title = object.displayText.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !title.isEmpty { return title }
-        if isImageObject(object) { return "Image" }
-        return "Canvas Card"
+    private func contextPreviewSize(for object: CanvasObject) -> CGSize {
+        let source = displaySize(for: object)
+        let maxWidth: CGFloat = 280
+        let maxHeight: CGFloat = 220
+        let scale = min(maxWidth / max(source.width, 1), maxHeight / max(source.height, 1), 1)
+        return CGSize(
+            width: max(120, source.width * scale),
+            height: max(86, source.height * scale)
+        )
     }
 
     private func renderedCanvasObjects(in geo: GeometryProxy) -> [CanvasObject] {
@@ -420,10 +464,12 @@ struct CanvasView: View {
             .onEnded { value in
                 guard activeResize?.objectID != object.id else { return }
                 guard editingObjectID == nil else { return }
-                let ids = activeDrag?.objectIDs ?? dragObjectIDs(startingFrom: object)
+                let session = activeDrag
+                let ids = session?.objectIDs ?? dragObjectIDs(startingFrom: object)
+                let committedTranslation = value.translation
                 for movedObject in canvasObjects where ids.contains(movedObject.id) {
-                    movedObject.x += value.translation.width / canvasScale
-                    movedObject.y += value.translation.height / canvasScale
+                    movedObject.x += committedTranslation.width / canvasScale
+                    movedObject.y += committedTranslation.height / canvasScale
                     clampObject(movedObject, in: geo)
                     movedObject.markUpdated()
                 }
@@ -721,7 +767,7 @@ struct CanvasView: View {
         guard clip.content != text else { return }
         let classification = ClipClassificationService.classifySensitivity(text)
         clip.content = text
-        clip.type = Clip.detect(content: text, imageData: clip.imageData)
+        clip.updateDetectedType()
         clip.updateSensitivity(classification.sensitivity, reason: classification.reason)
         clip.updatedAt = Date()
         object.markUpdated()
@@ -901,7 +947,7 @@ struct CanvasView: View {
             if clip.deletedAt != nil {
                 clip.restore()
             }
-            let object = workspace.place(clip: clip, at: canvasPoint)
+            let object = workspace.placeDuplicate(of: clip, at: canvasPoint, in: context)
             clampObject(object, in: geo)
             selectedObjectIDs = [object.id]
             didPlace = true
@@ -963,6 +1009,32 @@ private struct CanvasDragSession {
     let translation: CGSize
 }
 
+private struct CanvasContextMenuPreviewShapeModifier: ViewModifier {
+    func body(content: Content) -> some View {
+        #if os(macOS)
+        content.contentShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        #else
+        content.contentShape(.contextMenuPreview, RoundedRectangle(cornerRadius: 14, style: .continuous))
+        #endif
+    }
+}
+
+private struct CanvasObjectContextPreviewChrome: ViewModifier {
+    func body(content: Content) -> some View {
+        content
+            .background {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .fill(.regularMaterial)
+                    .shadow(color: .black.opacity(0.18), radius: 18, y: 8)
+            }
+            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 14, style: .continuous)
+                    .stroke(Color.accentColor, lineWidth: 2)
+            }
+    }
+}
+
 private struct CanvasObjectPositionModifier: ViewModifier {
     let object: CanvasObject
     let viewportOrigin: CGPoint
@@ -974,12 +1046,15 @@ private struct CanvasObjectPositionModifier: ViewModifier {
     func body(content: Content) -> some View {
         content
             .frame(width: size.width, height: size.height)
-            .scaleEffect(canvasScale * (isDragging ? 1.05 : 1.0), anchor: .topLeading)
+            .scaleEffect(canvasScale, anchor: .topLeading)
             .offset(
                 x: (object.x - viewportOrigin.x) * canvasScale + dragOffset.width,
                 y: (object.y - viewportOrigin.y) * canvasScale + dragOffset.height
             )
             .shadow(color: .black.opacity(isDragging ? 0.22 : 0), radius: isDragging ? 16 : 0, y: isDragging ? 8 : 0)
             .animation(.spring(response: 0.22, dampingFraction: 0.78), value: isDragging)
+            .animation(.spring(response: 0.28, dampingFraction: 0.86), value: canvasScale)
+            .animation(.spring(response: 0.28, dampingFraction: 0.86), value: viewportOrigin)
+            .animation(.spring(response: 0.28, dampingFraction: 0.86), value: size)
     }
 }

@@ -8,13 +8,13 @@ import AppKit
 // A value representing what's on the clipboard right now
 enum ClipboardContent {
     case text(String)
-    case image(Data, uti: String)
+    case image(Data, uti: String, name: String? = nil)
 
     // Used to detect when clipboard changes without storing the full content
     var fingerprint: String {
         switch self {
         case .text(let s):     return "t:\(s.hashValue)"
-        case .image(let d, _): return "i:\(d.count):\(d.hashValue)"
+        case .image(let d, _, _): return "i:\(d.count):\(d.hashValue)"
         }
     }
 }
@@ -39,8 +39,17 @@ enum ClipboardService {
         }
         #elseif canImport(AppKit)
         let pb = NSPasteboard.general
-        if let data = pb.data(forType: .png) ?? pb.data(forType: .tiff) {
-            return .image(data, uti: pb.data(forType: .png) == nil ? "public.tiff" : "public.png")
+        if let fileURLString = pb.string(forType: .fileURL),
+           let fileURL = URL(string: fileURLString),
+           let data = try? Data(contentsOf: fileURL),
+           PlatformImage(data: data) != nil {
+            return .image(data, uti: uti(for: fileURL), name: fileURL.lastPathComponent)
+        }
+        if let pngData = pb.data(forType: .png) {
+            return .image(pngData, uti: "public.png")
+        }
+        if let tiffData = pb.data(forType: .tiff) {
+            return .image(tiffData, uti: "public.tiff")
         }
         if let text = pb.string(forType: .string), !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return .text(text)
@@ -101,8 +110,8 @@ extension Clip {
                 sensitivity: classification.sensitivity,
                 sensitivityReason: classification.reason
             )
-        case .image(let data, let uti):
-            return Clip(content: "", imageData: data, imageUTI: uti, origin: origin)
+        case .image(let data, let uti, let name):
+            return Clip(content: name ?? "", imageData: data, imageUTI: uti, imageName: name, origin: origin)
         }
     }
 
@@ -120,16 +129,18 @@ extension Clip {
                 )
             )
             if let first = existing?.first(where: { $0.type != .image && $0.content.normalizedClipboardHistoryText == fingerprint }) {
+                first.updatedAt = Date()
                 ClipboardService.markImported(content)
                 return (first, false)
             }
-        case .image(let data, _):
+        case .image(let data, _, _):
             let existing = try? context.fetch(
                 FetchDescriptor<Clip>(
                     predicate: #Predicate { $0.deletedAt == nil }
                 )
             )
             if let first = existing?.first(where: { $0.type == .image && $0.imageData == data }) {
+                first.updatedAt = Date()
                 ClipboardService.markImported(content)
                 return (first, false)
             }
@@ -145,11 +156,25 @@ private extension ClipboardContent {
         switch self {
         case .text(let text):
             return "text:\(text.normalizedClipboardHistoryText.lowercased())"
-        case .image(let data, _):
+        case .image(let data, _, _):
             return "image:\(data.count):\(data.hashValue)"
         }
     }
 }
+
+#if canImport(AppKit)
+private extension ClipboardService {
+    static func uti(for url: URL) -> String {
+        switch url.pathExtension.lowercased() {
+        case "jpg", "jpeg": return "public.jpeg"
+        case "tif", "tiff": return "public.tiff"
+        case "gif": return "com.compuserve.gif"
+        case "heic": return "public.heic"
+        default: return "public.png"
+        }
+    }
+}
+#endif
 
 private extension String {
     var trimmedClipboardContent: String {

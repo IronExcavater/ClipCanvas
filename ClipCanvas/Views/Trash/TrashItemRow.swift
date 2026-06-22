@@ -19,33 +19,35 @@ struct TrashItemRow: View {
 
     var body: some View {
         ItemRow(tint: tint, opacity: 0.025, isSelecting: isSelecting, isSelected: isSelected, dragID: dragID) {
-            HStack(alignment: .top, spacing: 10) {
-                imageThumbnail
-                AppListRowHeader(
-                    systemImage: systemImage,
-                    color: tint,
-                    title: title,
-                    subtitle: isExpanded ? nil : compactPreview,
-                    metadata: [AppListRowMetadata("trash", value: "Deleted")],
-                    lineLimit: 2,
-                    date: deletedAt,
-                    dateSuffix: "",
-                    datePrefix: "Deleted ",
-                    dateEmptyText: "Just now"
-                )
-            }
+            VStack(alignment: .leading, spacing: 9) {
+                HStack(alignment: .top, spacing: 10) {
+                    imageThumbnail
+                    AppListRowHeader(
+                        systemImage: systemImage,
+                        color: tint,
+                        title: title,
+                        subtitle: isExpanded ? nil : compactPreview,
+                        metadata: [AppListRowMetadata("trash", value: "Deleted")],
+                        lineLimit: 2,
+                        date: deletedAt,
+                        dateSuffix: "",
+                        datePrefix: "Deleted ",
+                        dateEmptyText: "Just now"
+                    )
+                }
 
-            if isExpanded, let preview, !preview.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                MarkdownPreview(text: preview)
-                    .font(.callout)
-                    .foregroundStyle(.primary.opacity(0.78))
-                    .lineLimit(8)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .transition(.opacity.combined(with: .move(edge: .top)))
-            }
+                if isExpanded, let preview, !preview.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    MarkdownPreview(text: preview)
+                        .font(.callout)
+                        .foregroundStyle(.primary.opacity(0.78))
+                        .lineLimit(8)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
 
-            if !tags.isEmpty {
-                TagPillRow(tags: tags, limit: 2)
+                if !tags.isEmpty {
+                    TagPillRow(tags: tags, limit: 2)
+                }
             }
         }
         .onTapGesture { if isSelecting { onTap() } }

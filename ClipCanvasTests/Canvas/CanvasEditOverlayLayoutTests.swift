@@ -38,5 +38,6 @@ import Testing
 
         #expect(shown.minY == hidden.minY)
         #expect(shown.height < hidden.height)
+        #expect(abs(shown.maxY - (900 - 362)) < 0.001)
     }
 }

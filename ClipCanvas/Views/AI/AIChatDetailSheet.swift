@@ -181,16 +181,6 @@ struct AIChatDetailView: View {
                 }
             }
 
-            Menu("Skills", systemImage: "wand.and.sparkles") {
-                ForEach(AITransformSkill.allCases) { skill in
-                    Button {
-                        send(skill: skill)
-                    } label: {
-                        Label(skill.title, systemImage: skill.systemImage)
-                    }
-                    .disabled(isSending)
-                }
-            }
         } label: {
             AppToolbarCircleLabel(systemImage: chat.mode.systemImage, size: 36, symbolSize: 15)
         }
@@ -280,11 +270,6 @@ struct AIChatDetailView: View {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
         sendMessage(trimmed, clearInput: true)
-    }
-
-    private func send(skill: AITransformSkill) {
-        guard !isSending else { return }
-        sendMessage(skill.prompt, clearInput: false)
     }
 
     private func sendMessage(_ text: String, clearInput: Bool) {
