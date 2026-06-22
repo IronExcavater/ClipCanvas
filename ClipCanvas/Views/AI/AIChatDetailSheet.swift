@@ -20,7 +20,7 @@ struct AIChatDetailView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(\.modelContext) private var context
-    @Query(filter: #Predicate<Clip> { $0.deletedAt == nil }) private var clips: [Clip]
+    @Query(filter: #Predicate<Clip> { $0.deletedAt == nil && $0.isCanvasOnly == false }) private var clips: [Clip]
     @Query(filter: #Predicate<CanvasObject> { $0.deletedAt == nil }) private var canvasObjects: [CanvasObject]
     @Query(filter: #Predicate<Workspace> { $0.deletedAt == nil }) private var workspaces: [Workspace]
     @Query(filter: #Predicate<AIChat> { $0.deletedAt == nil }) private var chats: [AIChat]

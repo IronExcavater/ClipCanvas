@@ -101,10 +101,10 @@ struct RootView: View {
 
     #if os(macOS)
     private func macSplitLayout(prefersInspector: Bool) -> some View {
-        HStack(spacing: 0) {
+        NavigationSplitView(columnVisibility: $columnVisibility) {
             NavigationStack(path: $sidebarPath) {
                 SidebarView(
-                    onClose: nil,
+                    onClose: { columnVisibility = .detailOnly },
                     onOpenAIChat: { activeAIChat = $0 },
                     navigationPath: $sidebarPath
                 )
@@ -112,17 +112,17 @@ struct RootView: View {
                     SidebarDestinationContent(destination: destination)
                 }
             }
-            .frame(width: 300)
-            .frame(minWidth: 260, maxWidth: 340)
-
-            Divider()
-
+            .navigationSplitViewColumnWidth(min: 260, ideal: 300, max: 340)
+        } detail: {
             CanvasHost(
-                onToggleSidebar: {},
+                onToggleSidebar: {
+                    withAnimation {
+                        columnVisibility = columnVisibility == .all ? .detailOnly : .all
+                    }
+                },
                 prefersInspector: false,
                 showsSidebarButton: false
             )
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
         }
     }
     #endif

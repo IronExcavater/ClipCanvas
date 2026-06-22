@@ -22,6 +22,12 @@ struct ClipCanvasApp: App {
         WindowGroup {
             RootView()
                 .modelContainer(container)
+                .onOpenURL { url in
+                    if let route = AppRouteService.route(from: url) {
+                        AppRouteService.open(route)
+                    }
+                    drainPendingCanvasActions()
+                }
         }
         .commands {
             ClipCanvasCommands()

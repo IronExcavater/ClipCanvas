@@ -36,20 +36,7 @@ final class ShareViewController: PlatformViewController {
             return
         }
 
-        if provider.hasItemConformingToTypeIdentifier(UTType.data.identifier) {
-            provider.loadItem(forTypeIdentifier: UTType.data.identifier) { [weak self] result, _ in
-                if let url = result as? URL,
-                   let data = try? Data(contentsOf: url),
-                   let text = String(data: data, encoding: .utf8) {
-                    self?.saveAndComplete(text: text)
-                } else if let data = result as? Data,
-                          let text = String(data: data, encoding: .utf8) {
-                    self?.saveAndComplete(text: text)
-                } else {
-                    self?.saveAndComplete(text: nil)
-                }
-            }
-        } else if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
+        if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier) {
             provider.loadItem(forTypeIdentifier: UTType.url.identifier) { [weak self] result, _ in
                 let urlString = (result as? URL)?.absoluteString
                 self?.saveAndComplete(text: urlString)
@@ -58,6 +45,15 @@ final class ShareViewController: PlatformViewController {
             provider.loadItem(forTypeIdentifier: UTType.plainText.identifier) { [weak self] result, _ in
                 let text = result as? String
                 self?.saveAndComplete(text: text)
+            }
+        } else if provider.hasItemConformingToTypeIdentifier(UTType.data.identifier) {
+            provider.loadItem(forTypeIdentifier: UTType.data.identifier) { [weak self] result, _ in
+                if let data = result as? Data,
+                   let text = String(data: data, encoding: .utf8) {
+                    self?.saveAndComplete(text: text)
+                } else {
+                    self?.saveAndComplete(text: nil)
+                }
             }
         } else {
             extensionContext?.completeRequest(returningItems: [])
@@ -70,7 +66,25 @@ final class ShareViewController: PlatformViewController {
             PendingTextStore.savePendingText(trimmed)
         }
         DispatchQueue.main.async {
-            self.extensionContext?.completeRequest(returningItems: [])
+            guard let url = URL(string: "clipcanvas://workspace/active") else {
+                self.extensionContext?.completeRequest(returningItems: [])
+                return
+            }
+            self.openHostApp(url)
         }
+    }
+
+    private func openHostApp(_ url: URL) {
+        var didComplete = false
+        let completeOnce = { [weak self] in
+            guard !didComplete else { return }
+            didComplete = true
+            self?.extensionContext?.completeRequest(returningItems: [])
+        }
+
+        extensionContext?.open(url) { _ in
+            DispatchQueue.main.async(execute: completeOnce)
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.8, execute: completeOnce)
     }
 }

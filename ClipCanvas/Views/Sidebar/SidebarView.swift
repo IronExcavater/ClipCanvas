@@ -98,11 +98,10 @@ struct SidebarView: View {
 
     private var sidebarHeader: some View {
         VStack(alignment: .leading, spacing: 10) {
-            HStack(alignment: .top, spacing: 12) {
+            HStack(alignment: .center, spacing: 12) {
                 Text("ClipCanvas")
                     .font(.largeTitle.weight(.bold))
                     .foregroundStyle(Color.accentColor)
-                    .padding(.top, 2)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
                 Button(action: createChat) {
@@ -124,27 +123,38 @@ struct SidebarView: View {
             }
 
             HStack(spacing: 8) {
-                Menu {
-                    ForEach(workspaces) { workspace in
-                        Button {
-                            activateWorkspace(workspace)
-                        } label: {
-                            Label(
-                                workspace.name,
-                                systemImage: workspace.id == activeWorkspace?.id ? "checkmark" : "folder"
-                            )
+                if workspaces.count > 1 {
+                    Menu {
+                        ForEach(workspaces) { workspace in
+                            Button {
+                                activateWorkspace(workspace)
+                            } label: {
+                                Label(
+                                    workspace.name,
+                                    systemImage: workspace.id == activeWorkspace?.id ? "checkmark" : "folder"
+                                )
+                            }
                         }
+                    } label: {
+                        SidebarActiveWorkspaceSummary(
+                            name: activeWorkspace?.name ?? "Choose a workspace",
+                            cardCount: activeWorkspaceVisibleCardCount,
+                            chatCount: activeWorkspaceChatCount,
+                            updatedAt: activeWorkspace?.updatedAt,
+                            showsDisclosure: true
+                        )
                     }
-                } label: {
+                    .buttonStyle(.plain)
+                    .accessibilityLabel("Switch Workspace")
+                } else {
                     SidebarActiveWorkspaceSummary(
                         name: activeWorkspace?.name ?? "Choose a workspace",
                         cardCount: activeWorkspaceVisibleCardCount,
                         chatCount: activeWorkspaceChatCount,
-                        updatedAt: activeWorkspace?.updatedAt
+                        updatedAt: activeWorkspace?.updatedAt,
+                        showsDisclosure: false
                     )
                 }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Switch Workspace")
 
                 sidebarNavButton(destination: .workspaces, systemImage: "rectangle.3.group")
                     .accessibilityLabel("Workspaces")
@@ -321,6 +331,7 @@ private struct SidebarActiveWorkspaceSummary: View {
     let cardCount: Int
     let chatCount: Int
     let updatedAt: Date?
+    var showsDisclosure = true
 
     var body: some View {
         VStack(alignment: .leading, spacing: 7) {
@@ -333,9 +344,11 @@ private struct SidebarActiveWorkspaceSummary: View {
                     .lineLimit(1)
                     .frame(maxWidth: .infinity, alignment: .leading)
 
-                Image(systemName: "chevron.down")
-                    .font(.system(size: 11, weight: .bold))
-                    .foregroundStyle(.secondary)
+                if showsDisclosure {
+                    Image(systemName: "chevron.down")
+                        .font(.system(size: 11, weight: .bold))
+                        .foregroundStyle(.secondary)
+                }
             }
 
             HStack(spacing: 12) {

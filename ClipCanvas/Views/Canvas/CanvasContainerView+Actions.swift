@@ -9,11 +9,16 @@ extension CanvasContainerView {
 
     func clearAll() {
         let objects = Array(workspace.canvasObjects)
+        guard !objects.isEmpty || !activeDrawing.bounds.isEmpty else {
+            showFeedback("Canvas is already empty", kind: .info)
+            return
+        }
+        captureCanvasUndoSnapshot()
         objects.forEach { context.delete($0) }
         activeDrawing = PKDrawing()
         workspace.updatedAt = Date()
         selectedObjectIDs.removeAll()
-        showFeedback(objects.isEmpty ? "Canvas is already empty" : "Canvas cleared", kind: objects.isEmpty ? .info : .success)
+        showFeedback("Canvas cleared", kind: .success)
     }
 
     func showSelectedDetails() {
@@ -23,6 +28,7 @@ extension CanvasContainerView {
         }
         guard let object = orderedCanvasObjects(matching: selectedObjectIDs).first,
               object.kind == .stickyNote || object.kind == .text else { return }
+        captureCanvasUndoSnapshot()
         let clip = Clip(content: object.text, origin: .typed)
         context.insert(clip)
         object.clip = clip
@@ -61,6 +67,8 @@ extension CanvasContainerView {
 
     func deleteSelected() {
         let selected = workspace.canvasObjects.filter { selectedObjectIDs.contains($0.id) }
+        guard !selected.isEmpty else { return }
+        captureCanvasUndoSnapshot()
         selected.forEach { context.delete($0) }
         selectedObjectIDs.removeAll()
         showFeedback(selected.count == 1 ? "Deleted 1 card" : "Deleted \(selected.count) cards", kind: .success)
@@ -78,6 +86,7 @@ extension CanvasContainerView {
             showFeedback("Could not duplicate selection", kind: .failure)
             return
         }
+        captureCanvasUndoSnapshot()
         let request = WorkspaceActionRequest(
             name: .canvasDuplicateObjects,
             workspaceID: workspace.id,
@@ -94,6 +103,7 @@ extension CanvasContainerView {
     }
 
     func createNoteAtViewCenter() {
+        captureCanvasUndoSnapshot()
         let note = workspace.createNote(centeredAt: visibleViewportCenter, size: CanvasPlacementSizing.defaultSize)
         selectedObjectIDs = [note.id]
         editingObjectID = note.id
@@ -126,6 +136,7 @@ extension CanvasContainerView {
                 showFeedback("Could not load image", kind: .failure)
                 return
             }
+            captureCanvasUndoSnapshot()
             let clip = Clip(content: "Image", imageData: data, imageUTI: item.supportedContentTypes.first?.identifier, origin: .typed)
             context.insert(clip)
             let object = workspace.place(
@@ -193,6 +204,7 @@ extension CanvasContainerView {
     }
 
     func runAIAction(_ skill: AITransformSkill, on objects: [CanvasObject]) {
+        captureCanvasUndoSnapshot()
         let result = AITransformActionService.apply(
             skill,
             to: objects,
@@ -206,6 +218,7 @@ extension CanvasContainerView {
                 : Set(result.changedObjectIDs)
             showFeedback(skill.completion(for: result), kind: .success)
         } else {
+            _ = undoStack.popLast()
             showFeedback(result.message, kind: .failure)
         }
     }
@@ -264,6 +277,39 @@ extension CanvasContainerView {
 
     func showFeedback(_ msg: String, kind: FeedbackKind? = nil) {
         feedbackPresenter.show(msg, kind: kind)
+    }
+
+    // MARK: - Canvas Undo
+
+    func captureCanvasUndoSnapshot() {
+        undoStack.append(CanvasUndoSnapshot(workspace: workspace, drawingData: activeDrawing.dataRepresentation()))
+        if undoStack.count > 40 {
+            undoStack.removeFirst(undoStack.count - 40)
+        }
+        redoStack.removeAll()
+    }
+
+    func undoCanvasChange() {
+        guard let snapshot = undoStack.popLast() else { return }
+        redoStack.append(CanvasUndoSnapshot(workspace: workspace, drawingData: activeDrawing.dataRepresentation()))
+        restoreCanvas(snapshot)
+    }
+
+    func redoCanvasChange() {
+        guard let snapshot = redoStack.popLast() else { return }
+        undoStack.append(CanvasUndoSnapshot(workspace: workspace, drawingData: activeDrawing.dataRepresentation()))
+        restoreCanvas(snapshot)
+    }
+
+    private func restoreCanvas(_ snapshot: CanvasUndoSnapshot) {
+        snapshot.restore(in: workspace, context: context)
+        activeDrawing = (try? PKDrawing(data: snapshot.drawingData)) ?? PKDrawing()
+        selectedObjectIDs.removeAll()
+        editingObjectID = nil
+        tagClips = nil
+        colorObjects = nil
+        detailClip = nil
+        showFeedback("Canvas restored", kind: .success)
     }
 }
 

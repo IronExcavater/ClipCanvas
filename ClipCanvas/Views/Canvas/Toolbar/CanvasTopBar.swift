@@ -45,14 +45,7 @@ struct CanvasTopBar: View {
                         .frame(width: 46)
                     }
 
-                    if isRenaming {
-                        titleEditor(maxWidth: titleMaxWidth(in: proxy.size.width))
-                            .layoutPriority(1)
-                            .animation(.spring(response: 0.24, dampingFraction: 0.86), value: isRenaming)
-                    } else {
-                        titleButton(maxWidth: titleMaxWidth(in: proxy.size.width))
-                            .layoutPriority(1)
-                    }
+                    Spacer(minLength: 0)
 
                     actionCapsule
                 }
@@ -166,7 +159,6 @@ struct CanvasTopBar: View {
             }
             Button("Fit Content", systemImage: "arrow.up.left.and.arrow.down.right", action: onFitContent)
             Button("Arrange Grid", systemImage: "square.grid.2x2", action: onArrangeAll)
-            Button("Rename Workspace", systemImage: "pencil", action: onBeginRename)
             Button("Clear Canvas", systemImage: "trash", role: .destructive, action: onClearAll)
         } label: {
             AppCircleIconLabel(systemImage: AppSymbol.options)

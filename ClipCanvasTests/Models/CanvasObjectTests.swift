@@ -161,6 +161,8 @@ import Testing
 
         #expect(object.clip?.id != clip.id)
         #expect(object.clip?.content == clip.content)
+        #expect(object.clip?.isCanvasOnly == true)
+        #expect(clip.isCanvasOnly == false)
 
         object.clip?.content = "Edited on canvas"
 

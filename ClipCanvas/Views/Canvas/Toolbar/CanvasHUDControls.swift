@@ -1,16 +1,21 @@
 import SwiftUI
 
 struct CanvasUndoControls: View {
+    var canUndo = true
+    var canRedo = true
     let onUndo: () -> Void
     let onRedo: () -> Void
 
     var body: some View {
         VStack(spacing: 0) {
             hudButton("arrow.uturn.backward", action: onUndo)
+                .disabled(!canUndo)
             hudButton("arrow.uturn.forward", action: onRedo)
+                .disabled(!canRedo)
         }
         .font(.system(size: 16, weight: .semibold))
         .foregroundStyle(.primary)
+        .opacity(canUndo || canRedo ? 1 : 0.45)
         .buttonStyle(.plain)
         .frame(width: 44)
         .padding(.vertical, 6)

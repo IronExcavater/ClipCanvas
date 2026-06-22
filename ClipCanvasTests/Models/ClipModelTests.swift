@@ -136,4 +136,17 @@ import SwiftData
         #expect(result.clip.id == existing.id)
     }
 
+    @Test func findOrMakeIgnoresCanvasOnlyCopies() throws {
+        let context = try ModelContextFactory.makeCoreContext()
+        let canvasCopy = Clip(content: "Hello world", origin: .clipboard)
+        canvasCopy.isCanvasOnly = true
+        context.insert(canvasCopy)
+
+        let result = Clip.findOrMake(from: .text("Hello world"), origin: .clipboard, in: context)
+
+        #expect(result.isNew)
+        #expect(result.clip.id != canvasCopy.id)
+        #expect(result.clip.isCanvasOnly == false)
+    }
+
 }

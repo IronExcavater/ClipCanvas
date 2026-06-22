@@ -78,6 +78,7 @@ final class Clip: SoftDeletable, Identifiable {
     var expiresAt: Date?
     var color: CardColor
     var isPinned: Bool = false
+    var isCanvasOnly: Bool = false
     var createdAt: Date = Date()
     var updatedAt: Date = Date()
     var deletedAt: Date? = nil
@@ -185,6 +186,7 @@ final class Clip: SoftDeletable, Identifiable {
         )
         copy.expiresAt = expiresAt
         copy.isPinned = false
+        copy.isCanvasOnly = true
         copy.tags = tags
         copy.isTypeManuallySet = isTypeManuallySet
         return copy

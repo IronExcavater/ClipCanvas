@@ -13,7 +13,7 @@ struct ICloudProfilePage: View {
 
     @Query(filter: #Predicate<Workspace> { $0.deletedAt == nil }, sort: \Workspace.sortIndex)
     private var workspaces: [Workspace]
-    @Query(filter: #Predicate<Clip> { $0.deletedAt == nil }, sort: \Clip.updatedAt, order: .reverse)
+    @Query(filter: #Predicate<Clip> { $0.deletedAt == nil && $0.isCanvasOnly == false }, sort: \Clip.updatedAt, order: .reverse)
     private var clips: [Clip]
 
     @State private var status: ICloudProfileStatus = .checking

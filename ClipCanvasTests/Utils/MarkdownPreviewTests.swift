@@ -176,6 +176,18 @@ import SwiftUI
         #expect(outdented.text == "- one")
     }
 
+    @Test func quoteCommandDoesNotStackQuoteMarkers() {
+        let result = NoteTextFormattingEngine.apply(.quote, to: "> quoted", selectedRange: NSRange(location: 0, length: 8))
+
+        #expect(result.text == "quoted")
+    }
+
+    @Test func quoteCommandOnlyAddsMissingQuoteMarkers() {
+        let result = NoteTextFormattingEngine.apply(.quote, to: "> one\ntwo", selectedRange: NSRange(location: 0, length: 9))
+
+        #expect(result.text == "> one\n> two")
+    }
+
     @Test func returnFromListItemCreatesNextItem() {
         let result = NoteTextFormattingEngine.applyNewline(in: "- one", selectedRange: NSRange(location: 5, length: 0))
 

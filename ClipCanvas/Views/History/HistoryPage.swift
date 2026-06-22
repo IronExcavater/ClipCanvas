@@ -3,7 +3,7 @@ import SwiftData
 
 struct HistoryPage: View {
     @Query(
-        filter: #Predicate<Clip> { $0.deletedAt == nil },
+        filter: #Predicate<Clip> { $0.deletedAt == nil && $0.isCanvasOnly == false },
         sort: \Clip.updatedAt, order: .reverse
     ) private var clips: [Clip]
 

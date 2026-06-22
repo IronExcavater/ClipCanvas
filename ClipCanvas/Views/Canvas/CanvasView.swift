@@ -24,6 +24,7 @@ struct CanvasView: View {
     var onManageTags: ([CanvasObject]) -> Void = { _ in }
     var onAskAI: ([CanvasObject]) -> Void = { _ in }
     var onRunAIAction: (AITransformSkill, [CanvasObject]) -> Void = { _, _ in }
+    var onWillMutateCanvas: () -> Void = {}
 
     private let drawingWorldOrigin = CGPoint(x: 10_000, y: 10_000)
     private let drawingWorldSize = CGSize(width: 20_000, height: 20_000)
@@ -467,6 +468,13 @@ struct CanvasView: View {
                 let session = activeDrag
                 let ids = session?.objectIDs ?? dragObjectIDs(startingFrom: object)
                 let committedTranslation = value.translation
+                guard committedTranslation != .zero else {
+                    withTransaction(Transaction(animation: nil)) {
+                        activeDrag = nil
+                    }
+                    return
+                }
+                onWillMutateCanvas()
                 for movedObject in canvasObjects where ids.contains(movedObject.id) {
                     movedObject.x += committedTranslation.width / canvasScale
                     movedObject.y += committedTranslation.height / canvasScale
@@ -554,6 +562,14 @@ struct CanvasView: View {
         guard editingObjectID == nil else { return }
         guard let session = activeResize, session.objectID == object.id else { return }
         let size = CanvasPlacementSizing.committedSize(for: session, scale: canvasScale, clip: object.clip)
+        guard abs(object.width - size.width) > 0.5 || abs(object.height - size.height) > 0.5 else {
+            withTransaction(Transaction(animation: nil)) {
+                activeResize = nil
+                activeDrag = nil
+            }
+            return
+        }
+        onWillMutateCanvas()
         object.width = size.width
         object.height = size.height
         clampObject(object, in: geo)
@@ -578,6 +594,7 @@ struct CanvasView: View {
     private func toggleExpandedSize(for object: CanvasObject, in geo: GeometryProxy) {
         let width = geo.size.width / canvasScale
         let size = CanvasPlacementSizing.toggledSize(for: object, availableScreenWidth: width)
+        onWillMutateCanvas()
         let bounds = canvasBounds(viewportSize: geo.size)
         let frame = CanvasViewportFitting.frame(
             expanding: object.frame,
@@ -759,12 +776,14 @@ struct CanvasView: View {
 
     private func commitObjectText(_ text: String, object: CanvasObject) {
         guard object.text != text else { return }
+        onWillMutateCanvas()
         object.text = text
         object.markUpdated()
     }
 
     private func commitClipText(_ text: String, clip: Clip, object: CanvasObject) {
         guard clip.content != text else { return }
+        onWillMutateCanvas()
         let classification = ClipClassificationService.classifySensitivity(text)
         clip.content = text
         clip.updateDetectedType()
@@ -827,8 +846,13 @@ struct CanvasView: View {
             center: center
         )
 
+        var didCaptureSnapshot = false
         for frame in frames {
             guard let object = objectsByID[frame.id] else { continue }
+            if !didCaptureSnapshot {
+                onWillMutateCanvas()
+                didCaptureSnapshot = true
+            }
             object.x = Double(frame.origin.x)
             object.y = Double(frame.origin.y)
             clampObject(object, in: geo)
@@ -862,6 +886,7 @@ struct CanvasView: View {
 
     private func clipBackedObjectForActions(_ object: CanvasObject) -> CanvasObject {
         guard object.clip == nil, canEditText(object) else { return object }
+        onWillMutateCanvas()
         let clip = Clip(content: object.text, origin: .typed)
         context.insert(clip)
         object.clip = clip
@@ -890,6 +915,7 @@ struct CanvasView: View {
     // MARK: - Actions
 
     private func createNote(at center: CGPoint, in geo: GeometryProxy, beginEditing shouldBeginEditing: Bool) {
+        onWillMutateCanvas()
         let note = workspace.createNote(centeredAt: center, size: CanvasPlacementSizing.defaultSize)
         clampObject(note, in: geo)
         selectedObjectIDs = [note.id]
@@ -900,6 +926,7 @@ struct CanvasView: View {
     }
 
     private func duplicate(_ object: CanvasObject, in geo: GeometryProxy) {
+        onWillMutateCanvas()
         let copiedClip = object.clip?.duplicateForCanvas()
         if let copiedClip {
             context.insert(copiedClip)
@@ -931,6 +958,7 @@ struct CanvasView: View {
     }
 
     private func delete(_ object: CanvasObject) {
+        onWillMutateCanvas()
         context.delete(object)
         selectedObjectIDs.remove(object.id)
     }
@@ -946,6 +974,9 @@ struct CanvasView: View {
             )
             if clip.deletedAt != nil {
                 clip.restore()
+            }
+            if !didPlace {
+                onWillMutateCanvas()
             }
             let object = workspace.placeDuplicate(of: clip, at: canvasPoint, in: context)
             clampObject(object, in: geo)
@@ -1052,7 +1083,6 @@ private struct CanvasObjectPositionModifier: ViewModifier {
                 y: (object.y - viewportOrigin.y) * canvasScale + dragOffset.height
             )
             .shadow(color: .black.opacity(isDragging ? 0.22 : 0), radius: isDragging ? 16 : 0, y: isDragging ? 8 : 0)
-            .animation(.spring(response: 0.22, dampingFraction: 0.78), value: isDragging)
             .animation(.spring(response: 0.28, dampingFraction: 0.86), value: canvasScale)
             .animation(.spring(response: 0.28, dampingFraction: 0.86), value: viewportOrigin)
             .animation(.spring(response: 0.28, dampingFraction: 0.86), value: size)

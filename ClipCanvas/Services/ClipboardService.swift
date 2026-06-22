@@ -125,7 +125,7 @@ extension Clip {
             let fingerprint = text.normalizedClipboardHistoryText
             let existing = try? context.fetch(
                 FetchDescriptor<Clip>(
-                    predicate: #Predicate { $0.deletedAt == nil }
+                    predicate: #Predicate { $0.deletedAt == nil && $0.isCanvasOnly == false }
                 )
             )
             if let first = existing?.first(where: { $0.type != .image && $0.content.normalizedClipboardHistoryText == fingerprint }) {
@@ -136,7 +136,7 @@ extension Clip {
         case .image(let data, _, _):
             let existing = try? context.fetch(
                 FetchDescriptor<Clip>(
-                    predicate: #Predicate { $0.deletedAt == nil }
+                    predicate: #Predicate { $0.deletedAt == nil && $0.isCanvasOnly == false }
                 )
             )
             if let first = existing?.first(where: { $0.type == .image && $0.imageData == data }) {

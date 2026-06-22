@@ -12,6 +12,7 @@ extension CanvasContainerView {
             showFeedback("Clipboard is empty", kind: .info)
             return
         }
+        captureCanvasUndoSnapshot()
         let (clip, isNew) = Clip.findOrMake(from: content, origin: .clipboard, in: context)
         if isNew { context.insert(clip) }
         workspace.placeDuplicate(of: clip, at: workspace.nextPosition(around: visibleViewportCenter), in: context)
@@ -27,6 +28,7 @@ extension CanvasContainerView {
             showFeedback("Shared workspace added", kind: .success)
             return
         }
+        captureCanvasUndoSnapshot()
         let classification = ClipClassificationService.classifySensitivity(trimmed)
         let clip = Clip(
             content: trimmed,
@@ -127,6 +129,7 @@ extension CanvasContainerView {
         }
         switch content {
         case .text(let text):
+            captureCanvasUndoSnapshot()
             if let clip = object.clip {
                 let classification = ClipClassificationService.classifySensitivity(text)
                 clip.content = text
@@ -141,6 +144,7 @@ extension CanvasContainerView {
                 showFeedback("Select a clip to paste an image into", kind: .info)
                 return
             }
+            captureCanvasUndoSnapshot()
             clip.imageData = data
             clip.imageUTI = uti
             clip.imageName = name

@@ -33,6 +33,8 @@ struct CanvasContainerView: View {
     @State var tagClips: [Clip]?
     @State var colorObjects: [CanvasObject]?
     @State var aiSkillPreview: AISelectionSkillPreview?
+    @State var undoStack: [CanvasUndoSnapshot] = []
+    @State var redoStack: [CanvasUndoSnapshot] = []
     @State var isRenaming = false
     @State var renameText = ""
     @State var activeDrawing: PKDrawing = PKDrawing()
@@ -91,7 +93,6 @@ struct CanvasContainerView: View {
             }
             .animation(.spring(response: 0.28, dampingFraction: 0.86), value: usesInspector)
         }
-        .navigationTitle(workspace.name)
     }
 
     private func canvasContent(usesInspector: Bool) -> some View {
@@ -128,7 +129,8 @@ struct CanvasContainerView: View {
                 },
                 onRunAIAction: { skill, objects in
                     runAIAction(skill, on: objects)
-                }
+                },
+                onWillMutateCanvas: captureCanvasUndoSnapshot
             )
             .ignoresSafeArea(.container)
 
@@ -139,6 +141,14 @@ struct CanvasContainerView: View {
 
                 if editingObjectID == nil {
                     HStack {
+                        CanvasUndoControls(
+                            canUndo: !undoStack.isEmpty,
+                            canRedo: !redoStack.isEmpty,
+                            onUndo: undoCanvasChange,
+                            onRedo: redoCanvasChange
+                        )
+                        .padding(.leading, 14)
+                        .padding(.bottom, 12)
                         Spacer()
                         CanvasZoomControls(
                             scale: visibleScale,

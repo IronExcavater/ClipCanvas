@@ -67,7 +67,7 @@ nonisolated enum NoteTextFormattingEngine {
         case .list(let style):
             return applyList(style, to: source, selectedRange: selectedRange)
         case .quote:
-            return applyLinePrefix("> ", to: source, selectedRange: selectedRange)
+            return toggleQuote(to: source, selectedRange: selectedRange)
         case .link(let url, let displayText):
             let text = nonEmpty(displayText) ?? nonEmpty(selectedText(in: source, selectedRange: selectedRange)) ?? url
             return replaceSelection(in: source, selectedRange: selectedRange, replacement: "[\(text)](\(url))")
@@ -131,6 +131,24 @@ nonisolated enum NoteTextFormattingEngine {
         }
     }
 
+    private static func toggleQuote(to source: String, selectedRange: NSRange) -> Result {
+        let selectedLines = selectedLineStrings(in: source, selectedRange: selectedRange)
+        let quotedLines = selectedLines.filter { line in
+            let body = line.drop { $0 == " " || $0 == "\t" }
+            return body.hasPrefix("> ")
+        }
+        let shouldRemove = !quotedLines.isEmpty && quotedLines.count == selectedLines.count
+
+        return transformLines(in: source, selectedRange: selectedRange) { line, _ in
+            let leading = line.prefix { $0 == " " || $0 == "\t" }
+            let body = String(line.dropFirst(leading.count))
+            if body.hasPrefix("> ") {
+                return shouldRemove ? "\(leading)\(body.dropFirst(2))" : line
+            }
+            return "\(leading)> \(body)"
+        }
+    }
+
     private static func applyList(_ style: NoteTextListStyle, to source: String, selectedRange: NSRange) -> Result {
         transformLines(in: source, selectedRange: selectedRange) { line, index in
             let leading = line.prefix { $0 == " " || $0 == "\t" }
@@ -160,6 +178,17 @@ nonisolated enum NoteTextFormattingEngine {
         let replacement = lines.enumerated().map { transform($0.element, $0.offset) }.joined(separator: "\n") + (keepsTrailingNewline ? "\n" : "")
         let text = ns.replacingCharacters(in: range, with: replacement)
         return Result(text: text, selectedRange: NSRange(location: range.location + replacement.count, length: 0))
+    }
+
+    private static func selectedLineStrings(in source: String, selectedRange: NSRange) -> [String] {
+        let ns = source as NSString
+        let range = ns.lineRange(for: selectedRange)
+        let selectedLines = ns.substring(with: range)
+        var lines = selectedLines.components(separatedBy: .newlines)
+        if !selectedLines.isEmpty, lines.last == "" {
+            lines.removeLast()
+        }
+        return lines
     }
 
     private static func marker(for style: NoteTextListStyle, index: Int) -> String {
