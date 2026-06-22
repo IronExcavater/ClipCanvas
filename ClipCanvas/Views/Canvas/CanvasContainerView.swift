@@ -233,11 +233,12 @@ struct CanvasContainerView: View {
 
             if let preview = aiSkillPreview {
                 AppConfirmationOverlay(
-                    title: preview.skill.title,
+                    title: preview.title,
                     message: preview.message,
-                    destructiveTitle: "Apply",
+                    destructiveTitle: "Change",
+                    isDestructive: false,
                     onConfirm: {
-                        runAIAction(preview.skill, on: preview.objects)
+                        runAIAction(preview.skill, on: orderedCanvasObjects(matching: preview.objectIDs))
                         aiSkillPreview = nil
                     },
                     onCancel: { aiSkillPreview = nil }

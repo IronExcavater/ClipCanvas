@@ -316,35 +316,25 @@ extension CanvasContainerView {
 struct AISelectionSkillPreview: Identifiable {
     let id = UUID()
     let skill: AITransformSkill
-    let objects: [CanvasObject]
+    let objectIDs: Set<UUID>
+    let title: String
     let message: String
 
     init?(skill: AITransformSkill, objects: [CanvasObject]) {
-        let rows = objects.compactMap { object -> String? in
-            guard object.clip?.type != .image else { return nil }
+        let objectIDs = Set(objects.map(\.id))
+        let canTransform = objects.contains { object in
+            guard object.clip?.type != .image else { return false }
             let source = object.clip?.content ?? object.text
             let trimmed = source.trimmingCharacters(in: .whitespacesAndNewlines)
-            guard !trimmed.isEmpty,
-                  let transformed = TextTransformFallbacks.text(for: skill.id, input: source),
-                  transformed != source else {
-                return nil
-            }
-            return """
-            Before: \(Self.previewLine(trimmed))
-            After: \(Self.previewLine(transformed))
-            """
+            guard !trimmed.isEmpty else { return false }
+            return TextTransformFallbacks.text(for: skill.id, input: source) != nil
         }
-        guard !rows.isEmpty else { return nil }
+        guard !objectIDs.isEmpty, canTransform else { return nil }
         self.skill = skill
-        self.objects = objects
-        self.message = rows.prefix(3).joined(separator: "\n\n")
-    }
-
-    private static func previewLine(_ text: String) -> String {
-        let line = text
-            .components(separatedBy: .newlines)
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .first(where: { !$0.isEmpty }) ?? text
-        return String(line.prefix(120))
+        self.objectIDs = objectIDs
+        self.title = objects.count == 1 ? "Change Card?" : "Change Cards?"
+        self.message = objects.count == 1
+            ? "Are you sure you want to change the card?"
+            : "Are you sure you want to change the cards?"
     }
 }

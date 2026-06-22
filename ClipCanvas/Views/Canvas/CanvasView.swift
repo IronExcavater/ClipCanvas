@@ -611,7 +611,6 @@ struct CanvasView: View {
         withAnimation(.spring(response: 0.25, dampingFraction: 0.82)) {
             object.frame = frame
             viewportOrigin = origin
-            clampObject(object, in: geo)
         }
         activeResize = nil
         object.markUpdated()
