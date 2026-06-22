@@ -39,6 +39,7 @@ extension CanvasContainerView {
     // the OS-level "Allow Paste" alert with no automation to dismiss it, hanging the run.
     func checkClipboardOnForeground() {
         guard ProcessInfo.processInfo.environment["XCTestConfigurationFilePath"] == nil else { return }
+        importICloudClipboardIfNeeded()
         guard clipboardMonitoringEnabled else { return }
         guard let content = ClipboardService.readContent() else { return }
         defer { lastClipboardFingerprint = content.fingerprint }
@@ -55,6 +56,10 @@ extension CanvasContainerView {
         guard content.fingerprint != lastClipboardFingerprint,
               !ClipboardService.wasRecentlyImported(content) else { return }
         captureClipboardContent(content)
+        if iCloudClipboardSyncEnabled {
+            ICloudClipboardService.publish(content)
+        }
+        importICloudClipboardIfNeeded()
     }
 
     func captureClipboardContent(_ content: ClipboardContent) {
@@ -66,16 +71,37 @@ extension CanvasContainerView {
         )
     }
 
+    func importICloudClipboardIfNeeded() {
+        guard iCloudClipboardSyncEnabled else { return }
+        let lastSeen = lastSeenICloudClipboardTimestamp > 0
+            ? Date(timeIntervalSince1970: lastSeenICloudClipboardTimestamp)
+            : nil
+        guard let latest = ICloudClipboardService.latestRemoteContent(after: lastSeen),
+              !ClipboardService.wasRecentlyImported(latest.content) else { return }
+        lastSeenICloudClipboardTimestamp = latest.date.timeIntervalSince1970
+        captureClipboardContent(latest.content)
+    }
+
     func copySelectedToClipboard() {
         let objects = orderedCanvasObjects(matching: selectedObjectIDs)
         guard !objects.isEmpty else { return }
         let clips = objects.compactMap(\.clip)
         if clips.count == objects.count {
             ClipActionService.copy(clips)
+            if iCloudClipboardSyncEnabled, let first = clips.first {
+                if first.type == .image, let data = first.imageData {
+                    ICloudClipboardService.publish(.image(data, uti: first.imageUTI ?? "public.png"))
+                } else {
+                    ICloudClipboardService.publish(.text(clips.map(\.content).joined(separator: "\n\n")))
+                }
+            }
         } else {
             let text = objects.map(\.displayText).filter { !$0.isEmpty }.joined(separator: "\n\n")
             guard !text.isEmpty else { return }
             ClipboardService.writeString(text)
+            if iCloudClipboardSyncEnabled {
+                ICloudClipboardService.publish(.text(text))
+            }
         }
         showFeedback(objects.count == 1 ? "Copied" : "Copied \(objects.count) items", kind: .success)
     }

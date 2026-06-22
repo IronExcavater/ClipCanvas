@@ -17,7 +17,7 @@ struct ClipDetailView: View {
     @State private var isEditingContent = false
     @State private var noteTextCommand: NoteTextCommand?
     @State private var editorHeight: CGFloat = 180
-    @ObservedObject private var revealStore = PrivateClipRevealStore.shared
+    @ObservedObject private var revealStore = SensitiveTextRevealStore.shared
     var onClose: (() -> Void)?
 
     var body: some View {
@@ -30,12 +30,10 @@ struct ClipDetailView: View {
                         canTransform: clip.type != .image,
                         isTransforming: isTransforming,
                         isPrivate: clip.isPrivateContent,
-                        isRevealed: revealStore.isRevealed(clip),
                         onCopy: { ClipActionService.copy(clip) },
                         onOpen: { ClipActionService.openURL(for: clip) },
                         onPin: { ClipActionService.togglePin(clip) },
                         onTransform: applyTransform,
-                        onReveal: { revealStore.toggle(clip) },
                         onSensitive: { ClipActionService.toggleSensitive(clip) },
                         onEdit: { isEditingContent.toggle() },
                         onDelete: {
@@ -47,14 +45,15 @@ struct ClipDetailView: View {
                     ClipDetailSection("Content") {
                         ClipContentPanel(
                             clip: clip,
-                            isRevealed: revealStore.isRevealed(clip),
+                            revealedSensitiveParts: revealStore.revealedPartIDs,
                             isEditing: isEditingContent,
                             command: noteTextCommand,
                             editorHeight: editorHeight,
                             onEditorHeightChange: { editorHeight = $0 },
                             onCommit: updateClipContent,
                             onExitEditing: { isEditingContent = false },
-                            onCommand: { noteTextCommand = NoteTextCommand(kind: $0) }
+                            onCommand: { noteTextCommand = NoteTextCommand(kind: $0) },
+                            onSensitivePartTapped: revealStore.toggle
                         )
                     }
 
@@ -147,7 +146,7 @@ private struct ClipInfoPanel: View {
 
 private struct ClipContentPanel: View {
     let clip: Clip
-    let isRevealed: Bool
+    let revealedSensitiveParts: Set<String>
     let isEditing: Bool
     let command: NoteTextCommand?
     let editorHeight: CGFloat
@@ -155,6 +154,7 @@ private struct ClipContentPanel: View {
     let onCommit: (String) -> Void
     let onExitEditing: () -> Void
     let onCommand: (NoteTextCommandKind) -> Void
+    let onSensitivePartTapped: (String) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -174,7 +174,12 @@ private struct ClipContentPanel: View {
                 )
                 .frame(minHeight: editorHeight, maxHeight: editorHeight)
             } else {
-                MarkdownPreview(text: clip.displayPreview(isRevealed: isRevealed), emptyText: "No text")
+                MarkdownPreview(
+                    text: clip.displayPreview(isRevealed: false),
+                    emptyText: "No text",
+                    revealedSensitiveParts: revealedSensitiveParts,
+                    onSensitivePartTapped: onSensitivePartTapped
+                )
                     .font(.body)
                     .foregroundStyle(.primary)
                     .textSelection(.enabled)
@@ -187,8 +192,10 @@ private struct ClipContentPanel: View {
         HStack(spacing: 8) {
             formatButton("bold", kind: .bold)
             formatButton("italic", kind: .italic)
-            formatButton("list.bullet", kind: .bullet)
-            formatButton("highlighter", kind: .highlight)
+            formatButton("underline", kind: .underline)
+            formatButton("strikethrough", kind: .strikethrough)
+            formatButton("list.bullet", kind: .list(.bullet))
+            formatButton("highlighter", kind: .highlight(.yellow))
             Spacer(minLength: 0)
             Button("Done", action: onExitEditing)
                 .font(.caption.weight(.semibold))
@@ -290,12 +297,10 @@ private struct ClipDetailActionToolbar: View {
     let canTransform: Bool
     let isTransforming: Bool
     let isPrivate: Bool
-    let isRevealed: Bool
     let onCopy: () -> Void
     let onOpen: () -> Void
     let onPin: () -> Void
     let onTransform: (String) -> Void
-    let onReveal: () -> Void
     let onSensitive: () -> Void
     let onEdit: () -> Void
     let onDelete: () -> Void
@@ -309,11 +314,6 @@ private struct ClipDetailActionToolbar: View {
                     action("Open", icon: "safari", action: onOpen)
                 }
                 transformMenu
-                if isPrivate {
-                    action(isRevealed ? "Hide" : "Reveal",
-                           icon: isRevealed ? "eye.slash" : "eye",
-                           action: onReveal)
-                }
                 action(isPinned ? "Unpin" : "Pin", icon: isPinned ? "pin.slash" : "pin", action: onPin)
                 action(isPrivate ? "Unmark" : "Sensitive",
                        icon: isPrivate ? "lock.open" : "lock",
@@ -409,10 +409,17 @@ private extension ClipDetailView {
 private extension NoteTextCommandKind {
     var accessibilityName: String {
         switch self {
+        case .blockStyle(let style): style.rawValue.capitalized
         case .bold: "Bold"
         case .italic: "Italic"
-        case .bullet: "Bullets"
+        case .underline: "Underline"
+        case .strikethrough: "Strikethrough"
         case .highlight: "Highlight"
+        case .list(let style): "\(style.rawValue.capitalized) List"
+        case .quote: "Quote"
+        case .link: "Link"
+        case .indent: "Indent"
+        case .outdent: "Outdent"
         }
     }
 }

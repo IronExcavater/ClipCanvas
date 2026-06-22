@@ -85,8 +85,16 @@ struct NoteTextEditor: UIViewRepresentable {
             pattern: #"(?<!\*)\*(?![\*\s])(.+?)(?<![\*\s])\*(?!\*)"#,
             options: .dotMatchesLineSeparators
         )
+        private static let underlinePattern = try? NSRegularExpression(
+            pattern: #"<u>(.+?)</u>"#,
+            options: .dotMatchesLineSeparators
+        )
+        private static let strikethroughPattern = try? NSRegularExpression(
+            pattern: #"~~(.+?)~~"#,
+            options: .dotMatchesLineSeparators
+        )
         private static let highlightPattern = try? NSRegularExpression(
-            pattern: #"==(.+?)=="#,
+            pattern: #"==(?:(yellow|green|blue|pink|purple|orange):)?(.+?)=="#,
             options: .dotMatchesLineSeparators
         )
         private static let inlineCodePattern = try? NSRegularExpression(
@@ -132,22 +140,26 @@ struct NoteTextEditor: UIViewRepresentable {
             guard lastCommandID != command.id else { return }
             lastCommandID = command.id
 
-            switch command.kind {
-            case .bold:
-                wrapSelection(in: textView, prefix: "**", suffix: "**", placeholder: "bold")
-            case .italic:
-                wrapSelection(in: textView, prefix: "*", suffix: "*", placeholder: "italic")
-            case .highlight:
-                wrapSelection(in: textView, prefix: "==", suffix: "==", placeholder: "highlight")
-            case .bullet:
-                applyBullet(in: textView)
-            }
+            let result = NoteTextFormattingEngine.apply(command.kind, to: textView.text ?? "", selectedRange: textView.selectedRange)
+            textView.text = result.text
+            textView.selectedRange = result.selectedRange
 
             text = textView.text ?? ""
             onCommit(text)
             refreshAttributes(textView)
             reportSize(textView)
             scrollCaretIntoView(textView)
+        }
+
+        func textView(_ textView: UITextView, shouldChangeTextIn range: NSRange, replacementText replacement: String) -> Bool {
+            guard replacement == "\n",
+                  let result = NoteTextFormattingEngine.applyNewline(in: textView.text ?? "", selectedRange: range) else {
+                return true
+            }
+            textView.text = result.text
+            textView.selectedRange = result.selectedRange
+            textViewDidChange(textView)
+            return false
         }
 
         // Re-parses markdown markers so the stored plain text remains editable,
@@ -192,6 +204,23 @@ struct NoteTextEditor: UIViewRepresentable {
                 markerLength: 2
             )
             applyInlineMarkdown(
+                pattern: Self.underlinePattern,
+                to: attr,
+                in: plain,
+                range: nsRange,
+                bodyAttributes: [.underlineStyle: NSUnderlineStyle.single.rawValue],
+                markerLength: 3,
+                trailingMarkerLength: 4
+            )
+            applyInlineMarkdown(
+                pattern: Self.strikethroughPattern,
+                to: attr,
+                in: plain,
+                range: nsRange,
+                bodyAttributes: [.strikethroughStyle: NSUnderlineStyle.single.rawValue],
+                markerLength: 2
+            )
+            applyInlineMarkdown(
                 pattern: Self.inlineCodePattern,
                 to: attr,
                 in: plain,
@@ -211,73 +240,20 @@ struct NoteTextEditor: UIViewRepresentable {
             }
         }
 
-        private func wrapSelection(
-            in textView: UITextView,
-            prefix: String,
-            suffix: String,
-            placeholder: String
-        ) {
-            let source = textView.text ?? ""
-            let ns = source as NSString
-            let range = markdownBodyRange(for: textView.selectedRange, in: ns)
-            let selected = range.length > 0 ? ns.substring(with: range) : placeholder
-            let replacement = "\(prefix)\(selected)\(suffix)"
-            textView.text = ns.replacingCharacters(in: range, with: replacement)
-            let cursorOffset = range.length > 0 ? replacement.count : prefix.count + selected.count
-            textView.selectedRange = NSRange(location: range.location + cursorOffset, length: 0)
-        }
-
-        private func markdownBodyRange(for selectedRange: NSRange, in ns: NSString) -> NSRange {
-            let lineRange = ns.lineRange(for: selectedRange)
-            guard lineRange.length >= 1 else { return selectedRange }
-            let line = ns.substring(with: lineRange)
-            guard let bodyOffset = bulletBodyOffset(in: line) else {
-                return selectedRange
-            }
-
-            let bodyStart = lineRange.location + bodyOffset
-            if selectedRange.length == 0 {
-                return NSRange(location: max(selectedRange.location, bodyStart), length: 0)
-            }
-
-            let end = selectedRange.location + selectedRange.length
-            let adjustedStart = max(selectedRange.location, bodyStart)
-            return NSRange(location: adjustedStart, length: max(0, end - adjustedStart))
-        }
-
-        private func applyBullet(in textView: UITextView) {
-            let source = textView.text ?? ""
-            let ns = source as NSString
-            let range = ns.lineRange(for: textView.selectedRange)
-            var lines = ns.substring(with: range).components(separatedBy: .newlines)
-            let keepsTrailingNewline = lines.last == ""
-            if keepsTrailingNewline { lines.removeLast() }
-            let replacement = lines.map { line in
-                guard !line.trimmingCharacters(in: .whitespaces).isEmpty else { return line }
-                let leading = line.prefix { $0 == " " || $0 == "\t" }
-                let body = line.dropFirst(leading.count)
-                if body.hasPrefix("- ") { return String(leading) + String(body.dropFirst(2)) }
-                if body.hasPrefix("* ") { return String(leading) + String(body.dropFirst(2)) }
-                return "\(leading)- \(body)"
-            }
-            .joined(separator: "\n") + (keepsTrailingNewline ? "\n" : "")
-            textView.text = ns.replacingCharacters(in: range, with: replacement)
-            textView.selectedRange = NSRange(location: range.location + replacement.count, length: 0)
-        }
-
         private func applyInlineMarkdown(
             pattern: NSRegularExpression?,
             to attr: NSMutableAttributedString,
             in plain: String,
             range: NSRange,
             bodyAttributes: [NSAttributedString.Key: Any],
-            markerLength: Int
+            markerLength: Int,
+            trailingMarkerLength: Int? = nil
         ) {
             pattern?.enumerateMatches(in: plain, range: range) { match, _, _ in
                 guard let match, match.numberOfRanges > 1 else { return }
-                let bodyRange = match.range(at: 1)
+                let bodyRange = match.range(at: match.numberOfRanges - 1)
                 attr.addAttributes(bodyAttributes, range: bodyRange)
-                hideMarkdownMarkers(in: attr, matchRange: match.range, bodyRange: bodyRange, markerLength: markerLength)
+                hideMarkdownMarkers(in: attr, matchRange: match.range, bodyRange: bodyRange, markerLength: markerLength, trailingMarkerLength: trailingMarkerLength)
             }
         }
 
@@ -304,10 +280,11 @@ struct NoteTextEditor: UIViewRepresentable {
             in attr: NSMutableAttributedString,
             matchRange: NSRange,
             bodyRange: NSRange,
-            markerLength: Int
+            markerLength: Int,
+            trailingMarkerLength: Int? = nil
         ) {
             let leading = NSRange(location: matchRange.location, length: markerLength)
-            let trailing = NSRange(location: bodyRange.location + bodyRange.length, length: markerLength)
+            let trailing = NSRange(location: bodyRange.location + bodyRange.length, length: trailingMarkerLength ?? markerLength)
             [leading, trailing].forEach { markerRange in
                 attr.addAttributes(hiddenMarkerAttributes, range: markerRange)
             }
@@ -335,31 +312,6 @@ struct NoteTextEditor: UIViewRepresentable {
                 let lineRange = (plain as NSString).lineRange(for: match.range)
                 attr.addAttribute(.paragraphStyle, value: paragraph, range: lineRange)
             }
-        }
-
-        private func bulletBodyOffset(in line: String) -> Int? {
-            let leading = line.prefix { $0 == " " || $0 == "\t" }.count
-            let body = line.dropFirst(leading)
-            if body.hasPrefix("- ") || body.hasPrefix("* ") {
-                return leading + 2
-            }
-            var numberLength = 0
-            for character in body {
-                guard character.isNumber else { break }
-                numberLength += 1
-            }
-            if numberLength > 0 {
-                let dotIndex = body.index(body.startIndex, offsetBy: numberLength)
-                if dotIndex < body.endIndex {
-                    let spaceIndex = body.index(after: dotIndex)
-                    if spaceIndex < body.endIndex,
-                       body[dotIndex] == ".",
-                       body[spaceIndex].isWhitespace {
-                        return leading + numberLength + 2
-                    }
-                }
-            }
-            return nil
         }
 
         private var hiddenMarkerAttributes: [NSAttributedString.Key: Any] {
@@ -450,26 +402,8 @@ struct NoteTextEditor: View {
         guard let command, lastCommandID != command.id else { return }
         lastCommandID = command.id
 
-        switch command.kind {
-        case .bold:
-            text = text.isEmpty ? "**bold**" : "**\(text)**"
-        case .italic:
-            text = text.isEmpty ? "*italic*" : "*\(text)*"
-        case .highlight:
-            text = text.isEmpty ? "==highlight==" : "==\(text)=="
-        case .bullet:
-            text = text
-                .components(separatedBy: .newlines)
-                .map { line in
-                    guard !line.trimmingCharacters(in: .whitespaces).isEmpty else { return line }
-                    let leading = line.prefix { $0 == " " || $0 == "\t" }
-                    let body = line.dropFirst(leading.count)
-                    if body.hasPrefix("- ") { return String(leading) + String(body.dropFirst(2)) }
-                    if body.hasPrefix("* ") { return String(leading) + String(body.dropFirst(2)) }
-                    return "\(leading)- \(body)"
-                }
-                .joined(separator: "\n")
-        }
+        let result = NoteTextFormattingEngine.apply(command.kind, to: text, selectedRange: NSRange(location: 0, length: (text as NSString).length))
+        text = result.text
 
         onCommit(text)
         reportSize(for: text)

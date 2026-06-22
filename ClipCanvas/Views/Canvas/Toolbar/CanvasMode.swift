@@ -45,9 +45,16 @@ nonisolated enum CanvasToolbarItem: Hashable {
     case color
     case copyToClipboard
     case pasteFromClipboard
+    case formatPanel
+    case formatList
+    case formatQuote
+    case formatLink
+    case formatOutdent
+    case formatIndent
     case formatBold
     case formatItalic
-    case formatBullet
+    case formatUnderline
+    case formatStrikethrough
     case formatHighlight
     case delete
     case divider
@@ -72,9 +79,16 @@ nonisolated enum CanvasToolbarItem: Hashable {
         case .color: "Color"
         case .copyToClipboard: "Copy to Clipboard"
         case .pasteFromClipboard: "Paste from Clipboard"
+        case .formatPanel: "Format"
+        case .formatList: "List"
+        case .formatQuote: "Quote"
+        case .formatLink: "Link"
+        case .formatOutdent: "Outdent"
+        case .formatIndent: "Indent"
         case .formatBold: "Bold"
         case .formatItalic: "Italic"
-        case .formatBullet: "Bullets"
+        case .formatUnderline: "Underline"
+        case .formatStrikethrough: "Strikethrough"
         case .formatHighlight: "Highlight"
         case .delete: "Delete"
         case .divider: "Divider"
@@ -148,9 +162,16 @@ nonisolated struct CanvasToolbarConfiguration: Hashable {
             if isEditing {
                 return CanvasToolbarConfiguration(items: [
                     .closeMode,
+                    .formatPanel,
+                    .formatList,
+                    .formatQuote,
+                    .formatLink,
+                    .formatOutdent,
+                    .formatIndent,
                     .formatBold,
                     .formatItalic,
-                    .formatBullet,
+                    .formatUnderline,
+                    .formatStrikethrough,
                     .formatHighlight
                 ])
             }

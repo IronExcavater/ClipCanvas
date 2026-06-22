@@ -1,31 +1,31 @@
 import SwiftUI
 
 struct CanvasTopBar: View {
-    let workspaceName: String
-    let workspaces: [Workspace]
-    let activeWorkspaceID: UUID
     @Binding var isRenaming: Bool
     @Binding var renameText: String
     var renameFocused: FocusState<Bool>.Binding
     let onToggleSidebar: () -> Void
     let onBeginRename: () -> Void
     let onCommitRename: () -> Void
-    let onSelectWorkspace: (Workspace) -> Void
     let selectedCount: Int
     let visibleCount: Int
+    let shareSelectionText: String
+    let shareVisibleText: String
+    let shareWorkspaceText: String
+    let shareImageURLs: [URL]
     let onAskAI: () -> Void
     let onClearAll: () -> Void
     let onArrangeAll: () -> Void
     let onFitContent: () -> Void
     var onSearch: (() -> Void)? = nil
 
-    private func titleMaxWidth(in totalWidth: CGFloat, editing: Bool) -> CGFloat {
+    private func titleMaxWidth(in totalWidth: CGFloat) -> CGFloat {
         let horizontalPadding: CGFloat = 32
-        let sideControls: CGFloat = 46 * 2
+        let sideControls: CGFloat = 46 + 100
         let hStackSpacing: CGFloat = 12 * 2
         let minimumSpacerRoom: CGFloat = 16
         let available = totalWidth - horizontalPadding - sideControls - hStackSpacing - minimumSpacerRoom
-        return editing ? max(118, available) : max(82, min(180, available))
+        return max(118, available)
     }
 
     var body: some View {
@@ -40,31 +40,15 @@ struct CanvasTopBar: View {
                     .buttonStyle(BlendedIconButtonStyle())
                     .frame(width: 46)
 
-                    Spacer(minLength: 8)
-
-                    title(maxWidth: titleMaxWidth(in: proxy.size.width, editing: isRenaming))
-                        .layoutPriority(1)
-                        .animation(.spring(response: 0.24, dampingFraction: 0.86), value: isRenaming)
-                        .animation(.spring(response: 0.24, dampingFraction: 0.86), value: workspaceName)
-
-                    Spacer(minLength: 8)
-
-                    Menu {
-                        Button(askAITitle, systemImage: "sparkles", action: onAskAI)
-                            .disabled(selectedCount == 0 && visibleCount == 0)
-                        if let onSearch {
-                            Button("Search Canvas", systemImage: "magnifyingglass", action: onSearch)
-                        }
-                        Button("Fit Content", systemImage: "arrow.up.left.and.arrow.down.right", action: onFitContent)
-                        Button("Arrange Grid", systemImage: "square.grid.2x2", action: onArrangeAll)
-                        Button("Rename Workspace", systemImage: "pencil", action: onBeginRename)
-                        Button("Clear Canvas", systemImage: "trash", role: .destructive, action: onClearAll)
-                    } label: {
-                        AppCircleIconLabel(systemImage: AppSymbol.options)
+                    if isRenaming {
+                        titleEditor(maxWidth: titleMaxWidth(in: proxy.size.width))
+                            .layoutPriority(1)
+                            .animation(.spring(response: 0.24, dampingFraction: 0.86), value: isRenaming)
+                    } else {
+                        Spacer(minLength: 8)
                     }
-                    .buttonStyle(BlendedIconButtonStyle())
-                    .accessibilityLabel("Workspace options")
-                    .frame(width: 46)
+
+                    actionCapsule
                 }
             }
         }
@@ -85,70 +69,83 @@ struct CanvasTopBar: View {
     }
 
     @ViewBuilder
-    private func title(maxWidth: CGFloat) -> some View {
-        if isRenaming {
-            TextField("Workspace name", text: $renameText)
-                .font(.title3.weight(.semibold))
-                .multilineTextAlignment(.center)
-                .textFieldStyle(.plain)
-                .focused(renameFocused)
-                .submitLabel(.done)
-                .onChange(of: renameText) { _, newValue in
-                    let limited = WorkspaceNamePolicy.limitedEditingText(newValue)
-                    if limited != newValue { renameText = limited }
-                }
-                .onSubmit(onCommitRename)
-                .onDisappear {
-                    if isRenaming { onCommitRename() }
-                }
-                .frame(width: maxWidth)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background { WorkspaceTitleBackdrop() }
-        } else {
-            Menu {
-                ForEach(workspaces) { workspace in
-                    Button {
-                        onSelectWorkspace(workspace)
-                    } label: {
-                        Label(
-                            workspace.name,
-                            systemImage: workspace.id == activeWorkspaceID ? "checkmark" : "folder"
-                        )
-                    }
-                }
-                Button("Rename", systemImage: "pencil", action: onBeginRename)
-            } label: {
-                workspaceTitleLabel(maxWidth: maxWidth)
-            }
-            .buttonStyle(.plain)
-            .simultaneousGesture(LongPressGesture(minimumDuration: 0.45).onEnded { _ in onBeginRename() })
-        }
-    }
-
-    private func workspaceTitleLabel(maxWidth: CGFloat) -> some View {
-        ViewThatFits(in: .horizontal) {
-            workspaceTitleText
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background { WorkspaceTitleBackdrop() }
-                .fixedSize(horizontal: true, vertical: false)
-
-            workspaceTitleText
-                .frame(width: maxWidth - 28)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 8)
-                .background { WorkspaceTitleBackdrop() }
-        }
-        .frame(maxWidth: maxWidth)
-    }
-
-    private var workspaceTitleText: some View {
-        Text(workspaceName)
+    private func titleEditor(maxWidth: CGFloat) -> some View {
+        TextField("Workspace name", text: $renameText)
             .font(.title3.weight(.semibold))
-            .foregroundStyle(.primary)
-            .lineLimit(1)
-            .truncationMode(.tail)
+            .multilineTextAlignment(.center)
+            .textFieldStyle(.plain)
+            .focused(renameFocused)
+            .submitLabel(.done)
+            .onChange(of: renameText) { _, newValue in
+                let limited = WorkspaceNamePolicy.limitedEditingText(newValue)
+                if limited != newValue { renameText = limited }
+            }
+            .onSubmit(onCommitRename)
+            .onDisappear {
+                if isRenaming { onCommitRename() }
+            }
+            .frame(width: maxWidth)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
+            .background { WorkspaceTitleBackdrop() }
+    }
+
+    private var actionCapsule: some View {
+        HStack(spacing: 2) {
+            shareMenu
+            Divider()
+                .frame(height: 22)
+                .opacity(0.45)
+            overflowMenu
+        }
+        .padding(.horizontal, 5)
+        .padding(.vertical, 5)
+        .background { Capsule().fill(.regularMaterial) }
+        .overlay { Capsule().stroke(Color.white.opacity(0.35), lineWidth: 1) }
+    }
+
+    private var shareMenu: some View {
+        Menu {
+            ShareLink(item: shareWorkspaceText) {
+                Label("Share Workspace", systemImage: "rectangle.3.group")
+            }
+            ShareLink(item: shareVisibleText) {
+                Label("Share Visible Cards", systemImage: "rectangle.stack")
+            }
+            ShareLink(item: shareSelectionText) {
+                Label("Share Selection", systemImage: "square.and.arrow.up")
+            }
+            .disabled(selectedCount == 0)
+            if !shareImageURLs.isEmpty {
+                ShareLink(items: shareImageURLs) {
+                    Label("Share Images", systemImage: "photo.on.rectangle")
+                }
+            }
+        } label: {
+            AppCircleIconLabel(systemImage: "square.and.arrow.up")
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Share canvas")
+        .frame(width: 42, height: 42)
+    }
+
+    private var overflowMenu: some View {
+        Menu {
+            Button(askAITitle, systemImage: "sparkles", action: onAskAI)
+                .disabled(selectedCount == 0 && visibleCount == 0)
+            if let onSearch {
+                Button("Search Canvas", systemImage: "magnifyingglass", action: onSearch)
+            }
+            Button("Fit Content", systemImage: "arrow.up.left.and.arrow.down.right", action: onFitContent)
+            Button("Arrange Grid", systemImage: "square.grid.2x2", action: onArrangeAll)
+            Button("Rename Workspace", systemImage: "pencil", action: onBeginRename)
+            Button("Clear Canvas", systemImage: "trash", role: .destructive, action: onClearAll)
+        } label: {
+            AppCircleIconLabel(systemImage: AppSymbol.options)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Workspace options")
+        .frame(width: 42, height: 42)
     }
 }
 

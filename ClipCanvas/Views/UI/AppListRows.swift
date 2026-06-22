@@ -216,6 +216,7 @@ private struct RelativeAgeTimelineEntries: Sequence, IteratorProtocol {
 struct AppListRowHeader: View {
     @Environment(\.appListRowIsSelecting) private var isSelecting
     @Environment(\.appListRowIsSelected) private var isSelected
+    @ObservedObject private var revealStore = SensitiveTextRevealStore.shared
 
     let systemImage: String
     let color: Color
@@ -236,7 +237,11 @@ struct AppListRowHeader: View {
                     .padding(.top, 1)
 
                 HStack(alignment: .firstTextBaseline, spacing: 6) {
-                    MarkdownPreview(text: title)
+                    MarkdownPreview(
+                        text: title,
+                        revealedSensitiveParts: revealStore.revealedPartIDs,
+                        onSensitivePartTapped: revealStore.toggle
+                    )
                         .font(.subheadline.weight(.semibold))
                         .lineLimit(lineLimit)
                         .foregroundStyle(.primary)
@@ -253,7 +258,11 @@ struct AppListRowHeader: View {
             }
 
             if let subtitle, !subtitle.isEmpty {
-                MarkdownPreview(text: subtitle)
+                MarkdownPreview(
+                    text: subtitle,
+                    revealedSensitiveParts: revealStore.revealedPartIDs,
+                    onSensitivePartTapped: revealStore.toggle
+                )
                     .font(.caption)
                     .foregroundStyle(.primary.opacity(0.76))
                     .lineLimit(3)

@@ -76,9 +76,16 @@ import Testing
 
         #expect(configuration.items == [
             .closeMode,
+            .formatPanel,
+            .formatList,
+            .formatQuote,
+            .formatLink,
+            .formatOutdent,
+            .formatIndent,
             .formatBold,
             .formatItalic,
-            .formatBullet,
+            .formatUnderline,
+            .formatStrikethrough,
             .formatHighlight
         ])
     }

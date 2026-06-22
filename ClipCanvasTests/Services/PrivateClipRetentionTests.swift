@@ -4,9 +4,7 @@ import Testing
 @testable import ClipCanvas
 
 @Suite struct PrivateClipRetentionTests {
-    @Test func privateClipsGetDefaultExpiry() throws {
-        let before = Date()
-
+    @Test func privateClipsDoNotGetDefaultExpiry() {
         let clip = Clip(
             content: "password: hunter2",
             origin: .clipboard,
@@ -14,9 +12,7 @@ import Testing
             sensitivityReason: .secretKeyword
         )
 
-        let expiresAt = try #require(clip.expiresAt)
-        #expect(expiresAt.timeIntervalSince(before) >= PrivateClipRetentionPolicy.defaultExpiryInterval - 2)
-        #expect(expiresAt.timeIntervalSince(before) <= PrivateClipRetentionPolicy.defaultExpiryInterval + 2)
+        #expect(clip.expiresAt == nil)
         #expect(clip.sensitivityReason == .secretKeyword)
     }
 

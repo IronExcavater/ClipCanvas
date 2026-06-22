@@ -11,7 +11,7 @@ struct ClipRow: View {
     var onDetails: (() -> Void)?
     var onPrimaryAction: (() -> Void)?
 
-    @ObservedObject private var revealStore = PrivateClipRevealStore.shared
+    @ObservedObject private var revealStore = SensitiveTextRevealStore.shared
 
     @Query(
         filter: #Predicate<Workspace> { $0.deletedAt == nil },
@@ -32,7 +32,11 @@ struct ClipRow: View {
                 dateSuffix: " ago"
             )
             if isExpanded {
-                MarkdownPreview(text: displayPreview)
+                MarkdownPreview(
+                    text: displayPreview,
+                    revealedSensitiveParts: revealStore.revealedPartIDs,
+                    onSensitivePartTapped: revealStore.toggle
+                )
                     .font(.callout)
                     .foregroundStyle(.primary.opacity(0.78))
                     .lineLimit(6)
@@ -62,10 +66,6 @@ struct ClipRow: View {
             if ClipActionService.openableURL(for: clip) != nil {
                 Button("Open Link", systemImage: "safari") { ClipActionService.openURL(for: clip) }
             }
-            if clip.isPrivateContent {
-                Button(isRevealed ? "Hide" : "Reveal",
-                       systemImage: isRevealed ? "eye.slash" : "eye") { revealStore.toggle(clip) }
-            }
             Button(clip.isPrivateContent ? "Unmark Sensitive" : "Mark Sensitive",
                    systemImage: clip.isPrivateContent ? "lock.open" : "lock") {
                 ClipActionService.toggleSensitive(clip)
@@ -92,8 +92,7 @@ struct ClipRow: View {
 
     private var primaryTagColor: Color { clip.primaryDisplayColor }
     private var activeWorkspace: Workspace? { workspaces.first(where: \.isActive) ?? workspaces.first }
-    private var isRevealed: Bool { revealStore.isRevealed(clip) }
-    private var displayPreview: String { clip.displayPreview(isRevealed: isRevealed) }
+    private var displayPreview: String { clip.displayPreview(isRevealed: false) }
     private var displayTitle: String {
         displayPreview
             .components(separatedBy: .newlines)
@@ -109,27 +108,13 @@ struct ClipRow: View {
             AppListRowMetadata("character.cursor.ibeam", value: "\(clip.content.count)", monospaced: true)
         ]
         if clip.isPrivateContent {
-            metadata.append(AppListRowMetadata(isRevealed ? "eye.slash.fill" : "eye.fill", value: isRevealed ? "Shown" : "Hidden"))
+            metadata.append(AppListRowMetadata("lock.fill", value: "Sensitive"))
         }
         return metadata
     }
 
     private var rowFooter: some View {
         VStack(alignment: .leading, spacing: 4) {
-            if clip.isPrivateContent {
-                Button {
-                    revealStore.toggle(clip)
-                } label: {
-                    Label(isRevealed ? "Hide sensitive content" : "Reveal sensitive content",
-                          systemImage: isRevealed ? "eye.slash.fill" : "eye.fill")
-                        .labelStyle(.iconOnly)
-                        .font(.system(size: 13, weight: .semibold))
-                        .foregroundStyle(.secondary)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel(isRevealed ? "Hide sensitive content" : "Reveal sensitive content")
-            }
-
             TagPillRow(tags: Array(clip.tags), limit: 3, size: compact ? .compact : .regular)
         }
     }

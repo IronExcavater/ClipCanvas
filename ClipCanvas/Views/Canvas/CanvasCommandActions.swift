@@ -18,7 +18,11 @@ struct CanvasCommandActions {
     let deleteSelection: () -> Void
     let bold: () -> Void
     let italic: () -> Void
+    let underline: () -> Void
+    let strikethrough: () -> Void
     let bullet: () -> Void
+    let numbered: () -> Void
+    let checklist: () -> Void
     let highlight: () -> Void
 }
 
@@ -96,8 +100,24 @@ struct ClipCanvasCommands: Commands {
                 .keyboardShortcut("i", modifiers: [.command])
                 .disabled(canvasActions?.canFormatText != true)
 
+            Button("Underline") { canvasActions?.underline() }
+                .keyboardShortcut("u", modifiers: [.command])
+                .disabled(canvasActions?.canFormatText != true)
+
+            Button("Strikethrough") { canvasActions?.strikethrough() }
+                .keyboardShortcut("x", modifiers: [.command, .shift])
+                .disabled(canvasActions?.canFormatText != true)
+
             Button("Bulleted List") { canvasActions?.bullet() }
                 .keyboardShortcut("8", modifiers: [.command, .shift])
+                .disabled(canvasActions?.canFormatText != true)
+
+            Button("Numbered List") { canvasActions?.numbered() }
+                .keyboardShortcut("7", modifiers: [.command, .shift])
+                .disabled(canvasActions?.canFormatText != true)
+
+            Button("Checklist") { canvasActions?.checklist() }
+                .keyboardShortcut("9", modifiers: [.command, .shift])
                 .disabled(canvasActions?.canFormatText != true)
 
             Button("Highlight") { canvasActions?.highlight() }

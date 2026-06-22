@@ -7,9 +7,21 @@ struct SettingsPage: View {
     @AppStorage("settings.trashRetentionDays") private var trashRetentionDays = TrashRetentionService.defaultRetentionDays
     @AppStorage(OpenAIConfiguration.apiKeyUserDefaultsKey) private var openAIAPIKey = ""
     @AppStorage("settings.clipboardMonitoringEnabled") private var clipboardMonitoringEnabled = true
+    @AppStorage("settings.iCloudWorkspaceSyncEnabled") private var workspaceSyncEnabled = true
+    @AppStorage("settings.iCloudClipboardSyncEnabled") private var clipboardSyncEnabled = false
+    @AppStorage("settings.allowWorkspaceSharing") private var workspaceSharingEnabled = true
+    @AppStorage("settings.includeImagesInShares") private var includeImagesInShares = true
 
     var body: some View {
         List {
+            Section("iCloud") {
+                NavigationLink(destination: ICloudProfilePage()) {
+                    Label("Profile and Sync", systemImage: "person.crop.circle")
+                }
+                Toggle("Sync Workspaces", isOn: $workspaceSyncEnabled)
+                Toggle("Sync Clipboard Between Devices", isOn: $clipboardSyncEnabled)
+            }
+
             Section("Clipboard") {
                 Toggle("Monitor Clipboard", isOn: $clipboardMonitoringEnabled)
                 Text("When on, ClipCanvas checks your clipboard when the app opens or returns to the foreground and saves new copies to your history.")
@@ -25,6 +37,11 @@ struct SettingsPage: View {
                     Label("Open System Settings", systemImage: "gear")
                 }
                 #endif
+            }
+
+            Section("Sharing") {
+                Toggle("Allow Workspace Sharing", isOn: $workspaceSharingEnabled)
+                Toggle("Include Images in Share Sheets", isOn: $includeImagesInShares)
             }
 
             Section("AI") {

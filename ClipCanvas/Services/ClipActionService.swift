@@ -30,10 +30,16 @@ enum ClipActionService {
 
     static func toggleSensitive(_ clip: Clip) {
         if clip.isPrivateContent {
-            clip.unmarkPrivate()
+            let unmarked = removeSensitiveMarkdown(from: clip.content)
+            clip.content = unmarked
+            clip.updateSensitivity(.normal, reason: nil)
         } else {
-            clip.markPrivate()
+            let marked = ClipClassificationService.markSensitiveMarkdown(in: clip.content)
+            clip.content = marked
+            let classification = ClipClassificationService.classifySensitivity(marked)
+            clip.updateSensitivity(classification.sensitivity, reason: classification.reason)
         }
+        clip.updatedAt = Date()
     }
 
     @MainActor
@@ -74,5 +80,11 @@ enum ClipActionService {
         let candidate = trimmed.lowercased().hasPrefix("www.") ? "https://\(trimmed)" : trimmed
         guard let url = URL(string: candidate), url.host != nil else { return nil }
         return url
+    }
+
+    private static func removeSensitiveMarkdown(from text: String) -> String {
+        let regex = try? NSRegularExpression(pattern: #"\|\|(.+?)\|\|"#)
+        let range = NSRange(text.startIndex..., in: text)
+        return regex?.stringByReplacingMatches(in: text, range: range, withTemplate: "$1") ?? text
     }
 }

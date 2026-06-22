@@ -6,8 +6,36 @@ enum SensitiveClipDisplay {
         String(repeating: "•", count: maskLength(for: text))
     }
 
-    private static func maskLength(for text: String) -> Int {
+    static func maskLength(for text: String) -> Int {
         min(max(text.trimmingCharacters(in: .whitespacesAndNewlines).count, 6), 24)
+    }
+}
+
+struct SensitiveTextPart: Hashable {
+    let text: String
+    let occurrence: Int
+
+    var id: String {
+        "\(occurrence)-\(text)"
+    }
+}
+
+@MainActor
+final class SensitiveTextRevealStore: ObservableObject {
+    static let shared = SensitiveTextRevealStore()
+
+    @Published private(set) var revealedPartIDs: Set<String> = []
+
+    func isRevealed(_ partID: String) -> Bool {
+        revealedPartIDs.contains(partID)
+    }
+
+    func toggle(_ partID: String) {
+        if revealedPartIDs.contains(partID) {
+            revealedPartIDs.remove(partID)
+        } else {
+            revealedPartIDs.insert(partID)
+        }
     }
 }
 

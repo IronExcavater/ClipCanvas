@@ -1,6 +1,12 @@
 import Foundation
 
 enum ClipClassificationService {
+    nonisolated struct SensitiveSpan: Equatable {
+        var range: NSRange
+        var sensitivity: Sensitivity
+        var reason: SensitivityReason
+    }
+
     nonisolated struct SensitivityClassification: Equatable {
         var sensitivity: Sensitivity
         var reason: SensitivityReason?
@@ -18,17 +24,59 @@ enum ClipClassificationService {
     }
 
     static func classifySensitivity(_ text: String) -> SensitivityClassification {
-        let range = NSRange(text.startIndex..., in: text)
-        if looksLikePassword(text) {
-            return SensitivityClassification(sensitivity: .privateContent, reason: .passwordLike)
+        let spans = sensitiveSpans(in: text)
+        if let privateSpan = spans.first(where: { $0.sensitivity == .privateContent }) {
+            return SensitivityClassification(sensitivity: .privateContent, reason: privateSpan.reason)
         }
-        if secretRegex.firstMatch(in: text, range: range) != nil {
-            return SensitivityClassification(sensitivity: .privateContent, reason: .secretKeyword)
-        }
-        for (reason, pattern) in piiPatterns where pattern.firstMatch(in: text, range: range) != nil {
-            return SensitivityClassification(sensitivity: .sensitive, reason: reason)
+        if let sensitiveSpan = spans.first {
+            return SensitivityClassification(sensitivity: .sensitive, reason: sensitiveSpan.reason)
         }
         return SensitivityClassification(sensitivity: .normal, reason: nil)
+    }
+
+    static func markSensitiveMarkdown(in text: String) -> String {
+        let spans = sensitiveSpans(in: text)
+            .filter { $0.sensitivity == .privateContent }
+            .filter { $0.reason != .userMarkedPrivate }
+            .filter {
+                guard let range = Range($0.range, in: text) else { return false }
+                return !text[range].contains("||")
+            }
+            .sorted { $0.range.location > $1.range.location }
+
+        guard !spans.isEmpty else { return text }
+
+        var marked = text
+        for span in spans {
+            guard let range = Range(span.range, in: marked) else { continue }
+            marked.replaceSubrange(range, with: "||\(marked[range])||")
+        }
+        return marked
+    }
+
+    static func sensitiveSpans(in text: String) -> [SensitiveSpan] {
+        let range = NSRange(text.startIndex..., in: text)
+        var spans: [SensitiveSpan] = explicitSensitiveSpans(in: text)
+
+        for match in secretValueRegex.matches(in: text, range: range) {
+            let valueRange = match.range(at: 1)
+            if valueRange.location != NSNotFound {
+                spans.append(SensitiveSpan(range: valueRange, sensitivity: .privateContent, reason: .secretKeyword))
+            }
+        }
+
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if looksLikePassword(text), let range = text.range(of: trimmed) {
+            spans.append(SensitiveSpan(range: NSRange(range, in: text), sensitivity: .privateContent, reason: .passwordLike))
+        }
+
+        for (reason, pattern) in piiPatterns {
+            for match in pattern.matches(in: text, range: range) {
+                spans.append(SensitiveSpan(range: match.range, sensitivity: .sensitive, reason: reason))
+            }
+        }
+
+        return nonOverlapping(spans)
     }
 
     private static let urlPrefixRegex = try! NSRegularExpression(
@@ -46,6 +94,15 @@ enum ClipClassificationService {
 
     private static let secretRegex = try! NSRegularExpression(
         pattern: #"\b(?:password|passwd|secret|api[-_]?key|api[-_]?token|access[-_]?key|auth[-_]?key|bearer|private[-_]?key|client[-_]?secret)\b"#,
+        options: .caseInsensitive
+    )
+
+    private static let explicitSensitiveRegex = try! NSRegularExpression(
+        pattern: #"\|\|(.+?)\|\|"#
+    )
+
+    private static let secretValueRegex = try! NSRegularExpression(
+        pattern: #"\b(?:password|passwd|secret|api[-_]?key|api[-_]?token|access[-_]?key|auth[-_]?key|bearer(?:\s+token)?|private[-_]?key|client[-_]?secret)\b(?:\s+for\s+\S+\s+is\s+|\s*[:=]\s*|\s+)([^\s,;]+)"#,
         options: .caseInsensitive
     )
 
@@ -95,5 +152,28 @@ enum ClipClassificationService {
         let hasDigit = trimmed.contains(where: \.isNumber)
         let hasSymbol = trimmed.contains { !$0.isLetter && !$0.isNumber }
         return [hasUpper, hasLower, hasDigit, hasSymbol].filter { $0 }.count >= 3
+    }
+
+    private static func explicitSensitiveSpans(in text: String) -> [SensitiveSpan] {
+        let range = NSRange(text.startIndex..., in: text)
+        return explicitSensitiveRegex.matches(in: text, range: range).compactMap { match in
+            let valueRange = match.range(at: 1)
+            guard valueRange.location != NSNotFound else { return nil }
+            return SensitiveSpan(range: valueRange, sensitivity: .privateContent, reason: .userMarkedPrivate)
+        }
+    }
+
+    private static func nonOverlapping(_ spans: [SensitiveSpan]) -> [SensitiveSpan] {
+        spans
+            .sorted {
+                if $0.range.location == $1.range.location {
+                    return $0.range.length > $1.range.length
+                }
+                return $0.range.location < $1.range.location
+            }
+            .reduce(into: [SensitiveSpan]()) { output, span in
+                guard !output.contains(where: { NSIntersectionRange($0.range, span.range).length > 0 }) else { return }
+                output.append(span)
+            }
     }
 }

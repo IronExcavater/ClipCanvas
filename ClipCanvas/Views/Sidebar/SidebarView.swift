@@ -177,7 +177,7 @@ struct SidebarView: View {
             .buttonStyle(.plain)
             .accessibilityLabel("iCloud profile")
             .navigationDestination(isPresented: $navigatesToSettings) {
-                SettingsPage()
+                ICloudProfilePage()
             }
 
             Spacer(minLength: 10)
@@ -284,7 +284,7 @@ struct SidebarView: View {
     }
 
     private func refreshICloudStatus() {
-        iCloudStatus = FileManager.default.ubiquityIdentityToken == nil ? .noAccount : .available
+        iCloudStatus = ICloudAccountService.currentStatus()
     }
 }
 
@@ -327,11 +327,4 @@ private struct SidebarActiveWorkspaceSummary: View {
         .glassPanel(cornerRadius: 16, shadow: false, interactive: true)
         .contentShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
     }
-}
-
-private enum ICloudProfileStatus {
-    case checking
-    case available
-    case noAccount
-    case unavailable
 }

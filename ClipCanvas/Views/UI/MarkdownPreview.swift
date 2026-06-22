@@ -3,39 +3,65 @@ import SwiftUI
 struct MarkdownPreview: View {
     let text: String
     var emptyText = " "
+    var revealedSensitiveParts: Set<String> = []
+    var onSensitivePartTapped: (String) -> Void = { _ in }
     private static let orderedListPattern = try? NSRegularExpression(pattern: #"^\d+\.\s+"#)
 
     var body: some View {
         let blocks = Self.blocks(for: text, emptyText: emptyText)
         if blocks.count == 1, case .paragraph(let content) = blocks[0].kind {
-            Text(Self.attributedString(for: content, emptyText: emptyText))
+            Text(Self.attributedString(for: content, emptyText: emptyText, revealedSensitiveParts: revealedSensitiveParts))
+                .environment(\.openURL, sensitiveOpenURLAction)
         } else {
             VStack(alignment: .leading, spacing: 3) {
                 ForEach(blocks) { block in
                     switch block.kind {
+                    case .heading(let content, let level):
+                        Text(Self.attributedString(for: content, emptyText: emptyText, revealedSensitiveParts: revealedSensitiveParts))
+                            .font(headingFont(level: level))
+                            .frame(maxWidth: .infinity, alignment: .leading)
                     case .paragraph(let content):
-                        Text(Self.attributedString(for: content, emptyText: emptyText))
+                        Text(Self.attributedString(for: content, emptyText: emptyText, revealedSensitiveParts: revealedSensitiveParts))
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    case .monostyled(let content):
+                        Text(Self.attributedString(for: content, emptyText: emptyText, revealedSensitiveParts: revealedSensitiveParts))
+                            .font(.body.monospaced())
                             .frame(maxWidth: .infinity, alignment: .leading)
                     case .bullet(let content, let level):
                         HStack(alignment: .firstTextBaseline, spacing: 7) {
                             Text("•")
                                 .fontWeight(.semibold)
                                 .frame(width: 10, alignment: .center)
-                            Text(Self.attributedString(for: content, emptyText: emptyText))
+                            Text(Self.attributedString(for: content, emptyText: emptyText, revealedSensitiveParts: revealedSensitiveParts))
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .padding(.leading, CGFloat(level) * 16)
+                    case .quote(let content):
+                        Text(Self.attributedString(for: content, emptyText: emptyText, revealedSensitiveParts: revealedSensitiveParts))
+                            .padding(.leading, 10)
+                            .overlay(alignment: .leading) {
+                                Rectangle().fill(Color.secondary.opacity(0.45)).frame(width: 3)
+                            }
                     case .empty:
                         Text(" ")
                     }
                 }
             }
+            .environment(\.openURL, sensitiveOpenURLAction)
         }
     }
 
     static func attributedString(for text: String, emptyText: String = " ") -> AttributedString {
+        attributedString(for: text, emptyText: emptyText, revealedSensitiveParts: [])
+    }
+
+    static func attributedString(
+        for text: String,
+        emptyText: String = " ",
+        revealedSensitiveParts: Set<String>
+    ) -> AttributedString {
         let source = text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? emptyText : text
-        return MarkdownInlineRenderer.attributedString(for: source)
+        return MarkdownInlineRenderer.attributedString(for: source, revealedSensitiveParts: revealedSensitiveParts)
     }
 
     static func blocks(for text: String, emptyText: String = " ") -> [MarkdownPreviewBlock] {
@@ -47,6 +73,28 @@ struct MarkdownPreview: View {
             let trimmedNS = trimmed as NSString
             if trimmed.isEmpty {
                 return MarkdownPreviewBlock(index: index, kind: .empty)
+            }
+            if line.hasPrefix("    ") {
+                return MarkdownPreviewBlock(index: index, kind: .monostyled(String(line.dropFirst(4))))
+            }
+            if trimmed.hasPrefix("# ") {
+                return MarkdownPreviewBlock(index: index, kind: .heading(String(trimmed.dropFirst(2)), level: 1))
+            }
+            if trimmed.hasPrefix("## ") {
+                return MarkdownPreviewBlock(index: index, kind: .heading(String(trimmed.dropFirst(3)), level: 2))
+            }
+            if trimmed.hasPrefix("### ") {
+                return MarkdownPreviewBlock(index: index, kind: .heading(String(trimmed.dropFirst(4)), level: 3))
+            }
+            if trimmed.hasPrefix("> ") {
+                return MarkdownPreviewBlock(index: index, kind: .quote(String(trimmed.dropFirst(2))))
+            }
+            if trimmed.hasPrefix("- [ ] ") || trimmed.hasPrefix("- [x] ") {
+                let body = (trimmed as NSString).substring(from: 6)
+                return MarkdownPreviewBlock(
+                    index: index,
+                    kind: .bullet(body, level: min(leadingWhitespace / 2, 3))
+                )
             }
             if trimmed.hasPrefix("- ") || trimmed.hasPrefix("* ") {
                 let body = (trimmed as NSString).substring(from: 2)
@@ -68,13 +116,47 @@ struct MarkdownPreview: View {
             return MarkdownPreviewBlock(index: index, kind: .paragraph(line))
         }
     }
+
+    private var sensitiveOpenURLAction: OpenURLAction {
+        OpenURLAction { url in
+            guard url.scheme == "clipcanvas-sensitive",
+                  let id = url.host?.removingPercentEncoding else {
+                return .systemAction
+            }
+            onSensitivePartTapped(id)
+            return .handled
+        }
+    }
+
+    private func headingFont(level: Int) -> Font {
+        switch level {
+        case 1: return .title2.weight(.bold)
+        case 2: return .headline.weight(.bold)
+        default: return .subheadline.weight(.semibold)
+        }
+    }
 }
 
 private enum MarkdownInlineRenderer {
-    static func attributedString(for source: String) -> AttributedString {
+    static func attributedString(for source: String, revealedSensitiveParts: Set<String>) -> AttributedString {
         segments(for: source).reduce(into: AttributedString()) { output, segment in
+            if segment.style.contains(.sensitive), let id = segment.sensitivePartID {
+                output.append(attributedSensitiveSegment(segment, id: id, revealed: revealedSensitiveParts.contains(id)))
+                return
+            }
             output.append(attributedSegment(segment))
         }
+    }
+
+    private static func attributedSensitiveSegment(_ segment: MarkdownInlineSegment, id: String, revealed: Bool) -> AttributedString {
+        let visibleText = revealed ? segment.text : SensitiveClipDisplay.mask(for: segment.text)
+        var attributed = AttributedString(visibleText)
+        let encodedID = id.addingPercentEncoding(withAllowedCharacters: .urlHostAllowed) ?? id
+        attributed.link = URL(string: "clipcanvas-sensitive://\(encodedID)")
+        attributed.backgroundColor = Color.red.opacity(0.18)
+        attributed.foregroundColor = .primary
+        attributed.underlineStyle = .single
+        return attributed
     }
 
     private static func attributedSegment(_ segment: MarkdownInlineSegment) -> AttributedString {
@@ -95,7 +177,13 @@ private enum MarkdownInlineRenderer {
             attributed.inlinePresentationIntent = intent
         }
         if segment.style.contains(.highlight) {
-            attributed.backgroundColor = Color.yellow.opacity(0.32)
+            attributed.backgroundColor = color(for: segment.highlightColor ?? .yellow).opacity(0.32)
+        }
+        if segment.style.contains(.underline) {
+            attributed.underlineStyle = .single
+        }
+        if segment.style.contains(.strikethrough) {
+            attributed.strikethroughStyle = .single
         }
         if let link = segment.link {
             attributed.link = link
@@ -105,15 +193,35 @@ private enum MarkdownInlineRenderer {
         return attributed
     }
 
+    private static func color(for highlight: NoteHighlightColor) -> Color {
+        switch highlight {
+        case .yellow: return .yellow
+        case .green: return .green
+        case .blue: return .blue
+        case .pink: return .pink
+        case .purple: return .purple
+        case .orange: return .orange
+        }
+    }
+
     private static func segments(for source: String) -> [MarkdownInlineSegment] {
         var segments: [MarkdownInlineSegment] = []
         var buffer = ""
         var style: MarkdownInlineStyle = []
+        var highlightColor: NoteHighlightColor?
         var index = source.startIndex
+        var sensitiveOccurrence = 0
 
         func flush() {
             guard !buffer.isEmpty else { return }
-            segments.append(MarkdownInlineSegment(text: buffer, style: style))
+            let id: String?
+            if style.contains(.sensitive) {
+                id = SensitiveTextPart(text: buffer, occurrence: sensitiveOccurrence).id
+                sensitiveOccurrence += 1
+            } else {
+                id = nil
+            }
+            segments.append(MarkdownInlineSegment(text: buffer, style: style, highlightColor: highlightColor, sensitivePartID: id))
             buffer = ""
         }
 
@@ -163,7 +271,46 @@ private enum MarkdownInlineRenderer {
             if hasPrefix("==", in: source, at: index),
                canToggle(marker: "==", from: index, in: source, isClosing: style.contains(.highlight)) {
                 flush()
-                style.toggle(.highlight)
+                if style.contains(.highlight) {
+                    style.remove(.highlight)
+                    highlightColor = nil
+                    source.formIndex(&index, offsetBy: 2)
+                } else {
+                    style.insert(.highlight)
+                    let parsedColor = parseHighlightColor(from: source.index(index, offsetBy: 2), in: source)
+                    highlightColor = parsedColor.color
+                    index = parsedColor.contentStart
+                }
+                continue
+            }
+
+            if hasPrefix("<u>", in: source, at: index),
+               source.range(of: "</u>", range: source.index(index, offsetBy: 3)..<source.endIndex) != nil {
+                flush()
+                style.insert(.underline)
+                source.formIndex(&index, offsetBy: 3)
+                continue
+            }
+
+            if hasPrefix("</u>", in: source, at: index), style.contains(.underline) {
+                flush()
+                style.remove(.underline)
+                source.formIndex(&index, offsetBy: 4)
+                continue
+            }
+
+            if hasPrefix("~~", in: source, at: index),
+               canToggle(marker: "~~", from: index, in: source, isClosing: style.contains(.strikethrough)) {
+                flush()
+                style.toggle(.strikethrough)
+                source.formIndex(&index, offsetBy: 2)
+                continue
+            }
+
+            if hasPrefix("||", in: source, at: index),
+               canToggle(marker: "||", from: index, in: source, isClosing: style.contains(.sensitive)) {
+                flush()
+                style.toggle(.sensitive)
                 source.formIndex(&index, offsetBy: 2)
                 continue
             }
@@ -211,6 +358,17 @@ private enum MarkdownInlineRenderer {
 
     private static func hasPrefix(_ marker: String, in source: String, at index: String.Index) -> Bool {
         source[index...].hasPrefix(marker)
+    }
+
+    private static func parseHighlightColor(from index: String.Index, in source: String) -> (color: NoteHighlightColor?, contentStart: String.Index) {
+        guard let colon = source[index...].firstIndex(of: ":") else {
+            return (.yellow, index)
+        }
+        let candidate = String(source[index..<colon])
+        guard let color = NoteHighlightColor(rawValue: candidate) else {
+            return (.yellow, index)
+        }
+        return (color, source.index(after: colon))
     }
 
     private static func parseLink(from index: String.Index, in source: String) -> (label: String, url: URL, endIndex: String.Index)? {
@@ -262,6 +420,8 @@ private struct MarkdownInlineSegment {
     let text: String
     let style: MarkdownInlineStyle
     var link: URL?
+    var highlightColor: NoteHighlightColor?
+    var sensitivePartID: String?
 }
 
 private struct MarkdownInlineStyle: OptionSet {
@@ -271,6 +431,9 @@ private struct MarkdownInlineStyle: OptionSet {
     static let italic = MarkdownInlineStyle(rawValue: 1 << 1)
     static let highlight = MarkdownInlineStyle(rawValue: 1 << 2)
     static let code = MarkdownInlineStyle(rawValue: 1 << 3)
+    static let sensitive = MarkdownInlineStyle(rawValue: 1 << 4)
+    static let underline = MarkdownInlineStyle(rawValue: 1 << 5)
+    static let strikethrough = MarkdownInlineStyle(rawValue: 1 << 6)
 
     mutating func toggle(_ option: MarkdownInlineStyle) {
         if contains(option) {
@@ -288,8 +451,11 @@ struct MarkdownPreviewBlock: Identifiable {
     var id: Int { index }
 
     enum Kind {
+        case heading(String, level: Int)
         case paragraph(String)
+        case monostyled(String)
         case bullet(String, level: Int)
+        case quote(String)
         case empty
     }
 }

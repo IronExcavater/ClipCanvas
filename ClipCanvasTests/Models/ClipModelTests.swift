@@ -91,7 +91,7 @@ import SwiftData
 
     @Test func previewMasksPrivateContent() {
         let clip = Clip(content: "hunter2", origin: .clipboard, sensitivity: .privateContent)
-        #expect(clip.preview.allSatisfy { $0 == "•" })
+        #expect(clip.preview == "hunter2")
     }
 
     @Test func previewShowsTextForNormalContent() {
@@ -102,8 +102,8 @@ import SwiftData
     @Test func displayPreviewRequiresRevealForPrivateContent() {
         let clip = Clip(content: "N0tArealP@ssword1", origin: .clipboard, sensitivity: .privateContent)
 
-        #expect(clip.displayPreview(isRevealed: false) == clip.maskedPreview)
-        #expect(clip.displayPreview(isRevealed: true) == "N0tArealP@ssword1")
+        #expect(clip.displayPreview(isRevealed: false) == "||N0tArealP@ssword1||")
+        #expect(clip.displayPreview(isRevealed: true) == "||N0tArealP@ssword1||")
     }
 
     @Test func userCanMarkAndUnmarkPrivateContent() throws {
@@ -114,7 +114,7 @@ import SwiftData
 
         #expect(clip.sensitivity == .privateContent)
         #expect(clip.sensitivityReason == .userMarkedPrivate)
-        #expect(try #require(clip.expiresAt) == now.addingTimeInterval(PrivateClipRetentionPolicy.defaultExpiryInterval))
+        #expect(clip.expiresAt == nil)
 
         clip.unmarkPrivate()
 

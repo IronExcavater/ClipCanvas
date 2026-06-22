@@ -46,7 +46,10 @@ struct CanvasContainerView: View {
     @State private var measuredTopChromeHeight: CGFloat = 60
     @State var lastClipboardFingerprint: String?
     @AppStorage("settings.clipboardMonitoringEnabled") var clipboardMonitoringEnabled = true
+    @AppStorage("settings.iCloudClipboardSyncEnabled") var iCloudClipboardSyncEnabled = false
+    @AppStorage("settings.includeImagesInShares") var includeImagesInShares = true
     @AppStorage("settings.hasNudgedClipboardPermission") var hasNudgedClipboardPermission = false
+    @AppStorage("settings.lastSeenICloudClipboardDate") var lastSeenICloudClipboardTimestamp = 0.0
     @State var showClipboardPermissionNudge = false
     @State var canvasSearch = ""
     @State var isCanvasSearchActive = false
@@ -169,8 +172,15 @@ struct CanvasContainerView: View {
                     onPasteFromClipboard: pasteClipboardIntoSelected,
                     onFormatBold: { noteTextCommand = NoteTextCommand(kind: .bold) },
                     onFormatItalic: { noteTextCommand = NoteTextCommand(kind: .italic) },
-                    onFormatBullet: { noteTextCommand = NoteTextCommand(kind: .bullet) },
-                    onFormatHighlight: { noteTextCommand = NoteTextCommand(kind: .highlight) },
+                    onFormatUnderline: { noteTextCommand = NoteTextCommand(kind: .underline) },
+                    onFormatStrikethrough: { noteTextCommand = NoteTextCommand(kind: .strikethrough) },
+                    onFormatHighlight: { noteTextCommand = NoteTextCommand(kind: .highlight($0)) },
+                    onFormatList: { noteTextCommand = NoteTextCommand(kind: .list($0)) },
+                    onFormatQuote: { noteTextCommand = NoteTextCommand(kind: .quote) },
+                    onFormatLink: { noteTextCommand = NoteTextCommand(kind: .link(url: $0, displayText: $1)) },
+                    onFormatIndent: { noteTextCommand = NoteTextCommand(kind: .indent) },
+                    onFormatOutdent: { noteTextCommand = NoteTextCommand(kind: .outdent) },
+                    onFormatBlockStyle: { noteTextCommand = NoteTextCommand(kind: .blockStyle($0)) },
                     onDelete: deleteSelected,
                     activeDrawTool: activeDrawTool,
                     penColor: penColor,
@@ -378,8 +388,12 @@ struct CanvasContainerView: View {
             deleteSelection: deleteSelected,
             bold: { noteTextCommand = NoteTextCommand(kind: .bold) },
             italic: { noteTextCommand = NoteTextCommand(kind: .italic) },
-            bullet: { noteTextCommand = NoteTextCommand(kind: .bullet) },
-            highlight: { noteTextCommand = NoteTextCommand(kind: .highlight) }
+            underline: { noteTextCommand = NoteTextCommand(kind: .underline) },
+            strikethrough: { noteTextCommand = NoteTextCommand(kind: .strikethrough) },
+            bullet: { noteTextCommand = NoteTextCommand(kind: .list(.bullet)) },
+            numbered: { noteTextCommand = NoteTextCommand(kind: .list(.numbered)) },
+            checklist: { noteTextCommand = NoteTextCommand(kind: .list(.checklist)) },
+            highlight: { noteTextCommand = NoteTextCommand(kind: .highlight(.yellow)) }
         )
     }
 
@@ -390,18 +404,18 @@ struct CanvasContainerView: View {
     private var topChrome: some View {
         VStack(spacing: 0) {
             CanvasTopBar(
-                workspaceName: workspace.name,
-                workspaces: workspaces,
-                activeWorkspaceID: workspace.id,
                 isRenaming: $isRenaming,
                 renameText: $renameText,
                 renameFocused: $renameFocused,
                 onToggleSidebar: toggleSidebar,
                 onBeginRename: beginRename,
                 onCommitRename: commitRename,
-                onSelectWorkspace: { WorkspaceActionService.activate($0, among: workspaces) },
                 selectedCount: selectedObjectIDs.count,
                 visibleCount: visibleObjectIDs.count,
+                shareSelectionText: shareSelectionText,
+                shareVisibleText: shareVisibleText,
+                shareWorkspaceText: shareWorkspaceText,
+                shareImageURLs: shareImageURLs,
                 onAskAI: askAIAboutCurrentContext,
                 onClearAll: { confirmingClearCanvas = true },
                 onArrangeAll: { zoomCommand = .arrangeAll },
@@ -434,6 +448,26 @@ struct CanvasContainerView: View {
 
     var visibleCanvasObjectCount: Int {
         workspace.canvasObjects.filter(\.isCanvasContent).count
+    }
+
+    var shareSelectionText: String {
+        CanvasShareExporter.cardsText(orderedCanvasObjects(matching: selectedObjectIDs))
+    }
+
+    var shareVisibleText: String {
+        CanvasShareExporter.cardsText(orderedCanvasObjects(matching: visibleObjectIDs), title: "Visible ClipCanvas Cards")
+    }
+
+    var shareWorkspaceText: String {
+        CanvasShareExporter.workspaceText(workspace)
+    }
+
+    var shareImageURLs: [URL] {
+        guard includeImagesInShares else { return [] }
+        let source = selectedObjectIDs.isEmpty
+            ? orderedCanvasObjects(matching: visibleObjectIDs)
+            : orderedCanvasObjects(matching: selectedObjectIDs)
+        return CanvasShareExporter.imageURLs(for: source)
     }
 
     var canvasSearchResultCount: Int {

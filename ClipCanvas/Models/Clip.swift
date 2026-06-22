@@ -102,7 +102,7 @@ final class Clip: SoftDeletable, Identifiable {
         self.origin = origin
         self.sensitivity = sensitivity
         self.sensitivityReasonRaw = sensitivityReason?.rawValue
-        self.expiresAt = PrivateClipRetentionPolicy.expiryDate(for: sensitivity, from: now)
+        self.expiresAt = nil
         self.color = color
         self.createdAt = now
         self.updatedAt = now
@@ -124,11 +124,8 @@ final class Clip: SoftDeletable, Identifiable {
     }
 
     var preview: String {
-        guard !isMasked else {
-            return maskedPreview
-        }
         if type == .image { return content.isEmpty ? "Image" : content }
-        return content
+        return sensitiveMarkdownContent
     }
 
     var maskedPreview: String {
@@ -136,9 +133,14 @@ final class Clip: SoftDeletable, Identifiable {
     }
 
     func displayPreview(isRevealed: Bool) -> String {
-        guard !isPrivateContent || isRevealed else { return maskedPreview }
         if type == .image { return content.isEmpty ? "Image" : content }
-        return content
+        return sensitiveMarkdownContent
+    }
+
+    var sensitiveMarkdownContent: String {
+        guard type != .image else { return content }
+        guard isPrivateContent else { return content }
+        return ClipClassificationService.markSensitiveMarkdown(in: content)
     }
 
     func softDelete() {
@@ -153,9 +155,7 @@ final class Clip: SoftDeletable, Identifiable {
     ) {
         sensitivity = newSensitivity
         sensitivityReason = reason
-        if newSensitivity == .privateContent {
-            expiresAt = expiresAt ?? PrivateClipRetentionPolicy.expiryDate(for: newSensitivity, from: date)
-        } else {
+        if newSensitivity != .privateContent {
             expiresAt = nil
         }
     }

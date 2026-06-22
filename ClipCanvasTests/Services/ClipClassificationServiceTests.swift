@@ -54,4 +54,35 @@ import Testing
         #expect(classification.sensitivity == .privateContent)
         #expect(classification.reason == .passwordLike)
     }
+
+    @Test func sensitiveMarkdownWrapsOnlyPasswordValue() {
+        let marked = ClipClassificationService.markSensitiveMarkdown(in: "password: hunter2 for staging")
+
+        #expect(marked == "password: ||hunter2|| for staging")
+    }
+
+    @Test func sensitiveMarkdownWrapsOnlyApiKeyValue() {
+        let marked = ClipClassificationService.markSensitiveMarkdown(in: "api_key=abc123secretxyz owner: dev")
+
+        #expect(marked == "api_key=||abc123secretxyz|| owner: dev")
+    }
+
+    @Test func explicitSensitiveMarkdownClassifiesAsPrivateContent() {
+        let classification = ClipClassificationService.classifySensitivity("Deploy with ||manual-secret||")
+
+        #expect(classification.sensitivity == .privateContent)
+        #expect(classification.reason == .userMarkedPrivate)
+    }
+
+    @Test func existingSensitiveMarkdownIsNotWrappedAgain() {
+        let marked = ClipClassificationService.markSensitiveMarkdown(in: "Deploy with ||manual-secret||")
+
+        #expect(marked == "Deploy with ||manual-secret||")
+    }
+
+    @Test func labelledExistingSensitiveMarkdownIsNotWrappedAgain() {
+        let marked = ClipClassificationService.markSensitiveMarkdown(in: "password: ||hunter2||")
+
+        #expect(marked == "password: ||hunter2||")
+    }
 }
