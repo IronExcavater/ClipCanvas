@@ -7,6 +7,8 @@ struct ICloudProfilePage: View {
     @AppStorage("settings.iCloudWorkspaceSyncEnabled") private var workspaceSyncEnabled = true
     @AppStorage("settings.iCloudClipboardSyncEnabled") private var clipboardSyncEnabled = false
     @AppStorage(ClipboardService.accessEnabledKey) private var clipboardAccessEnabled = false
+    @AppStorage("settings.allowWorkspaceSharing") private var workspaceSharingEnabled = true
+    @AppStorage("settings.includeImagesInShares") private var includeImagesInShares = true
 
     @State private var status: ICloudProfileStatus = .checking
 
@@ -47,6 +49,15 @@ struct ICloudProfilePage: View {
                 Text("Sync")
             } footer: {
                 Text(syncHint)
+            }
+
+            Section {
+                Toggle("Workspace Sharing", isOn: $workspaceSharingEnabled)
+                Toggle("Include Images", isOn: $includeImagesInShares)
+            } header: {
+                Text("Sharing")
+            } footer: {
+                Text("Controls what ClipCanvas includes when sharing workspaces, cards, and images.")
             }
         }
         .navigationTitle("iCloud Profile")

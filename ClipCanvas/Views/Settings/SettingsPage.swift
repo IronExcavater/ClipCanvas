@@ -9,8 +9,6 @@ struct SettingsPage: View {
     @AppStorage("settings.clipboardMonitoringEnabled") private var clipboardMonitoringEnabled = true
     @AppStorage(ClipboardService.accessEnabledKey) private var clipboardAccessEnabled = false
     @AppStorage("settings.iCloudClipboardSyncEnabled") private var iCloudClipboardSyncEnabled = false
-    @AppStorage("settings.allowWorkspaceSharing") private var workspaceSharingEnabled = true
-    @AppStorage("settings.includeImagesInShares") private var includeImagesInShares = true
 
     var body: some View {
         List {
@@ -21,7 +19,7 @@ struct SettingsPage: View {
             }
 
             Section {
-                Toggle("Enable Clipboard Features", isOn: $clipboardAccessEnabled)
+                Toggle("Clipboard Features", isOn: $clipboardAccessEnabled)
                 Toggle("Monitor Clipboard", isOn: $clipboardMonitoringEnabled)
                     .disabled(!clipboardAccessEnabled)
                 #if canImport(UIKit)
@@ -35,11 +33,6 @@ struct SettingsPage: View {
                 Text("Clipboard")
             } footer: {
                 Text(clipboardHint)
-            }
-
-            Section("Sharing") {
-                Toggle("Allow Workspace Sharing", isOn: $workspaceSharingEnabled)
-                Toggle("Include Images in Share Sheets", isOn: $includeImagesInShares)
             }
 
             Section("AI") {
@@ -79,13 +72,9 @@ struct SettingsPage: View {
 
     private var clipboardHint: String {
         #if canImport(UIKit)
-        clipboardAccessEnabled
-            ? "Controls all clipboard reads and writes. iOS may still ask for paste permission."
-            : "Clipboard tools, monitoring, copy, paste, history capture, and clipboard sync are disabled."
+        "Use clipboard features for copy, paste, history capture, and clipboard sync. iOS may still ask for paste permission."
         #else
-        clipboardAccessEnabled
-            ? "Controls all clipboard reads and writes."
-            : "Clipboard tools, monitoring, copy, paste, history capture, and clipboard sync are disabled."
+        "Use clipboard features for copy, paste, history capture, and clipboard sync."
         #endif
     }
 }

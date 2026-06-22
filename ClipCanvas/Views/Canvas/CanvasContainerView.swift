@@ -304,14 +304,15 @@ struct CanvasContainerView: View {
             matching: .images
         )
         .alert("Use Clipboard Features?", isPresented: $showClipboardPermissionPrompt) {
-            Button("Disable Clipboard", role: .cancel) {
-                disableClipboardAccess()
-            }
             Button("Enable Clipboard") {
                 enableClipboardAccessFromLaunchPrompt()
             }
+            .keyboardShortcut(.defaultAction)
+            Button("Not Now", role: .cancel) {
+                disableClipboardAccess()
+            }
         } message: {
-            Text("Enable clipboard features to paste into the canvas, copy cards, save clipboard history, monitor clipboard changes, and sync clipboard items with iCloud. If disabled, ClipCanvas will not read or write the system clipboard.")
+            Text("Paste, copy, history, and clipboard sync need clipboard access. You can turn this on later in Settings.")
         }
         .onChange(of: selectedPhotoItem) { _, newItem in
             Task { await importSelectedImage(newItem) }
